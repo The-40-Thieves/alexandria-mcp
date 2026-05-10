@@ -1,75 +1,233 @@
-# Alexandria MCP
+# Alexandria
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node: >=22](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
-[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-blue)](https://modelcontextprotocol.io)
+A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 61 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
 
-Alexandria is an MCP server that gives Claude (or any MCP-compatible AI) access to 61 public digital libraries — academic papers, classic books, legal records, historical archives, government databases, and software documentation — through a single unified interface.
+## Tools
 
-You can ask it things like:
+| Tool | Description |
+|---|---|
+| `library_list_sources` | List all 61 sources with descriptions and full-text capabilities |
+| `library_ask(query, max_sources?, results_per_source?)` | **Natural language search** — routes your query to the best sources, searches in parallel, returns unified deduplicated results |
+| `library_search(query, source, limit?)` | Search a specific source by title, author, or keywords |
+| `library_read(id, source)` | Fetch full text or metadata for an item (200k char limit) |
+| `library_index(id, source)` | Dry run: chunk and score text quality without writing anything |
+| `library_ingest(id, source)` | Chunk → embed → store in your vector database. Idempotent. |
+| `library_recommend(id, limit?)` | Get similar papers via Semantic Scholar's recommendation engine (up to 500) |
 
-> *"Find me recent papers on attention mechanisms in transformer models"*
-> *"Search ancient Greek texts on the nature of virtue"*
-> *"Look up US military records from World War II"*
-> *"Get the documentation for the fastify web framework"*
+`library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts.
 
-And it automatically figures out which libraries to search, runs the queries in parallel, and returns unified results.
+## Sources (61)
 
----
+### Public Domain Literature (29)
 
-## Before you start: what do you actually need?
+| Source | Coverage | Full Text |
+|---|---|---|
+| `gutenberg` | 76k+ public domain books | Yes |
+| `openlibrary` | 30M+ records | Metadata only |
+| `archive` | 41M+ texts, newspapers, scanned books | Yes |
+| `sacredtexts` | Curated registry: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism | Yes (scraped) |
+| `wikisource` | Free-content library: historical documents, literary works | Yes |
+| `standardebooks` | Carefully formatted, public domain ebooks | Yes |
+| `perseus` | Classical Greek and Latin texts with translations | Yes |
+| `ctext` | Chinese Text Project — pre-modern Chinese literature | Yes |
+| `gallica` | Bibliothèque nationale de France — French heritage texts | Yes |
+| `loc` | Library of Congress — US historical collections | Metadata only |
+| `hathitrust` | 17M+ volumes from research libraries | Metadata only |
+| `dpla` | Digital Public Library of America — US cultural heritage | Metadata only |
+| `ndl` | National Diet Library Japan | Metadata only |
+| `europeana` | European cultural heritage — 50M+ objects | Metadata only |
+| `trove` | National Library of Australia — newspapers, books, images | Yes |
+| `bhl` | Biodiversity Heritage Library — natural history literature | Yes |
+| `digitalnz` | National Library of New Zealand | Metadata only |
+| `internetclassics` | Internet Classics Archive — 441 classical works | Yes |
+| `marxists` | Marxists Internet Archive — political theory, philosophy | Yes |
+| `projectruneberg` | Nordic literature and history | Yes |
+| `cervantes` | Biblioteca Virtual Miguel de Cervantes — Spanish literature | Yes |
+| `doab` | Directory of Open Access Books — 70k+ peer-reviewed OA books | Metadata only |
+| `oapen` | Open Access Publishing in European Networks — humanities & social sciences | Yes |
+| `googlebooks` | Google Books — metadata and preview snippets | Metadata only |
+| `chroniclingamerica` | Library of Congress — US historic newspapers 1770–1963 | Yes |
+| `ccel` | Christian Classics Ethereal Library | Yes |
+| `feedbooks` | Public domain and self-published ebooks | Yes |
+| `wdl` | World Digital Library — international manuscripts and maps | Metadata only |
+| `datagov` | Data.gov — US government open data catalog | Metadata only |
 
-Here's the honest version:
+### Academic & Science (11)
 
-**46 sources work with zero API keys.** If you just want to search arXiv, Project Gutenberg, Oxford's repository, Cambridge's repository, Europe PMC, PLOS, OpenAlex, the US National Archives, UK legislation, and dozens of others — you can do that right now without signing up for anything.
+| Source | Coverage | Full Text |
+|---|---|---|
+| `arxiv` | 2M+ preprints: physics, math, CS, biology, economics | Yes |
+| `core` | 57M+ open access research papers across all disciplines | Yes |
+| `europmc` | Europe PubMed Central — life sciences literature | Yes |
+| `nasa` | NASA Technical Reports Server | Yes |
+| `osti` | DOE Office of Scientific and Technical Information | Yes |
+| `eric` | Education Resources Information Center | Yes |
+| `nsf` | NSF Award Search — funded research abstracts | Yes |
+| `courtlistener` | US federal and state court opinions (Free Law Project). 125 req/day. | Yes |
+| `biorxiv` | bioRxiv preprints — biology | Yes |
+| `zenodo` | CERN open repository — papers, datasets, software. 2M+ records. | Yes |
+| `semanticscholar` | Semantic Scholar — 200M+ papers with AI-powered metadata | Yes |
 
-**The only key that meaningfully upgrades the experience is your OpenAI API key**, which powers the natural language search (`library_ask`). Without it, you can still search specific sources directly — you just have to name the source yourself.
+### Government, Law & International (5)
 
-**Everything else is optional.** Each additional key unlocks a specific source. Pick up the ones relevant to what you're researching. Skip the rest.
+| Source | Coverage | Full Text |
+|---|---|---|
+| `govinfo` | US Government Publishing Office — laws, regulations, congressional records | Yes |
+| `nih` | NIH Office of Portfolio Analysis | Yes |
+| `nbnorway` | National Library of Norway | Metadata only |
+| `legislation` | legislation.gov.uk — UK Acts and Statutory Instruments | Yes |
+| `osf` | Open Science Framework — preprints and research data | Yes |
 
----
+### Specialized Corpora (3)
 
-## Step 1: Make sure you have Node.js 22 or later
+| Source | Coverage | Full Text |
+|---|---|---|
+| `earlyprint` | Early English print 1473–1700 | Yes |
+| `openiti` | OpenITI — Arabic/Persian Islamic texts (GitHub-based) | Yes |
+| `legislationscot` | Scottish legislation | Yes |
 
-Open your terminal and check:
+### Research Aggregators (8)
+
+| Source | Coverage | Full Text |
+|---|---|---|
+| `openalex` | OpenAlex — 240M+ scholarly works, open catalog | Metadata only |
+| `plos` | PLOS journals — open access science | Yes |
+| `crossref` | Crossref — 150M+ DOI metadata records | Metadata only |
+| `nasaads` | NASA Astrophysics Data System | Yes |
+| `smithsonian` | Smithsonian Institution — collections and research | Metadata only |
+| `doaj` | Directory of Open Access Journals — 20k+ journals | Metadata only |
+| `nara` | National Archives — US federal records | Metadata only |
+| `springer` | SpringerNature — OA and metadata | Metadata only |
+
+### Institutional Repositories (4)
+
+| Source | Coverage | Full Text |
+|---|---|---|
+| `harvardlib` | Harvard Library Digital Collections | Metadata only |
+| `apollo` | Cambridge University repository | Yes |
+| `ora` | Oxford Research Archive | Yes |
+| `base` | Bielefeld Academic Search Engine — 300M+ documents (pending IP whitelist) | Metadata only |
+
+### Software Documentation (1)
+
+| Source | Coverage | Full Text |
+|---|---|---|
+| `codewiki` | Google Code Wiki — open source project documentation | Yes |
+
+## Credentials
+
+Most tools query external library APIs directly and need no credentials at all. The two optional dependencies are scoped to specific tools:
+
+### OpenAI — optional ([platform.openai.com](https://platform.openai.com/api-keys))
+
+Required by two tools only:
+
+- **`library_ask`** — uses `gpt-4o-mini` to route your natural language query to the right sources and generate optimized per-source search terms. Without this key, use `library_search` to query sources directly.
+- **`library_ingest`** — uses `text-embedding-3-small` to embed chunked text before writing to the vector store.
+
+`library_list_sources`, `library_search`, `library_read`, `library_index`, and `library_recommend` all work without an OpenAI key.
+
+### Supabase — optional ([supabase.com](https://supabase.com/dashboard))
+
+Required by one tool only:
+
+- **`library_ingest`** — writes chunked, embedded text into a pgvector table for semantic search. Without this, retrieved texts stay in-context and are not persisted anywhere.
+
+Everything else — searching, reading, browsing, getting recommendations — queries external sources in real time and needs no database.
+
+### Source-specific keys
+
+Some sources require their own API key. These are free registrations. Sources without a key listed here work without any credentials.
+
+| Env Var | Source(s) | Get It |
+|---|---|---|
+| `CORE_API_KEY` | `core` | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
+| `COURTLISTENER_API_KEY` | `courtlistener` | [courtlistener.com/profile/tokens](https://www.courtlistener.com/profile/tokens/) |
+| `GOVINFO_API_KEY` | `govinfo`, `smithsonian` | [api.data.gov/signup](https://api.data.gov/signup/) — one key covers both |
+| `GOOGLE_BOOKS_API_KEY` | `googlebooks` | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Books API |
+| `BHL_API_KEY` | `bhl` | [biodiversitylibrary.org/getapikey](https://www.biodiversitylibrary.org/getapikey.aspx) |
+| `DIGITALNZ_API_KEY` | `digitalnz` | [digitalnz.org/developers](https://digitalnz.org/developers) |
+| `DPLA_API_KEY` | `dpla` | [pro.dp.la/developers/api-codex](https://pro.dp.la/developers/api-codex) |
+| `EUROPEANA_API_KEY` | `europeana` | [apis.europeana.eu](https://apis.europeana.eu/en/) — test key immediate, personal ~1 week |
+| `GITHUB_TOKEN` | `openiti` | [github.com/settings/tokens](https://github.com/settings/tokens) — public repo read scope, optional but prevents rate limiting |
+| `NASA_ADS_API_KEY` | `nasaads` | [ui.adsabs.harvard.edu/user/settings/token](https://ui.adsabs.harvard.edu/user/settings/token) |
+| `SPRINGER_OA_API_KEY` + `SPRINGER_META_API_KEY` | `springer` | [dev.springernature.com](https://dev.springernature.com/) — same registration, two keys |
+| `ZENODO_API_KEY` | `zenodo` | [zenodo.org/account/settings/applications/tokens/new](https://zenodo.org/account/settings/applications/tokens/new/) — optional, increases rate limits |
+| `SEMANTIC_SCHOLAR_API_KEY` | `semanticscholar` | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) — optional, increases rate limits |
+| `TROVE_API_KEY` | `trove` | [trove.nla.gov.au/about/create-something/using-api](https://trove.nla.gov.au/about/create-something/using-api) — ~1 week approval |
+| `BASE_API_KEY` | `base` | [base-search.net/about/en/contact](https://www.base-search.net/about/en/contact.php) — requires IP whitelist |
+
+## Setup
 
 ```bash
-node --version
-```
-
-If it shows `v22.x.x` or higher, you're good. If not, download the latest LTS from [nodejs.org](https://nodejs.org).
-
----
-
-## Step 2: Clone and build Alexandria
-
-```bash
-git clone https://github.com/suavecito585/alexandria-mcp.git
+git clone https://github.com/suavecito585/alexandria-mcp
 cd alexandria-mcp
 npm install
 npm run build
 ```
 
-This takes about 30 seconds. When it's done, you'll see a `dist/` folder appear. That's the compiled server.
+Copy `.env.example` to `.env`. Minimum configuration to run with no credentials (search and read only):
 
-Note the full path to this folder — you'll need it in the next step. On Mac/Linux you can run `pwd` to print it. On Windows, `cd` by itself prints the current path.
+```env
+TRANSPORT=stdio
+```
 
----
+To enable `library_ask`:
 
-## Step 3: Add Alexandria to Claude Desktop
+```env
+TRANSPORT=stdio
+OPENAI_API_KEY=sk-...
+```
 
-Find your Claude Desktop config file:
-- **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+To enable `library_ingest`:
 
-Open it in any text editor. If it already has other MCP servers configured, add Alexandria alongside them. If it's empty or new, use this as your starting point:
+```env
+TRANSPORT=stdio
+OPENAI_API_KEY=sk-...
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+## Supabase Schema
+
+Required only if using `library_ingest`:
+
+```sql
+create table if not exists knowledge_chunks (
+  id bigserial primary key,
+  content text not null,
+  embedding vector(1536),
+  mcp_name text,
+  metadata jsonb,
+  created_at timestamptz default now()
+);
+
+create table if not exists source_docs (
+  id bigserial primary key,
+  source_url text not null,
+  mcp_name text not null,
+  title text,
+  source text,
+  chunk_count int,
+  indexed_at timestamptz,
+  unique (source_url, mcp_name)
+);
+
+create index if not exists knowledge_chunks_embedding_idx
+  on knowledge_chunks using ivfflat (embedding vector_cosine_ops)
+  with (lists = 100);
+```
+
+## Claude Desktop (stdio)
+
+Minimum config (search and read only):
 
 ```json
 {
   "mcpServers": {
-    "alexandria": {
+    "library": {
       "command": "node",
-      "args": ["/full/path/to/alexandria-mcp/dist/index.js"],
+      "args": ["/path/to/alexandria-mcp/dist/index.js"],
       "env": {
         "TRANSPORT": "stdio"
       }
@@ -78,164 +236,17 @@ Open it in any text editor. If it already has other MCP servers configured, add 
 }
 ```
 
-Replace `/full/path/to/alexandria-mcp` with the actual path from Step 2.
-
-**Restart Claude Desktop** after saving the file.
-
-To verify it worked, ask Claude: *"Use library_list_sources to show all available sources."* You should see all 61 sources listed.
-
----
-
-## Step 4: Add your OpenAI key (recommended)
-
-Without this, you have to name the source every time you search — e.g., *"search arxiv for transformer papers"*. With it, you can just say *"find me papers on transformer models"* and Alexandria figures out which sources to check.
-
-Get your key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys). It costs a fraction of a cent per search (the routing call uses `gpt-4o-mini`, ~$0.0002 per query).
-
-Add it to the `env` block in your config:
-
-```json
-"env": {
-  "TRANSPORT": "stdio",
-  "OPENAI_API_KEY": "sk-..."
-}
-```
-
-Restart Claude Desktop again.
-
----
-
-## Step 5: Optional — set up vector storage (for saving ingested text)
-
-`library_ingest` lets you chunk, embed, and store full-text content in a vector database for later retrieval. This is only useful if you're building a research RAG pipeline. If you just want to search and read, skip this entirely.
-
-If you do want it:
-
-1. Create a free project at [supabase.com](https://supabase.com)
-2. Go to the SQL editor and run this:
-
-```sql
-create extension if not exists vector;
-
-create table if not exists source_docs (
-  id text primary key,
-  mcp_name text not null,
-  ingested_at timestamptz default now()
-);
-
-create table if not exists knowledge_chunks (
-  id uuid primary key default gen_random_uuid(),
-  mcp_name text not null,
-  source_id text not null,
-  title text,
-  authors text[],
-  year int,
-  language text,
-  section text,
-  chunk_index int,
-  total_chunks int,
-  quality_score float,
-  content text not null,
-  embedding vector(1536),
-  created_at timestamptz default now()
-);
-
-create index if not exists knowledge_chunks_embedding_idx
-  on knowledge_chunks
-  using ivfflat (embedding vector_cosine_ops)
-  with (lists = 100);
-```
-
-3. Add to your config env block:
-
-```json
-"SUPABASE_URL": "https://your-project.supabase.co",
-"SUPABASE_SERVICE_ROLE_KEY": "eyJ..."
-```
-
-You'll find both values in your Supabase project under **Settings → API**.
-
----
-
-## Step 6: Pick up the API keys you actually want
-
-Here's every optional key, grouped by how much effort they take and what you get.
-
-### Instant (takes 2 minutes, form-fill and you're done)
-
-These are all free. Registration is immediate or near-immediate.
-
-| What you get | Where to register | Key name in config |
-|---|---|---|
-| **CORE** — 57M+ full-text OA papers, the largest collection available | [core.ac.uk/services/api](https://core.ac.uk/services/api) | `CORE_API_KEY` |
-| **Semantic Scholar** — 200M+ papers with AI-powered recommendations and citation graphs | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) | `SEMANTIC_SCHOLAR_API_KEY` |
-| **NASA ADS** — the premier portal for astronomy, astrophysics, and physics literature | [ui.adsabs.harvard.edu/user/settings/token](https://ui.adsabs.harvard.edu/user/settings/token) | `NASA_ADS_API_KEY` |
-| **Smithsonian** — 14M records across all Smithsonian museums (same key works for GovInfo) | [api.data.gov/signup](https://api.data.gov/signup/) | `SMITHSONIAN_API_KEY` |
-| **Springer Nature** — 16M+ articles across Springer and BioMed Central | [dev.springernature.com](https://dev.springernature.com/) | `SPRINGER_OA_API_KEY` and `SPRINGER_META_API_KEY` |
-| **Zenodo** — CERN's open research repository, higher rate limits | [zenodo.org/account/settings/applications](https://zenodo.org/account/settings/applications/) | `ZENODO_API_KEY` |
-| **BHL** — Biodiversity Heritage Library, centuries of natural history literature | [biodiversitylibrary.org/getapikey.aspx](https://www.biodiversitylibrary.org/getapikey.aspx) | `BHL_API_KEY` |
-| **DigitalNZ** — New Zealand's national digital collections | [digitalnz.org/developers](https://digitalnz.org/developers) | `DIGITALNZ_API_KEY` |
-| **DPLA** — Digital Public Library of America | [pro.dp.la/developers/api-codex](https://pro.dp.la/developers/api-codex) | `DPLA_API_KEY` |
-| **Europeana** — 50M+ items from European museums and archives | [apis.europeana.eu](https://apis.europeana.eu/) | `EUROPEANA_API_KEY` |
-| **GitHub Token** — needed for OpenITI (10k+ Islamicate texts). No special scopes required. | [github.com/settings/tokens](https://github.com/settings/tokens) | `GITHUB_TOKEN` |
-
-### Takes a few days (email approval or manual review)
-
-| What you get | Where to register | Key name in config |
-|---|---|---|
-| **CourtListener** — full-text US federal and state case law | [courtlistener.com/sign-in](https://www.courtlistener.com/sign-in/) | `COURTLISTENER_API_KEY` |
-| **Trove** — National Library of Australia, digitized newspapers and books | [trove.nla.gov.au/about/create-something/using-api](https://trove.nla.gov.au/about/create-something/using-api) | `TROVE_API_KEY` |
-
-### Special case: BASE (IP whitelist required)
-
-BASE gives you 400M+ records from 11,000+ academic providers — the largest index we support. It's free but requires emailing their team to whitelist your IP address. Usually takes 2–3 business days.
-
-1. Go to [base-search.net/about/en/contact.php](https://www.base-search.net/about/en/contact.php)
-2. Select **"Access BASE's HTTP API"** from the subject dropdown
-3. Include your IP address (find it at [whatismyip.com](https://whatismyip.com)) and a brief description of your use case (e.g., "non-commercial research aggregation")
-4. Wait for their reply — they'll whitelist your IP
-
-Once approved, add to your config: `"BASE_API_KEY": ""` (the value may be empty if they use IP-only auth, or they'll give you a token).
-
-### Console setup (slightly more involved)
-
-| What you get | Notes | Key name in config |
-|---|---|---|
-| **Google Books** — 40M+ books, full text for public domain titles | Create a project in [Google Cloud Console](https://console.cloud.google.com/), enable the Books API, create an API key | `GOOGLE_BOOKS_API_KEY` |
-| **GovInfo** — US Congressional Record, Federal Register | Register at [api.govinfo.gov/docs](https://api.govinfo.gov/docs/) — same key also works for Smithsonian | `GOVINFO_API_KEY` |
-
----
-
-## Adding keys to your config
-
-Every key goes in the `env` block. Your final config might look something like this (include only the keys you've actually gotten):
+With `library_ask` and `library_ingest` enabled:
 
 ```json
 {
   "mcpServers": {
-    "alexandria": {
+    "library": {
       "command": "node",
-      "args": ["/full/path/to/alexandria-mcp/dist/index.js"],
+      "args": ["/path/to/alexandria-mcp/dist/index.js"],
       "env": {
         "TRANSPORT": "stdio",
         "OPENAI_API_KEY": "sk-...",
-        "CONTACT_EMAIL": "you@example.com",
-        "CORE_API_KEY": "your-core-key",
-        "SEMANTIC_SCHOLAR_API_KEY": "your-s2-key",
-        "NASA_ADS_API_KEY": "your-ads-key",
-        "SMITHSONIAN_API_KEY": "your-data-gov-key",
-        "GOVINFO_API_KEY": "your-data-gov-key",
-        "SPRINGER_OA_API_KEY": "your-springer-oa-key",
-        "SPRINGER_META_API_KEY": "your-springer-meta-key",
-        "ZENODO_API_KEY": "your-zenodo-key",
-        "BHL_API_KEY": "your-bhl-key",
-        "DPLA_API_KEY": "your-dpla-key",
-        "EUROPEANA_API_KEY": "your-europeana-key",
-        "DIGITALNZ_API_KEY": "your-digitalnz-key",
-        "GITHUB_TOKEN": "ghp_...",
-        "COURTLISTENER_API_KEY": "your-cl-key",
-        "TROVE_API_KEY": "your-trove-key",
-        "GOOGLE_BOOKS_API_KEY": "your-books-key",
         "SUPABASE_URL": "https://your-project.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "eyJ..."
       }
@@ -244,48 +255,46 @@ Every key goes in the `env` block. Your final config might look something like t
 }
 ```
 
-**Remember to restart Claude Desktop every time you change the config.**
+## Railway (HTTP)
 
----
+Set env vars in the Railway dashboard and deploy:
 
-## What can I do now?
-
-Here are some things to try once you're set up:
-
-```
-Use library_ask to find recent papers on CRISPR gene editing
+```bash
+railway up
 ```
 
-```
-Use library_search to search gutenberg for "Marcus Aurelius"
-```
+Register in Claude Desktop:
 
-```
-Use library_read to get the full text of arxiv paper 2401.12345
-```
-
-```
-Use library_ask to find ancient Greek philosophical texts about justice
-```
-
-```
-Use library_ask to find the Code Wiki documentation for the fastify/fastify GitHub repo
+```json
+{
+  "mcpServers": {
+    "library": {
+      "url": "https://your-service.up.railway.app/mcp"
+    }
+  }
+}
 ```
 
----
+Health check: `GET /health` returns `{ status: "ok", sources: 61 }`.
 
-## Sources at a glance
+## Adding Custom Providers
 
-**46 sources need no API key.** These work the moment you install:
+The pipeline is provider-agnostic. To add a new embedding model or vector store:
 
-arXiv, Europe PMC, NASA NTRS, OSTI, ERIC, NSF, NIH, bioRxiv, PLOS, OpenAlex, Crossref, DOAJ, NARA, GovInfo, UK Legislation, Scottish Legislation, Norwegian National Library, OSF (PsyArXiv/SocArXiv), EarlyPrint, Harvard LibraryCloud, Cambridge Apollo, Oxford ORA, Google Code Wiki, Gutenberg, Open Library, Standard Ebooks, Wikisource, Internet Classics Archive, Sacred Texts, Marxists Internet Archive, CCEL, Project Runeberg, Cervantes Virtual, Classical Chinese Texts, Gallica, HathiTrust, Library of Congress, DOAB, OAPEN, Feedbooks, World Digital Library, Data.gov, Chronicling America, NDL (Japan)
+1. Implement `EmbeddingProvider` or `VectorStoreProvider` from `src/types.ts`
+2. Add your implementation to `src/pipeline/providers/`
+3. Register it in `src/pipeline/providers/index.ts`
+4. Set `EMBEDDING_PROVIDER` or `VECTOR_STORE_PROVIDER` in your env
 
-**15 sources need a free API key:**
+```typescript
+// Example: Ollama embedding provider
+import type { EmbeddingProvider } from '../../types.js';
 
-CORE, Semantic Scholar, NASA ADS, Smithsonian, Springer Nature, Zenodo, BHL, DigitalNZ, DPLA, Europeana, GitHub (OpenITI), CourtListener, Trove, Google Books, BASE (IP whitelist)
+export class OllamaEmbeddingProvider implements EmbeddingProvider {
+  readonly dimensions = 768;
 
----
-
-## License
-
-MIT — use it however you like.
+  async embed(texts: string[]): Promise<number[][]> {
+    // your implementation
+  }
+}
+```

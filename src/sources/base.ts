@@ -8,7 +8,7 @@ import type { LibraryResult } from '../types.js';
 // Once approved, set BASE_API_KEY env var (if token-based) or ensure your IP is whitelisted.
 
 const SEARCH_URL = 'https://api.base-search.net/cgi-bin/BaseHttpSearchInterface.fcgi';
-const UA = 'Alexandria/9.0 (non-commercial research; ' + (process.env.CONTACT_EMAIL ?? 'alexandria-mcp@example.com') + ')';
+const UA = 'Alexandria/7.0 (non-commercial research; contact@the13thletter.co)';
 
 type DCArr = string | string[] | undefined;
 

@@ -3,7 +3,7 @@ import { register, truncateText } from './registry.js';
 import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.crossref.org/works';
-const MAILTO = process.env.CONTACT_EMAIL ?? 'alexandria-mcp@example.com';
+const MAILTO = 'contact@the13thletter.co';
 
 interface CRAuthor { given?: string; family?: string; name?: string; }
 interface CRLink { URL: string; 'content-type': string; }
