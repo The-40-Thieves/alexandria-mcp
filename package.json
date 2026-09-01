@@ -1,7 +1,7 @@
 {
-  "name": "alexandria-mcp",
+  "name": "@the-40-thieves/alexandria-mcp",
   "version": "9.2.0",
-  "description": "61-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
+  "description": "60-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -28,6 +28,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/The-40-Thieves/alexandria-mcp.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
