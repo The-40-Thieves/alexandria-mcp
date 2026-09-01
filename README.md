@@ -1,12 +1,12 @@
 # Alexandria
 
-A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 59 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
+A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 60 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
 
 ## Tools
 
 | Tool | Description |
 |---|---|
-| `library_list_sources` | List all 59 sources with descriptions and full-text capabilities |
+| `library_list_sources` | List all 60 sources with descriptions and full-text capabilities |
 | `library_ask(query, max_sources?, results_per_source?)` | **Natural language search** — routes your query to the best sources, searches in parallel, returns unified deduplicated results |
 | `library_search(query, source, limit?)` | Search a specific source by title, author, or keywords |
 | `library_read(id, source)` | Fetch full text or metadata for an item (200k char limit) |
@@ -16,7 +16,7 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 `library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts.
 
-## Sources (59)
+## Sources (60)
 
 ### Public Domain Literature (28)
 
@@ -112,6 +112,12 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 |---|---|---|
 | `codewiki` | Google Code Wiki — open source project documentation | Yes |
 
+### Video & Lectures (1)
+
+| Source | Coverage | Full Text |
+|---|---|---|
+| `youtube` | YouTube — video search (Data API v3, needs `YOUTUBE_API_KEY`); transcripts via captions, no quota | Yes (transcript) |
+
 ## Credentials
 
 Most tools query external library APIs directly and need no credentials at all. The two optional dependencies are scoped to specific tools:
@@ -154,6 +160,7 @@ Some sources require their own API key. These are free registrations. Sources wi
 | `SEMANTIC_SCHOLAR_API_KEY` | `semanticscholar` | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) — optional, increases rate limits |
 | `TROVE_API_KEY` | `trove` | [trove.nla.gov.au/about/create-something/using-api](https://trove.nla.gov.au/about/create-something/using-api) — ~1 week approval |
 | `BASE_API_KEY` | `base` | [base-search.net/about/en/contact](https://www.base-search.net/about/en/contact.php) — requires IP whitelist |
+| `YOUTUBE_API_KEY` | `youtube` | [console.cloud.google.com](https://console.cloud.google.com/) — enable YouTube Data API v3; search only, transcripts need no key |
 
 ## Setup
 
@@ -273,7 +280,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", sources: 59 }`.
+Health check: `GET /health` returns `{ status: "ok", sources: 60 }`.
 
 ## Adding Custom Providers
 
