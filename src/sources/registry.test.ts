@@ -65,4 +65,44 @@ test('registry v2', async (t) => {
     assert.ok(!catalog().some(c => c.name === 't_keyed'));
     assert.ok(getAdapter('t_keyed'));
   });
+
+  await t.test('getAdapter wraps search with the daily quota cap from pacing', async () => {
+    let calls = 0;
+    register('t_capped', {
+      description: 'x',
+      supportsIngest: false,
+      pacing: { dailyCap: 2 },
+      async search() { calls++; return []; },
+      async read() { return { title: '', authors: [] }; },
+    });
+    const adapter = getAdapter('t_capped');
+    await adapter.search('q1', 1);
+    await adapter.search('q2', 1);
+    await assert.rejects(adapter.search('q3', 1), /Daily quota/);
+    assert.equal(calls, 2);
+  });
+
+  await t.test('getAdapter caches an identical search without re-calling the adapter', async () => {
+    let calls = 0;
+    register('t_cached', {
+      description: 'x',
+      supportsIngest: false,
+      async search() { calls++; return []; },
+      async read() { return { title: '', authors: [] }; },
+    });
+    const adapter = getAdapter('t_cached');
+    await adapter.search('same query', 3);
+    await adapter.search('same query', 3);
+    assert.equal(calls, 1);
+  });
+
+  await t.test('getAdapter returns a stable wrapped instance per name', () => {
+    register('t_stable', {
+      description: 'x',
+      supportsIngest: false,
+      async search() { return []; },
+      async read() { return { title: '', authors: [] }; },
+    });
+    assert.equal(getAdapter('t_stable'), getAdapter('t_stable'));
+  });
 });

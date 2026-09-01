@@ -1,4 +1,7 @@
 import type { LibraryResult, ReadResult } from '../types.js';
+import { rateLimited } from '../utils/rateLimit.js';
+import { createLedger, enforceQuota, recordUsage, type LedgerStore } from '../utils/quotaLedger.js';
+import { searchCache, cacheKey } from '../utils/resultCache.js';
 
 export type SourceKind = 'rest' | 'hub' | 'rss' | 'mcp' | 'scrape';
 export type Freshness = 'realtime' | 'daily' | 'static';
@@ -50,6 +53,8 @@ const DEFAULTS = {
 };
 
 const REGISTRY = new Map<string, RegisteredEntry>();
+const WRAPPED = new Map<string, SourceAdapter>();
+const ledger: LedgerStore = createLedger();
 
 // True when a source needs no key (auth undefined or type 'none'), or its
 // configured env var is present.
@@ -68,6 +73,57 @@ export function register(name: string, adapter: SourceAdapter): void {
     timeoutMs: adapter.timeoutMs ?? DEFAULTS.timeoutMs,
     hidden,
   });
+  WRAPPED.delete(name); // invalidate a memoized wrapper from an earlier registration
+}
+
+// Rejects with the message existing callers already match on (e.g.
+// scripts/probe.ts's classify()'s /abort/i test) once `meta.timeoutMs`
+// elapses, whichever of the underlying call or the timer settles first.
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('This operation was aborted')), ms);
+    p.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
+// Wraps a registered adapter with the guards every source inherits: a
+// result cache ahead of everything else (cache hits skip quota and
+// pacing), a daily quota ledger, per-source pacing, and a call timeout.
+function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
+  return {
+    ...adapter,
+    async search(query, limit) {
+      const key = cacheKey(name, query, limit);
+      const cached = searchCache.get(key);
+      if (cached) return cached;
+      await enforceQuota(name, adapter.pacing?.dailyCap, ledger);
+      let result: LibraryResult[];
+      try {
+        result = await withTimeout(
+          rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.search(query, limit)),
+          adapter.timeoutMs,
+        );
+      } finally {
+        await recordUsage(name, ledger);
+      }
+      searchCache.set(key, result);
+      return result;
+    },
+    async read(id) {
+      await enforceQuota(name, adapter.pacing?.dailyCap, ledger);
+      try {
+        return await withTimeout(
+          rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.read(id)),
+          adapter.timeoutMs,
+        );
+      } finally {
+        await recordUsage(name, ledger);
+      }
+    },
+  };
 }
 
 export function getAdapter(name: string): SourceAdapter {
@@ -79,7 +135,12 @@ export function getAdapter(name: string): SourceAdapter {
       `Available sources: ${available}`
     );
   }
-  return adapter;
+  let wrapped = WRAPPED.get(name);
+  if (!wrapped) {
+    wrapped = withGuards(name, adapter);
+    WRAPPED.set(name, wrapped);
+  }
+  return wrapped;
 }
 
 export function listSources(): Array<{ name: string; description: string; supportsIngest: boolean } & SourceMeta> {

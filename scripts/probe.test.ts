@@ -23,4 +23,11 @@ test('probe classification', async (t) => {
     const now = { a: { status: 'ERROR' }, b: { status: 'OK' } } as any;
     assert.deepEqual(regressions(base, now), ['a']);
   });
+  await t.test('regressions does not flag a source absent from the current run', () => {
+    // A source dropped from the registry (e.g. deleted) disappears from
+    // `now` entirely; that is a deliberate removal, not a regression.
+    const base = { a: { status: 'OK' }, dropped: { status: 'OK' } } as any;
+    const now = { a: { status: 'OK' } } as any;
+    assert.deepEqual(regressions(base, now), []);
+  });
 });

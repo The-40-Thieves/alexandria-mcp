@@ -35,8 +35,11 @@ export function regressions(
   base: Record<string, { status: string }>,
   now: Record<string, { status: string }>,
 ): string[] {
+  // A source absent from `now` (e.g. deleted from the registry) is a
+  // deliberate removal, not a regression — only a source still present but
+  // no longer OK counts.
   return Object.keys(base)
-    .filter((s) => base[s].status === 'OK' && now[s]?.status !== 'OK')
+    .filter((s) => base[s].status === 'OK' && now[s] !== undefined && now[s].status !== 'OK')
     .sort();
 }
 
