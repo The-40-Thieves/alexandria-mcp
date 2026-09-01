@@ -31,7 +31,30 @@ import type { LibraryResult } from '../types.js';
 
 const SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
 const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+// Innertube client. The default WEB client is bot-checked from datacenter
+// IPs (Railway, cloud VMs): the player call returns UNPLAYABLE / "Sign in to
+// confirm you're not a bot" with no caption tracks. ANDROID_VR is the client
+// yt-dlp defaults to for exactly this reason (no PO token required as of
+// 2026-09); verified from a cloud IP on 2026-09-01. If read() starts returning
+// metadataOnly for every video, check yt-dlp's current default clients first.
+const CLIENT = {
+  clientName: 'ANDROID_VR',
+  clientVersion: '1.57.29',
+  deviceModel: 'Quest 3',
+  osName: 'Android',
+  osVersion: '12L',
+  androidSdkVersion: 32,
+};
+const UA = 'com.google.android.apps.youtube.vr.oculus/1.57.29 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
+
+// Caption track URLs already carry a `fmt` parameter (srv3 XML). Appending
+// `&fmt=json3` is ignored (first value wins) and the XML then fails JSON.parse,
+// so the parameter has to be replaced, not added.
+export function captionJsonUrl(baseUrl: string): string {
+  const u = new URL(baseUrl);
+  u.searchParams.set('fmt', 'json3');
+  return u.toString();
+}
 
 interface YTSearchItem {
   id?: { videoId?: string };
@@ -134,7 +157,7 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
     body: JSON.stringify({
-      context: { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } },
+      context: { client: CLIENT },
       videoId: id,
     }),
   });
@@ -167,7 +190,7 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
 
   let parsed: TimedTextResponse;
   try {
-    const raw = await fetchText(`${track.baseUrl}&fmt=json3`, { headers: { 'User-Agent': UA } });
+    const raw = await fetchText(captionJsonUrl(track.baseUrl), { headers: { 'User-Agent': UA } });
     parsed = JSON.parse(raw) as TimedTextResponse;
   } catch {
     return {
