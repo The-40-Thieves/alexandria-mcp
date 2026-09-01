@@ -29,7 +29,7 @@ export interface AskResult {
   errors: Array<{ source: string; error: string }>;
 }
 
-const SYSTEM_PROMPT = `You are a library search router with access to 61 specialized sources.
+const SYSTEM_PROMPT = `You are a library search router with access to 60 specialized sources.
 Given a natural language query, select the most relevant sources and generate an optimized search string for each.
 
 Return JSON with this exact structure:
@@ -41,7 +41,7 @@ Return JSON with this exact structure:
 }
 
 Source category guide:
-- Academic papers/preprints: arxiv, semanticscholar, openalex, core, europmc, plos, crossref, biorxiv, zenodo, osf
+- Academic papers/preprints: arxiv, semanticscholar, openalex, core, europmc, plos, biorxiv, zenodo, osf
 - Books/literature: gutenberg, openlibrary, archive, googlebooks, standardebooks, feedbooks
 - Historical/cultural: loc, nara, chroniclingamerica, europeana, hathitrust, smithsonian, gallica, dpla, trove, wdl
 - Legal/government: courtlistener, govinfo, legislation, legislationscot, nbnorway
@@ -52,15 +52,17 @@ Source category guide:
 - Early modern English: earlyprint
 - Islamic texts: openiti
 - Software documentation: codewiki
+- Video/lecture transcripts: youtube
 - University repositories: harvardlib, apollo, ora
 - Energy/STEM government: osti, nsf
-- Open access journals: doaj, springer, doab, oapen
+- Open access journals: doaj, springer, doab
 
 Rules:
 - source must EXACTLY match one of the available source names
 - Generate short, precise queries optimized for each source's search system
 - Prioritize open access sources when query is about academic research
-- For codewiki, the query should be an owner/repo like "tensorflow/tensorflow" or a project name`;
+- For codewiki, the query should be an owner/repo like "tensorflow/tensorflow" or a project name
+- For youtube, the query should be phrased like a natural YouTube search (video title keywords, not a research query)`;
 
 async function routeQuery(query: string, maxSources: number): Promise<RoutingDecision> {
   const apiKey = process.env.OPENAI_API_KEY;

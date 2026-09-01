@@ -20,10 +20,11 @@ const CATALOG: Array<{
 ];
 
 export function runbergSearch(query: string, limit: number): LibraryResult[] {
-  const q = query.toLowerCase();
-  const terms = q.split(/\s+/);
+  const q = query.toLowerCase().trim();
+  const terms = q.split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return [];
   return CATALOG
-    .filter(e => terms.some(t =>
+    .filter(e => terms.every(t =>
       [e.title, ...e.authors, ...e.subjects].join(' ').toLowerCase().includes(t)
     ))
     .slice(0, limit)
