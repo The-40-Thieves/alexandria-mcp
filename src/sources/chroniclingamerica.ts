@@ -1,27 +1,47 @@
 import type { LibraryResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { normaliseWhitespace } from '../utils/text-clean.js';
+import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
 
-const BASE = 'https://chroniclingamerica.loc.gov';
+// Migrated off the retired chroniclingamerica.loc.gov API (2026) to the
+// unified loc.gov search/item JSON API. Chronicling America is now one
+// collection within loc.gov rather than its own host.
+const BASE = 'https://www.loc.gov';
 
-interface CAItem {
-  url: string;
-  title: string;
-  date: string;
-  edition_sequence: number;
-  page: number;
-  lccn: string;
-  state: string;
-  place_of_publication?: string;
+interface CAResultItem {
+  id: string;
+  title?: string;
+  date?: string;
 }
 
-interface CAResponse {
-  totalItems: number;
-  itemsPerPage: number;
-  startIndex: number;
-  endIndex: number;
-  items: CAItem[];
+interface CASearchResponse {
+  results?: CAResultItem[];
+}
+
+interface CAItemDetail {
+  full_text?: string;
+  title?: string;
+  date?: string;
+}
+
+interface CAReadResponse {
+  item?: CAItemDetail;
+  results?: CAItemDetail[];
+}
+
+export function normalizeChroniclingAmerica(
+  data: CASearchResponse,
+  limit: number,
+): LibraryResult[] {
+  return (data.results ?? []).slice(0, limit).map((item) => ({
+    id: item.id,
+    source: 'chroniclingamerica' as const,
+    title: item.title ?? item.id,
+    authors: [],
+    year: item.date ? parseInt(item.date.slice(0, 4), 10) : undefined,
+    hasFullText: true,
+    previewUrl: item.id,
+    url: item.id,
+  }));
 }
 
 export async function chroniclingAmericaSearch(
@@ -29,106 +49,86 @@ export async function chroniclingAmericaSearch(
   limit: number,
 ): Promise<LibraryResult[]> {
   const params = new URLSearchParams({
-    andtext: query,
-    format: 'json',
-    rows: String(limit),
-    sort: 'relevance',
+    q: query,
+    fo: 'json',
+    c: String(limit),
   });
+  // loc.gov's collections search is slow (observed 15-33s) — give it a
+  // longer per-attempt budget than the shared default and only one retry.
+  const data = await fetchJSON<CASearchResponse>(
+    `${BASE}/collections/chronicling-america/?${params}`,
+    {},
+    40000,
+    1,
+  );
+  return normalizeChroniclingAmerica(data, limit);
+}
 
-  const data = await fetchJSON<CAResponse>(`${BASE}/search/pages/results/?${params}`);
+// Appends a query param to a URL that may already carry a query string
+// (loc.gov item ids commonly do, e.g. "...?sp=8").
+function withParam(url: string, key: string, value: string): string {
+  const u = new URL(url);
+  u.searchParams.set(key, value);
+  return u.toString();
+}
 
-  return (data.items ?? []).slice(0, limit).map((item) => {
-    // Normalize URL: ensure it ends with /
-    const pageUrl = item.url.endsWith('/') ? item.url : `${item.url}/`;
+export async function chroniclingAmericaRead(id: string): Promise<{
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+}> {
+  const data = await fetchJSON<CAReadResponse>(withParam(id, 'fo', 'json'), {}, 40000, 1);
+  const item = data.item;
+  const text = item?.full_text ?? data.results?.[0]?.full_text;
 
+  if (text) {
     return {
-      id: pageUrl,
-      source: 'chroniclingamerica' as const,
-      title: `${item.title} — ${item.date} (p. ${item.page})`,
-      authors: [item.title], // newspaper name as author
-      year: parseInt(item.date.slice(0, 4), 10),
-      language: 'en',
-      subjects: ['Newspaper', item.state, 'American history'].filter(Boolean),
-      hasFullText: true,
-      previewUrl: pageUrl,
-      downloadUrl: `${pageUrl}ocr.txt`,
+      text,
+      title: item?.title ?? id,
+      authors: [],
+      year: item?.date ? parseInt(item.date.slice(0, 4), 10) : undefined,
     };
-  });
-}
-
-export async function chroniclingAmericaRead(pageUrl: string): Promise<{
-  text: string;
-  title: string;
-  authors: string[];
-  year?: number;
-}> {
-  // pageUrl looks like: https://chroniclingamerica.loc.gov/lccn/sn83030214/1865-04-15/ed-1/seq-1/
-  const ocrUrl = pageUrl.endsWith('/') ? `${pageUrl}ocr.txt` : `${pageUrl}/ocr.txt`;
-
-  const text = await fetchText(ocrUrl);
-  if (!text || text.length < 50) {
-    throw new Error(
-      `No OCR text found for ${pageUrl}. ` +
-        `The page may not have been digitized with text recognition.`,
-    );
   }
 
-  // Extract date and paper name from URL for metadata
-  const dateMatch = pageUrl.match(/\/(\d{4}-\d{2}-\d{2})\//);
-  const year = dateMatch ? parseInt(dateMatch[1], 10) : undefined;
-
-  return {
-    text: normaliseWhitespace(text),
-    title: `Chronicling America — ${pageUrl}`,
-    authors: [],
-    year,
-  };
-}
-
-// For ingest: fetch multiple pages from a search and concatenate.
-// This allows ingesting a topic across many newspaper pages.
-export async function chroniclingAmericaReadTopic(
-  query: string,
-  maxPages = 10,
-): Promise<{
-  text: string;
-  title: string;
-  authors: string[];
-  year?: number;
-}> {
-  const results = await chroniclingAmericaSearch(query, maxPages);
-  const parts: string[] = [];
-
-  for (const r of results) {
-    await new Promise((res) => setTimeout(res, 500));
-    try {
-      const page = await chroniclingAmericaRead(r.id);
-      if (page.text.length > 100) {
-        parts.push(`--- ${r.title} ---\n\n${page.text}`);
-      }
-    } catch {
-      /* skip failed OCR */
-    }
+  // Fall back to the LoC text-services overlay when the item JSON itself
+  // did not carry a full_text field (common for newspaper page records,
+  // which serve OCR through a separate ALTO/word-coordinates service).
+  const fallback = await fetchJSON<CAReadResponse>(
+    withParam(id, 'st', 'text'),
+    {},
+    40000,
+    1,
+  ).catch(() => undefined);
+  const fallbackText = fallback?.item?.full_text ?? fallback?.results?.[0]?.full_text;
+  if (fallbackText) {
+    return {
+      text: fallbackText,
+      title: fallback?.item?.title ?? item?.title ?? id,
+      authors: [],
+      year: (fallback?.item?.date ?? item?.date)
+        ? parseInt((fallback?.item?.date ?? item?.date ?? '').slice(0, 4), 10)
+        : undefined,
+    };
   }
 
-  return {
-    text: parts.join('\n\n'),
-    title: `Chronicling America: "${query}" — ${results.length} pages`,
-    authors: [],
-  };
+  throw new Error(
+    `No full text found for Chronicling America item ${id}. ` +
+      `The page may not have been digitized with text recognition.`,
+  );
 }
 
 register('chroniclingamerica', {
   description:
-    'Chronicling America (LOC) — full OCR text of US newspapers 1770–1963. Search returns individual pages; ingest via page URL or search query.',
+    'Chronicling America (LOC) — full OCR text of US newspapers 1770–1963, now served via the unified loc.gov search/item API.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'archives',
+  freshness: 'static',
+  homepage: 'https://www.loc.gov/collections/chronicling-america/',
+  timeoutMs: 45000,
   search: chroniclingAmericaSearch,
   async read(id) {
-    // If id looks like a search query (no LOC URL structure), aggregate topic pages
-    if (!id.includes('chroniclingamerica.loc.gov') && !id.includes('/lccn/')) {
-      const raw = await chroniclingAmericaReadTopic(id);
-      return { ...raw, ...truncateText(raw.text) };
-    }
     const raw = await chroniclingAmericaRead(id);
     return { ...raw, ...truncateText(raw.text) };
   },

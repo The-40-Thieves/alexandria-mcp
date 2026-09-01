@@ -42,11 +42,26 @@ export async function fetchWithRetry(
   throw lastError;
 }
 
-export async function fetchJSON<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetchWithRetry(url, {
-    ...options,
-    headers: { Accept: 'application/json', ...options.headers },
-  });
+// timeoutMs/retries let a source with a known-slow upstream (e.g. loc.gov's
+// collections search, which can take 15-30s to answer) ask for a longer
+// per-attempt budget than DEFAULT_TIMEOUT_MS without touching the shared
+// default other callers rely on. The registry's own withTimeout (meta.timeoutMs)
+// is a separate outer guard and should be set at least as large as this.
+export async function fetchJSON<T>(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  retries = DEFAULT_RETRIES,
+): Promise<T> {
+  const response = await fetchWithRetry(
+    url,
+    {
+      ...options,
+      headers: { Accept: 'application/json', ...options.headers },
+    },
+    timeoutMs,
+    retries,
+  );
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} ${response.statusText} — ${url}`);
@@ -55,8 +70,13 @@ export async function fetchJSON<T>(url: string, options: RequestInit = {}): Prom
   return response.json() as Promise<T>;
 }
 
-export async function fetchText(url: string, options: RequestInit = {}): Promise<string> {
-  const response = await fetchWithRetry(url, options);
+export async function fetchText(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  retries = DEFAULT_RETRIES,
+): Promise<string> {
+  const response = await fetchWithRetry(url, options, timeoutMs, retries);
 
   if (!response.ok) {
     throw new Error(`HTTP ${response.status} ${response.statusText} — ${url}`);
