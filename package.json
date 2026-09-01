@@ -33,17 +33,17 @@
     "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@supabase/supabase-js": "^2.104.0",
-    "express": "^4.18.2",
+    "express": "^5.2.1",
     "fast-xml-parser": "^5.7.3",
-    "node-html-parser": "^7.1.0",
-    "openai": "^4.0.0",
+    "node-html-parser": "^9.0.2",
+    "openai": "^7.8.0",
     "p-limit": "^7.3.0",
-    "zod": "^3.22.0"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "typescript": "^5.0.0"
   },
