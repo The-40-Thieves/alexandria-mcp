@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
+import test from 'node:test';
 import { strict as assert } from 'node:assert';
-import { truncateText, READ_MAX_CHARS } from './registry.js';
+import { truncateText, READ_MAX_CHARS, register, listSources, catalog, getAdapter } from './registry.js';
 
 describe('truncateText', () => {
   it('returns exact string if below max limit', () => {
@@ -35,5 +36,33 @@ describe('truncateText', () => {
       truncated: true,
       truncatedAt: READ_MAX_CHARS,
     });
+  });
+});
+
+test('registry v2', async (t) => {
+  await t.test('applies defaults and exposes metadata', () => {
+    register('t_defaults', {
+      description: 'x',
+      supportsIngest: false,
+      async search() { return []; },
+      async read() { return { title: '', authors: [] }; },
+    });
+    const s = listSources().find(x => x.name === 't_defaults')!;
+    assert.equal(s.kind, 'rest');
+    assert.equal(s.freshness, 'static');
+    assert.equal(s.timeoutMs, 15000);
+  });
+
+  await t.test('keyed source without env is hidden from catalog but still resolvable', () => {
+    delete process.env.T_KEY;
+    register('t_keyed', {
+      description: 'x',
+      supportsIngest: false,
+      auth: { type: 'query', env: 'T_KEY', param: 'key' },
+      async search() { return []; },
+      async read() { return { title: '', authors: [] }; },
+    });
+    assert.ok(!catalog().some(c => c.name === 't_keyed'));
+    assert.ok(getAdapter('t_keyed'));
   });
 });

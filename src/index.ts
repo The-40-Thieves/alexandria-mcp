@@ -10,105 +10,29 @@ import { s2Recommend } from './sources/semanticscholar.js';
 import { libraryAsk } from './tools/libraryAsk.js';
 import type { LibrarySource } from './types.js';
 
-import './sources/gutenberg.js';
-import './sources/openlibrary.js';
-import './sources/archive.js';
-import './sources/sacredtexts.js';
-import './sources/wikisource.js';
-import './sources/standardebooks.js';
-import './sources/perseus.js';
-import './sources/ctext.js';
-import './sources/gallica.js';
-import './sources/loc.js';
-import './sources/hathitrust.js';
-import './sources/dpla.js';
-import './sources/ndl.js';
-import './sources/europeana.js';
-import './sources/trove.js';
-import './sources/bhl.js';
-import './sources/digitalnz.js';
-import './sources/internetclassics.js';
-import './sources/marxists.js';
-import './sources/projectruneberg.js';
-import './sources/cervantes.js';
-import './sources/doab.js';
-import './sources/googlebooks.js';
-import './sources/chroniclingamerica.js';
-import './sources/ccel.js';
-import './sources/feedbooks.js';
-import './sources/wdl.js';
-import './sources/datagov.js';
-import './sources/arxiv.js';
-import './sources/core.js';
-import './sources/europmc.js';
-import './sources/nasa.js';
-import './sources/osti.js';
-import './sources/eric.js';
-import './sources/nsf.js';
-import './sources/courtlistener.js';
-import './sources/biorxiv.js';
-import './sources/zenodo.js';
-import './sources/semanticscholar.js';
-import './sources/govinfo.js';
-import './sources/nih.js';
-import './sources/nbnorway.js';
-import './sources/legislation.js';
-import './sources/osf.js';
-import './sources/earlyprint.js';
-import './sources/openiti.js';
-import './sources/legislationscot.js';
-import './sources/openalex.js';
-import './sources/plos.js';
-import './sources/nasaads.js';
-import './sources/smithsonian.js';
-import './sources/doaj.js';
-import './sources/nara.js';
-import './sources/springer.js';
-import './sources/harvardlib.js';
-import './sources/apollo.js';
-import './sources/ora.js';
-import './sources/base.js';
-import './sources/codewiki.js';
-import './sources/youtube.js';
+import './sources/all.js';
 
 const server = new McpServer({ name: 'alexandria', version: '9.2.0' });
 
-const ALL_SOURCES = [
-  'gutenberg', 'openlibrary', 'archive', 'sacredtexts',
-  'wikisource', 'standardebooks', 'perseus', 'ctext', 'gallica',
-  'loc', 'hathitrust', 'dpla', 'ndl',
-  'europeana', 'trove', 'bhl', 'digitalnz',
-  'internetclassics', 'marxists', 'projectruneberg', 'cervantes',
-  'doab', 'googlebooks', 'chroniclingamerica', 'ccel', 'feedbooks', 'wdl', 'datagov',
-  'arxiv', 'core', 'europmc', 'nasa', 'osti', 'eric', 'nsf',
-  'courtlistener', 'biorxiv', 'zenodo', 'semanticscholar',
-  'govinfo', 'nih', 'nbnorway', 'legislation', 'osf',
-  'earlyprint', 'openiti', 'legislationscot',
-  'openalex', 'plos', 'nasaads', 'smithsonian', 'doaj', 'nara', 'springer',
-  'harvardlib', 'apollo', 'ora', 'base',
-  'codewiki',
-  'youtube',
-] as const;
-
-const SourceSchema = z.enum(ALL_SOURCES).describe('Library source. Run library_list_sources for descriptions.');
+const SourceSchema = z.string().describe('Library source name. Run library_list_sources for the current list and descriptions.');
 function toStructured(val: unknown): Record<string, unknown> { return JSON.parse(JSON.stringify(val)) as Record<string, unknown>; }
 
 // ── library_list_sources ─────────────────────────────────────────────────────
 server.registerTool('library_list_sources', {
   title: 'List Available Library Sources',
-  description: 'List all 60 library sources with descriptions and capabilities.',
+  description: `List all ${listSources().length} library sources with descriptions and capabilities.`,
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 }, async () => {
   const sources = listSources();
-  const text = sources.map(s => `${s.name}${s.supportsIngest ? ' [full text]' : ' [metadata]'}: ${s.description}`).join('\n');
+  const text = sources.map(s => `${s.name} [${s.kind}/${s.cluster}] [${s.supportsIngest ? 'full text' : 'metadata'}]: ${s.description}`).join('\n');
   return { content: [{ type: 'text', text }], structuredContent: { sources } };
 });
 
 // ── library_ask (natural language) ───────────────────────────────────────────
 server.registerTool('library_ask', {
   title: 'Natural Language Library Search',
-  description: `Ask for content in plain English. Automatically selects the best sources from all 60 libraries, generates optimized per-source queries, and searches in parallel. Returns unified, deduplicated results.
+  description: `Ask for content in plain English. Automatically selects the best sources from all ${listSources().length} libraries, generates optimized per-source queries, and searches in parallel. Returns unified, deduplicated results.
 
 Examples:
   "recent papers on diffusion models for music generation"
@@ -258,15 +182,15 @@ async function runHTTP(): Promise<void> {
   app.post('/mcp', handleMcpRequest);
   app.get('/mcp', handleMcpRequest);
   app.delete('/mcp', handleMcpRequest);
-  app.get('/health', (_req, res) => res.json({ status: 'ok', sources: ALL_SOURCES.length }));
+  app.get('/health', (_req, res) => res.json({ status: 'ok', sources: listSources().length }));
   const port = parseInt(process.env.PORT ?? '3000', 10);
-  app.listen(port, () => console.error(`alexandria — ${ALL_SOURCES.length} sources — http://localhost:${port}/mcp`));
+  app.listen(port, () => console.error(`alexandria — ${listSources().length} sources — http://localhost:${port}/mcp`));
 }
 
 async function runStdio(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`alexandria — ${ALL_SOURCES.length} sources`);
+  console.error(`alexandria — ${listSources().length} sources`);
 }
 
 const transportMode = process.env.TRANSPORT ?? 'stdio';

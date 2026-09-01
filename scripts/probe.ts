@@ -1,68 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-// Stage 1 (Task 1.1) creates src/sources/all.ts as a barrel; until then this
-// duplicates the import list from src/index.ts. Replace with a single
-// `import '../src/sources/all.js';` once that barrel exists.
-import '../src/sources/gutenberg.js';
-import '../src/sources/openlibrary.js';
-import '../src/sources/archive.js';
-import '../src/sources/sacredtexts.js';
-import '../src/sources/wikisource.js';
-import '../src/sources/standardebooks.js';
-import '../src/sources/perseus.js';
-import '../src/sources/ctext.js';
-import '../src/sources/gallica.js';
-import '../src/sources/loc.js';
-import '../src/sources/hathitrust.js';
-import '../src/sources/dpla.js';
-import '../src/sources/ndl.js';
-import '../src/sources/europeana.js';
-import '../src/sources/trove.js';
-import '../src/sources/bhl.js';
-import '../src/sources/digitalnz.js';
-import '../src/sources/internetclassics.js';
-import '../src/sources/marxists.js';
-import '../src/sources/projectruneberg.js';
-import '../src/sources/cervantes.js';
-import '../src/sources/doab.js';
-import '../src/sources/googlebooks.js';
-import '../src/sources/chroniclingamerica.js';
-import '../src/sources/ccel.js';
-import '../src/sources/feedbooks.js';
-import '../src/sources/wdl.js';
-import '../src/sources/datagov.js';
-import '../src/sources/arxiv.js';
-import '../src/sources/core.js';
-import '../src/sources/europmc.js';
-import '../src/sources/nasa.js';
-import '../src/sources/osti.js';
-import '../src/sources/eric.js';
-import '../src/sources/nsf.js';
-import '../src/sources/courtlistener.js';
-import '../src/sources/biorxiv.js';
-import '../src/sources/zenodo.js';
-import '../src/sources/semanticscholar.js';
-import '../src/sources/govinfo.js';
-import '../src/sources/nih.js';
-import '../src/sources/nbnorway.js';
-import '../src/sources/legislation.js';
-import '../src/sources/osf.js';
-import '../src/sources/earlyprint.js';
-import '../src/sources/openiti.js';
-import '../src/sources/legislationscot.js';
-import '../src/sources/openalex.js';
-import '../src/sources/plos.js';
-import '../src/sources/nasaads.js';
-import '../src/sources/smithsonian.js';
-import '../src/sources/doaj.js';
-import '../src/sources/nara.js';
-import '../src/sources/springer.js';
-import '../src/sources/harvardlib.js';
-import '../src/sources/apollo.js';
-import '../src/sources/ora.js';
-import '../src/sources/base.js';
-import '../src/sources/codewiki.js';
-import '../src/sources/youtube.js';
+import '../src/sources/all.js';
 import { getAdapter, listSources } from '../src/sources/registry.js';
 
 export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT';
@@ -141,7 +79,7 @@ async function main() {
   fs.mkdirSync('eval', { recursive: true });
   fs.writeFileSync(
     path.join('eval', writeBaseline ? 'probe-baseline.json' : 'probe-latest.json'),
-    JSON.stringify(out, null, 2),
+    `${JSON.stringify(out, null, 2)}\n`,
   );
   const counts = Object.values(results).reduce(
     (m, r) => {

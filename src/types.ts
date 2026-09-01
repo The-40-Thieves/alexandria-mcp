@@ -1,19 +1,7 @@
-export type LibrarySource =
-  | 'gutenberg' | 'openlibrary' | 'archive' | 'sacredtexts'
-  | 'wikisource' | 'standardebooks' | 'perseus' | 'ctext'
-  | 'loc' | 'hathitrust' | 'dpla' | 'ndl'
-  | 'gallica' | 'europeana' | 'trove' | 'bhl' | 'digitalnz'
-  | 'internetclassics' | 'marxists' | 'projectruneberg' | 'cervantes'
-  | 'doab' | 'googlebooks' | 'chroniclingamerica'
-  | 'ccel' | 'feedbooks' | 'wdl' | 'datagov'
-  | 'arxiv' | 'core' | 'europmc' | 'nasa' | 'osti'
-  | 'eric' | 'nsf' | 'courtlistener' | 'biorxiv' | 'zenodo' | 'semanticscholar'
-  | 'govinfo' | 'nih' | 'nbnorway' | 'legislation' | 'osf'
-  | 'earlyprint' | 'openiti' | 'legislationscot'
-  | 'openalex' | 'plos' | 'nasaads' | 'smithsonian' | 'doaj' | 'nara' | 'springer'
-  | 'harvardlib' | 'apollo' | 'ora' | 'base'
-  | 'codewiki'
-  | 'youtube';
+// A source is any name registered in src/sources/registry.ts. It was a
+// closed union in v1; v2's registry is the source of truth for which names
+// exist, so this widens to string and callers validate via getAdapter().
+export type LibrarySource = string;
 
 export interface LibraryResult {
   id: string;
@@ -27,6 +15,8 @@ export interface LibraryResult {
   previewUrl?: string;
   downloadUrl?: string;
   description?: string;
+  published?: string;
+  url?: string;
 }
 
 export interface Chunk {
