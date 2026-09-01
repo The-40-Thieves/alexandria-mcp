@@ -1,13 +1,13 @@
-import { test, describe } from 'node:test';
 import * as assert from 'node:assert';
+import { describe, test } from 'node:test';
 import {
-  stripGutenbergWrapper,
-  stripHtml,
-  normaliseWhitespace,
-  ocrQualityScore,
-  cleanGutenbergText,
   cleanArchiveText,
   cleanGenericText,
+  cleanGutenbergText,
+  normaliseWhitespace,
+  ocrQualityScore,
+  stripGutenbergWrapper,
+  stripHtml,
 } from './text-clean.js';
 
 describe('text-clean utilities', () => {

@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.biorxiv.org';
 
@@ -20,9 +20,9 @@ interface BiorxivResponse {
 
 export async function biorxivSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<BiorxivResponse>(
-    `${BASE}/search/biorxiv/${encodeURIComponent(query)}/0/${limit}`
+    `${BASE}/search/biorxiv/${encodeURIComponent(query)}/0/${limit}`,
   );
-  return (data.collection || []).map(p => ({
+  return (data.collection || []).map((p) => ({
     id: p.doi,
     source: 'biorxiv' as const,
     title: p.title,
@@ -37,11 +37,14 @@ export async function biorxivSearch(query: string, limit = 10): Promise<LibraryR
 }
 
 export async function biorxivRead(doi: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const data = await fetchJSON<BiorxivResponse>(
-    `${BASE}/details/biorxiv/${encodeURIComponent(doi)}/na/json`
+    `${BASE}/details/biorxiv/${encodeURIComponent(doi)}/na/json`,
   );
   const p = data.collection?.[0];
   if (!p) throw new Error(`bioRxiv paper not found: ${doi}`);

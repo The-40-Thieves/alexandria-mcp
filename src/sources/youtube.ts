@@ -25,9 +25,9 @@
 // read() spends zero Data API quota — it only uses the unofficial
 // Innertube + timedtext path.
 
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
 const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';
@@ -45,7 +45,8 @@ const CLIENT = {
   osVersion: '12L',
   androidSdkVersion: 32,
 };
-const UA = 'com.google.android.apps.youtube.vr.oculus/1.57.29 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
+const UA =
+  'com.google.android.apps.youtube.vr.oculus/1.57.29 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip';
 
 // Caption track URLs already carry a `fmt` parameter (srv3 XML). Appending
 // `&fmt=json3` is ignored (first value wins) and the XML then fails JSON.parse,
@@ -85,9 +86,11 @@ export async function youtubeSearch(query: string, limit = 10): Promise<LibraryR
 
   return (data.items ?? [])
     .filter((item): item is YTSearchItem & { id: { videoId: string } } => Boolean(item.id?.videoId))
-    .map(item => {
+    .map((item) => {
       const id = item.id.videoId;
-      const yearRaw = item.snippet?.publishedAt ? parseInt(item.snippet.publishedAt.substring(0, 4), 10) : NaN;
+      const yearRaw = item.snippet?.publishedAt
+        ? parseInt(item.snippet.publishedAt.substring(0, 4), 10)
+        : NaN;
       return {
         id,
         source: 'youtube' as const,
@@ -134,8 +137,8 @@ interface TimedTextResponse {
 
 function pickTrack(tracks: CaptionTrack[]): CaptionTrack | undefined {
   return (
-    tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr') ??
-    tracks.find(t => t.languageCode?.startsWith('en')) ??
+    tracks.find((t) => t.languageCode === 'en' && t.kind !== 'asr') ??
+    tracks.find((t) => t.languageCode?.startsWith('en')) ??
     tracks[0]
   );
 }
@@ -167,7 +170,11 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
 
   if (player.playabilityStatus?.status && player.playabilityStatus.status !== 'OK') {
     return {
-      text: '', title, authors, metadataOnly: true, externalUrl,
+      text: '',
+      title,
+      authors,
+      metadataOnly: true,
+      externalUrl,
       note: `Video not accessible: ${player.playabilityStatus.reason ?? player.playabilityStatus.status}`,
     };
   }
@@ -175,7 +182,11 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
   const tracks = player.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
   if (tracks.length === 0) {
     return {
-      text: '', title, authors, metadataOnly: true, externalUrl,
+      text: '',
+      title,
+      authors,
+      metadataOnly: true,
+      externalUrl,
       note: 'No captions available for this video (creator disabled captions or none were generated).',
     };
   }
@@ -183,7 +194,11 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
   const track = pickTrack(tracks);
   if (!track?.baseUrl) {
     return {
-      text: '', title, authors, metadataOnly: true, externalUrl,
+      text: '',
+      title,
+      authors,
+      metadataOnly: true,
+      externalUrl,
       note: 'Caption track metadata was present but had no fetchable URL.',
     };
   }
@@ -194,21 +209,29 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
     parsed = JSON.parse(raw) as TimedTextResponse;
   } catch {
     return {
-      text: '', title, authors, metadataOnly: true, externalUrl,
+      text: '',
+      title,
+      authors,
+      metadataOnly: true,
+      externalUrl,
       note: 'Caption track fetch failed or returned an unparseable response — YouTube likely changed the format.',
     };
   }
 
   const text = (parsed.events ?? [])
-    .flatMap(e => e.segs ?? [])
-    .map(s => s.utf8 ?? '')
+    .flatMap((e) => e.segs ?? [])
+    .map((s) => s.utf8 ?? '')
     .join('')
     .replace(/\n{2,}/g, '\n')
     .trim();
 
   if (!text) {
     return {
-      text: '', title, authors, metadataOnly: true, externalUrl,
+      text: '',
+      title,
+      authors,
+      metadataOnly: true,
+      externalUrl,
       note: 'Caption track had no text segments.',
     };
   }

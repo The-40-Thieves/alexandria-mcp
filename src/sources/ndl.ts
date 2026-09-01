@@ -1,11 +1,15 @@
 import { XMLParser } from 'fast-xml-parser';
-import { fetchText } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchText } from '../utils/http.js';
 import { register } from './registry.js';
 
 const SRU = 'https://iss.ndl.go.jp/api/sru/search';
 
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', textNodeName: '#text' });
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+});
 
 export async function ndlSearch(query: string, limit: number): Promise<LibraryResult[]> {
   const params = new URLSearchParams({
@@ -19,13 +23,14 @@ export async function ndlSearch(query: string, limit: number): Promise<LibraryRe
   const xml = await fetchText(`${SRU}?${params}`);
   const doc = parser.parse(xml);
 
-  const records = toArray(
-    doc?.['srw:searchRetrieveResponse']?.['srw:records']?.['srw:record']
-  );
+  const records = toArray(doc?.['srw:searchRetrieveResponse']?.['srw:records']?.['srw:record']);
 
   return records.slice(0, limit).map((r: unknown) => {
-    const dcndl = (r as Record<string, unknown>)['srw:recordData'] as Record<string, unknown> ?? {};
-    const id = String(findDeep(dcndl, 'dcterms:identifier') ?? findDeep(dcndl, 'dc:identifier') ?? '');
+    const dcndl =
+      ((r as Record<string, unknown>)['srw:recordData'] as Record<string, unknown>) ?? {};
+    const id = String(
+      findDeep(dcndl, 'dcterms:identifier') ?? findDeep(dcndl, 'dc:identifier') ?? '',
+    );
     const title = String(findDeep(dcndl, 'dc:title') ?? '');
     const creator = toArray(findDeep(dcndl, 'dc:creator')).map(String);
     const date = String(findDeep(dcndl, 'dcterms:issued') ?? findDeep(dcndl, 'dc:date') ?? '');
@@ -61,7 +66,8 @@ function findDeep(obj: unknown, key: string): unknown {
 }
 
 register('ndl', {
-  description: 'Japan National Diet Library — 350k+ out-of-copyright digitized books. Metadata and discovery; full text via NDL Digital Collections.',
+  description:
+    'Japan National Diet Library — 350k+ out-of-copyright digitized books. Metadata and discovery; full text via NDL Digital Collections.',
   supportsIngest: false,
   search: ndlSearch,
   async read(id) {

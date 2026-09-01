@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.nb.no/catalog/v1';
 
@@ -26,17 +26,17 @@ interface NBResponse {
 
 export async function nbnorwaySearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<NBResponse>(
-    `${BASE}/items?q=${encodeURIComponent(query)}&size=${limit}&digital=true`
+    `${BASE}/items?q=${encodeURIComponent(query)}&size=${limit}&digital=true`,
   );
 
-  return (data._embedded?.items || []).map(item => {
+  return (data._embedded?.items || []).map((item) => {
     const m = item.metadata || {};
     const id = item.id || item._links?.self?.href?.split('/').pop() || '';
     return {
       id,
       source: 'nbnorway' as const,
       title: m.title || 'Untitled',
-      authors: (m.creators || []).map(c => c.name || '').filter(Boolean),
+      authors: (m.creators || []).map((c) => c.name || '').filter(Boolean),
       year: m.yearOfPublication ? parseInt(String(m.yearOfPublication), 10) : undefined,
       subjects: m.subject || [],
       language: m.language,
@@ -48,8 +48,11 @@ export async function nbnorwaySearch(query: string, limit = 10): Promise<Library
 }
 
 export async function nbnorwayRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const item = await fetchJSON<NBItem>(`${BASE}/items/${id}`);
   const m = item.metadata || {};
@@ -57,14 +60,15 @@ export async function nbnorwayRead(id: string): Promise<{
   return {
     text: m.description || `No description available for NB Norway item ${id}`,
     title: m.title || id,
-    authors: (m.creators || []).map(c => c.name || '').filter(Boolean),
+    authors: (m.creators || []).map((c) => c.name || '').filter(Boolean),
     year: m.yearOfPublication ? parseInt(String(m.yearOfPublication), 10) : undefined,
     language: m.language,
   };
 }
 
 register('nbnorway', {
-  description: 'National Library of Norway — digitized books, manuscripts, and newspapers with OCR text in JSON. No API key required.',
+  description:
+    'National Library of Norway — digitized books, manuscripts, and newspapers with OCR text in JSON. No API key required.',
   supportsIngest: true,
   search: nbnorwaySearch,
   async read(id) {

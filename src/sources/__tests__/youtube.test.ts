@@ -1,5 +1,5 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { captionJsonUrl } from '../youtube.js';
 
 test('captionJsonUrl', async (t) => {

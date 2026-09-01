@@ -1,16 +1,16 @@
-const DEFAULT_TIMEOUT_MS = 15_000;
+export const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
 const RETRY_DELAY_MS = 1_000;
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function fetchWithRetry(
   url: string,
   options: RequestInit = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
-  retries = DEFAULT_RETRIES
+  retries = DEFAULT_RETRIES,
 ): Promise<Response> {
   let lastError: Error = new Error('Unknown error');
 
@@ -42,10 +42,7 @@ export async function fetchWithRetry(
   throw lastError;
 }
 
-export async function fetchJSON<T>(
-  url: string,
-  options: RequestInit = {}
-): Promise<T> {
+export async function fetchJSON<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetchWithRetry(url, {
     ...options,
     headers: { Accept: 'application/json', ...options.headers },
@@ -58,10 +55,7 @@ export async function fetchJSON<T>(
   return response.json() as Promise<T>;
 }
 
-export async function fetchText(
-  url: string,
-  options: RequestInit = {}
-): Promise<string> {
+export async function fetchText(url: string, options: RequestInit = {}): Promise<string> {
   const response = await fetchWithRetry(url, options);
 
   if (!response.ok) {

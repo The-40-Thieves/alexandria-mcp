@@ -1,0 +1,331 @@
+{
+  "generatedAt": "2026-09-01T23:16:34.005Z",
+  "results": {
+    "gutenberg": {
+      "status": "OK",
+      "ms": 224,
+      "count": 30
+    },
+    "openlibrary": {
+      "status": "OK",
+      "ms": 1926,
+      "count": 2
+    },
+    "archive": {
+      "status": "OK",
+      "ms": 547,
+      "count": 2
+    },
+    "sacredtexts": {
+      "status": "OK",
+      "ms": 0,
+      "count": 2
+    },
+    "wikisource": {
+      "status": "OK",
+      "ms": 266,
+      "count": 2
+    },
+    "standardebooks": {
+      "status": "ERROR",
+      "ms": 138,
+      "count": 0,
+      "message": "HTTP 401  — https://standardebooks.org/opds/all"
+    },
+    "perseus": {
+      "status": "OK",
+      "ms": 0,
+      "count": 2
+    },
+    "ctext": {
+      "status": "ERROR",
+      "ms": 429,
+      "count": 0,
+      "message": "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"
+    },
+    "gallica": {
+      "status": "EMPTY",
+      "ms": 640,
+      "count": 0
+    },
+    "loc": {
+      "status": "OK",
+      "ms": 3765,
+      "count": 2
+    },
+    "hathitrust": {
+      "status": "ERROR",
+      "ms": 282,
+      "count": 0,
+      "message": "HTTP 404  — https://catalog.hathitrust.org/api/v2/volumes/search?q=history+of+science&rows=2&fl=htid%2Ctitle%2Cauthor%2CpublishDate%2Clanguage%2CrightsCode"
+    },
+    "dpla": {
+      "status": "ERROR",
+      "ms": 349,
+      "count": 0,
+      "message": "HTTP 403  — https://api.dp.la/v2/items?q=history%20of%20science&page_size=2&fields=id,sourceResource,isShownAt"
+    },
+    "ndl": {
+      "status": "ERROR",
+      "ms": 516,
+      "count": 0,
+      "message": "HTTP 403  — https://iss.ndl.go.jp/api/sru/search?operation=searchRetrieve&version=1.2&query=title%3D%22history+of+science%22+or+creator%3D%22history+of+science%"
+    },
+    "europeana": {
+      "status": "ERROR",
+      "ms": 1,
+      "count": 0,
+      "message": "Europeana requires a free API key. Register at: https://pro.europeana.eu/page/developer-keys then set EUROPEANA_API_KEY in your environment."
+    },
+    "trove": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "Trove requires a free API key. Register at: https://trove.nla.gov.au/about/create-something/using-api then set TROVE_API_KEY in your environment."
+    },
+    "bhl": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "BHL requires a free API key. Register at: https://www.biodiversitylibrary.org/getapikey.aspx then set BHL_API_KEY in your environment."
+    },
+    "digitalnz": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "DigitalNZ requires a free API key. Register at: https://digitalnz.org/developers then set DIGITALNZ_API_KEY in your environment."
+    },
+    "internetclassics": {
+      "status": "OK",
+      "ms": 1,
+      "count": 2
+    },
+    "marxists": {
+      "status": "OK",
+      "ms": 708,
+      "count": 2
+    },
+    "projectruneberg": {
+      "status": "OK",
+      "ms": 0,
+      "count": 2
+    },
+    "cervantes": {
+      "status": "OK",
+      "ms": 796,
+      "count": 1
+    },
+    "doab": {
+      "status": "OK",
+      "ms": 1127,
+      "count": 2
+    },
+    "googlebooks": {
+      "status": "ERROR",
+      "ms": 27,
+      "count": 0,
+      "message": "HTTP 429  — https://www.googleapis.com/books/v1/volumes?q=history+of+science&maxResults=2&printType=books&filter=partial&projection=full"
+    },
+    "chroniclingamerica": {
+      "status": "ERROR",
+      "ms": 95,
+      "count": 0,
+      "message": "HTTP 404  — https://chroniclingamerica.loc.gov/search/pages/results/?andtext=history+of+science&format=json&rows=2&sort=relevance"
+    },
+    "ccel": {
+      "status": "OK",
+      "ms": 0,
+      "count": 2
+    },
+    "feedbooks": {
+      "status": "ERROR",
+      "ms": 53,
+      "count": 0,
+      "message": "HTTP 403  — https://www.feedbooks.com/books/search.opds?q=history+of+science"
+    },
+    "wdl": {
+      "status": "OK",
+      "ms": 838,
+      "count": 2
+    },
+    "datagov": {
+      "status": "OK",
+      "ms": 302,
+      "count": 2
+    },
+    "arxiv": {
+      "status": "OK",
+      "ms": 16027,
+      "count": 2
+    },
+    "core": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "CORE_API_KEY is not set"
+    },
+    "europmc": {
+      "status": "OK",
+      "ms": 740,
+      "count": 2
+    },
+    "nasa": {
+      "status": "EMPTY",
+      "ms": 665,
+      "count": 0
+    },
+    "osti": {
+      "status": "OK",
+      "ms": 322,
+      "count": 2
+    },
+    "eric": {
+      "status": "OK",
+      "ms": 552,
+      "count": 2
+    },
+    "nsf": {
+      "status": "OK",
+      "ms": 105,
+      "count": 2
+    },
+    "courtlistener": {
+      "status": "ERROR",
+      "ms": 1,
+      "count": 0,
+      "message": "COURTLISTENER_API_KEY is not set"
+    },
+    "biorxiv": {
+      "status": "ERROR",
+      "ms": 101,
+      "count": 0,
+      "message": "HTTP 404  — https://api.biorxiv.org/search/biorxiv/history%20of%20science/0/2"
+    },
+    "zenodo": {
+      "status": "OK",
+      "ms": 1737,
+      "count": 2
+    },
+    "semanticscholar": {
+      "status": "ERROR",
+      "ms": 175,
+      "count": 0,
+      "message": "HTTP 429  — https://api.semanticscholar.org/graph/v1/paper/search?query=history%20of%20science&fields=paperId,title,authors,year,abstract,openAccessPdf,external"
+    },
+    "govinfo": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "GOVINFO_API_KEY is not set"
+    },
+    "nih": {
+      "status": "OK",
+      "ms": 196,
+      "count": 2
+    },
+    "nbnorway": {
+      "status": "OK",
+      "ms": 1063,
+      "count": 2
+    },
+    "legislation": {
+      "status": "EMPTY",
+      "ms": 498,
+      "count": 0
+    },
+    "osf": {
+      "status": "OK",
+      "ms": 1106,
+      "count": 2
+    },
+    "earlyprint": {
+      "status": "ERROR",
+      "ms": 157,
+      "count": 0,
+      "message": "HTTP 404 Not Found — https://eplab.artsci.wustl.edu/blacklab-server/earlyprint/docs?filter=title%3Ahistory%20of%20science%20OR%20author%3Ahistory%20of%20science"
+    },
+    "openiti": {
+      "status": "ERROR",
+      "ms": 15,
+      "count": 0,
+      "message": "HTTP 401  — https://api.github.com/search/code?q=hadith+org:OpenITI+in:path&per_page=2"
+    },
+    "legislationscot": {
+      "status": "OK",
+      "ms": 358,
+      "count": 2
+    },
+    "openalex": {
+      "status": "OK",
+      "ms": 620,
+      "count": 2
+    },
+    "plos": {
+      "status": "OK",
+      "ms": 170,
+      "count": 2
+    },
+    "nasaads": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "NASA_ADS_API_KEY is not set. Register free at https://ui.adsabs.harvard.edu/user/settings/token"
+    },
+    "smithsonian": {
+      "status": "ERROR",
+      "ms": 1,
+      "count": 0,
+      "message": "SMITHSONIAN_API_KEY is not set. Register free at https://api.data.gov/signup/"
+    },
+    "doaj": {
+      "status": "OK",
+      "ms": 319,
+      "count": 2
+    },
+    "nara": {
+      "status": "ERROR",
+      "ms": 153,
+      "count": 0,
+      "message": "Unexpected token '<', \"<!doctype \"... is not valid JSON"
+    },
+    "springer": {
+      "status": "ERROR",
+      "ms": 1,
+      "count": 0,
+      "message": "SPRINGER_META_API_KEY is not set. Register at https://dev.springernature.com/"
+    },
+    "harvardlib": {
+      "status": "ERROR",
+      "ms": 582,
+      "count": 0,
+      "message": "HTTP 429  — https://api.lib.harvard.edu/v2/items.dc.json?q=history%20of%20science&limit=2&start=1"
+    },
+    "apollo": {
+      "status": "OK",
+      "ms": 1956,
+      "count": 2
+    },
+    "ora": {
+      "status": "ERROR",
+      "ms": 614,
+      "count": 0,
+      "message": "HTTP 500  — https://ora.ox.ac.uk/api/records/?q=history%20of%20science&size=2"
+    },
+    "base": {
+      "status": "EMPTY",
+      "ms": 1232,
+      "count": 0
+    },
+    "codewiki": {
+      "status": "EMPTY",
+      "ms": 410,
+      "count": 0
+    },
+    "youtube": {
+      "status": "ERROR",
+      "ms": 0,
+      "count": 0,
+      "message": "YOUTUBE_API_KEY is required for the youtube source"
+    }
+  }
+}

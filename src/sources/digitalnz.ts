@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 const API = 'https://api.digitalnz.org/v3';
@@ -7,9 +7,10 @@ const KEY_URL = 'https://digitalnz.org/developers';
 
 function getKey(): string {
   const key = process.env.DIGITALNZ_API_KEY;
-  if (!key) throw new Error(
-    `DigitalNZ requires a free API key. Register at: ${KEY_URL} then set DIGITALNZ_API_KEY in your environment.`
-  );
+  if (!key)
+    throw new Error(
+      `DigitalNZ requires a free API key. Register at: ${KEY_URL} then set DIGITALNZ_API_KEY in your environment.`,
+    );
   return key;
 }
 
@@ -38,7 +39,7 @@ export async function digitalnzSearch(query: string, limit: number): Promise<Lib
 
   const data = await fetchJSON<DNZResponse>(`${API}/records.json?${params}`);
 
-  return (data.search?.results ?? []).slice(0, limit).map(r => ({
+  return (data.search?.results ?? []).slice(0, limit).map((r) => ({
     id: String(r.id),
     source: 'digitalnz' as const,
     title: r.title ?? String(r.id),
@@ -52,7 +53,8 @@ export async function digitalnzSearch(query: string, limit: number): Promise<Lib
 }
 
 register('digitalnz', {
-  description: 'DigitalNZ — New Zealand digital heritage including Māori and Pacific content. Requires free DIGITALNZ_API_KEY.',
+  description:
+    'DigitalNZ — New Zealand digital heritage including Māori and Pacific content. Requires free DIGITALNZ_API_KEY.',
   supportsIngest: false,
   search: digitalnzSearch,
   async read(id) {

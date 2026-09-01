@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.govinfo.gov';
 
@@ -15,7 +15,11 @@ function stripHtml(html: string): string {
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -38,10 +42,10 @@ interface GovInfoSearchResponse {
 
 export async function govinfoSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<GovInfoSearchResponse>(
-    `${BASE}/search?query=${encodeURIComponent(query)}&pageSize=${limit}&api_key=${key()}`
+    `${BASE}/search?query=${encodeURIComponent(query)}&pageSize=${limit}&api_key=${key()}`,
   );
   const items = data.packages || data.results || [];
-  return items.map(p => ({
+  return items.map((p) => ({
     id: p.packageId,
     source: 'govinfo' as const,
     title: p.title || p.packageId,
@@ -55,22 +59,25 @@ export async function govinfoSearch(query: string, limit = 10): Promise<LibraryR
 }
 
 export async function govinfoRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   // Get package summary for metadata
   const summary = await fetchJSON<{ title?: string; dateIssued?: string; collectionName?: string }>(
-    `${BASE}/packages/${id}/summary?api_key=${key()}`
+    `${BASE}/packages/${id}/summary?api_key=${key()}`,
   );
 
   // Get HTML content
-  const html = await fetchText(
-    `${BASE}/packages/${id}/htm?api_key=${key()}`
-  );
+  const html = await fetchText(`${BASE}/packages/${id}/htm?api_key=${key()}`);
   const text = stripHtml(html);
 
   if (text.length < 100) {
-    throw new Error(`GovInfo package ${id} returned no readable text. It may not have an HTML version.`);
+    throw new Error(
+      `GovInfo package ${id} returned no readable text. It may not have an HTML version.`,
+    );
   }
 
   return {
@@ -83,7 +90,8 @@ export async function govinfoRead(id: string): Promise<{
 }
 
 register('govinfo', {
-  description: 'GovInfo — US Congressional Record, Federal Register, US Code, Bills, CFR, and more. GPO official archive.',
+  description:
+    'GovInfo — US Congressional Record, Federal Register, US Code, Bills, CFR, and more. GPO official archive.',
   supportsIngest: true,
   search: govinfoSearch,
   async read(id) {

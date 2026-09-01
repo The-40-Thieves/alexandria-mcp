@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE_URL = 'https://ora.ox.ac.uk/api';
 
@@ -55,9 +55,9 @@ function firstFileUrl(record: ORARecord): string | undefined {
 
 export async function oraSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<ORAResponse>(
-    `${BASE_URL}/records/?q=${encodeURIComponent(query)}&size=${limit}`
+    `${BASE_URL}/records/?q=${encodeURIComponent(query)}&size=${limit}`,
   );
-  return (data.hits?.hits || []).map(r => {
+  return (data.hits?.hits || []).map((r) => {
     const meta = r.metadata || {};
     const year = meta.publication_date
       ? parseInt(meta.publication_date.substring(0, 4), 10)
@@ -67,9 +67,9 @@ export async function oraSearch(query: string, limit = 10): Promise<LibraryResul
       source: 'ora' as const,
       title: meta.title || 'Untitled',
       authors: (meta.creators || []).map(creatorName).filter(Boolean),
-      year: isNaN(year as number) ? undefined : year,
+      year: Number.isNaN(year as number) ? undefined : year,
       language: meta.languages?.[0]?.id,
-      subjects: (meta.subjects || []).map(s => s.subject),
+      subjects: (meta.subjects || []).map((s) => s.subject),
       hasFullText: Boolean(meta.description || r.files?.enabled),
       previewUrl: firstFileUrl(r) || `https://ora.ox.ac.uk/objects/uuid:${r.id}`,
       description: meta.description?.substring(0, 300),
@@ -78,8 +78,11 @@ export async function oraSearch(query: string, limit = 10): Promise<LibraryResul
 }
 
 export async function oraRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const r = await fetchJSON<ORARecord>(`${BASE_URL}/records/${id}`);
   const meta = r.metadata || {};
@@ -90,13 +93,14 @@ export async function oraRead(id: string): Promise<{
     text: meta.description || `No description available for Oxford ORA record ${id}`,
     title: meta.title || id,
     authors: (meta.creators || []).map(creatorName).filter(Boolean),
-    year: isNaN(year as number) ? undefined : year,
+    year: Number.isNaN(year as number) ? undefined : year,
     language: meta.languages?.[0]?.id,
   };
 }
 
 register('ora', {
-  description: 'Oxford ORA — Oxford University Research Archive. Oxford theses, preprints, working papers, and the Oxford Text Archive (classical texts, TEI/XML). InvenioRDM API, no auth required.',
+  description:
+    'Oxford ORA — Oxford University Research Archive. Oxford theses, preprints, working papers, and the Oxford Text Archive (classical texts, TEI/XML). InvenioRDM API, no auth required.',
   supportsIngest: true,
   search: oraSearch,
   async read(id) {

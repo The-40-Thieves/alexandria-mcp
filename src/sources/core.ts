@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.core.ac.uk/v3';
 
@@ -30,13 +30,13 @@ interface CoreSearchResponse {
 export async function coreSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<CoreSearchResponse>(
     `${BASE}/search/works?q=${encodeURIComponent(query)}&limit=${limit}`,
-    { headers: headers() }
+    { headers: headers() },
   );
-  return (data.results || []).map(w => ({
+  return (data.results || []).map((w) => ({
     id: String(w.id),
     source: 'core' as const,
     title: w.title || 'Untitled',
-    authors: (w.authors || []).map(a => a.name),
+    authors: (w.authors || []).map((a) => a.name),
     year: w.yearPublished,
     subjects: w.fieldOfStudy || [],
     language: w.language?.code,
@@ -47,26 +47,27 @@ export async function coreSearch(query: string, limit = 10): Promise<LibraryResu
 }
 
 export async function coreRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
-  const w = await fetchJSON<CoreWork>(
-    `${BASE}/works/${id}`,
-    { headers: headers() }
-  );
+  const w = await fetchJSON<CoreWork>(`${BASE}/works/${id}`, { headers: headers() });
   const text = w.fullText || w.abstract;
   if (!text) throw new Error(`CORE work ${id} has no retrievable text`);
   return {
     text,
     title: w.title || id,
-    authors: (w.authors || []).map(a => a.name),
+    authors: (w.authors || []).map((a) => a.name),
     year: w.yearPublished,
     language: w.language?.code,
   };
 }
 
 register('core', {
-  description: 'CORE — 57M+ open access research papers with full text. Broadest OA academic aggregator across all disciplines.',
+  description:
+    'CORE — 57M+ open access research papers with full text. Broadest OA academic aggregator across all disciplines.',
   supportsIngest: true,
   search: coreSearch,
   async read(id) {

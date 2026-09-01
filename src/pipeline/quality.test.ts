@@ -1,14 +1,14 @@
-import test from 'node:test';
 import assert from 'node:assert';
+import test from 'node:test';
+import type { Chunk } from '../types.js';
+import { ocrQualityScore } from '../utils/text-clean.js';
 import {
+  avgQuality,
   DEFAULT_QUALITY_THRESHOLD,
+  filterChunks,
   MIN_CHUNK_LENGTH,
   scoreChunk,
-  filterChunks,
-  avgQuality,
 } from './quality.js';
-import { ocrQualityScore } from '../utils/text-clean.js';
-import type { Chunk } from '../types.js';
 
 test('DEFAULT_QUALITY_THRESHOLD is 0.75', () => {
   assert.strictEqual(DEFAULT_QUALITY_THRESHOLD, 0.75);
@@ -86,10 +86,7 @@ test('filterChunks tests', async (t) => {
   const shortText = 'a'.repeat(MIN_CHUNK_LENGTH - 1); // Below MIN_CHUNK_LENGTH
 
   await t.test('passes valid chunks', () => {
-    const chunks = [
-      createChunk(validText, DEFAULT_QUALITY_THRESHOLD),
-      createChunk(validText, 1.0),
-    ];
+    const chunks = [createChunk(validText, DEFAULT_QUALITY_THRESHOLD), createChunk(validText, 1.0)];
     const result = filterChunks(chunks);
     assert.strictEqual(result.passed.length, 2);
     assert.strictEqual(result.dropped, 0);
@@ -106,9 +103,7 @@ test('filterChunks tests', async (t) => {
   });
 
   await t.test('drops chunks below minimum length', () => {
-    const chunks = [
-      createChunk(shortText, 1.0),
-    ];
+    const chunks = [createChunk(shortText, 1.0)];
     const result = filterChunks(chunks);
     assert.strictEqual(result.passed.length, 0);
     assert.strictEqual(result.dropped, 1);
@@ -143,11 +138,7 @@ test('avgQuality tests', async (t) => {
   });
 
   await t.test('calculates average correctly', () => {
-    const chunks = [
-      createChunk(0.5),
-      createChunk(1.0),
-      createChunk(0.75),
-    ];
+    const chunks = [createChunk(0.5), createChunk(1.0), createChunk(0.75)];
     assert.strictEqual(avgQuality(chunks), 0.75);
   });
 });

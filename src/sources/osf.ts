@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.osf.io/v2';
 
@@ -30,15 +30,15 @@ interface OSFResponse {
 
 function flatSubjects(subjects?: Array<Array<{ text: string }>>): string[] {
   if (!subjects) return [];
-  return subjects.flatMap(arr => arr.map(s => s.text)).filter(Boolean);
+  return subjects.flatMap((arr) => arr.map((s) => s.text)).filter(Boolean);
 }
 
 export async function osfSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<OSFResponse>(
-    `${BASE}/preprints/?filter[title]=${encodeURIComponent(query)}&filter[is_published]=true&page[size]=${limit}`
+    `${BASE}/preprints/?filter[title]=${encodeURIComponent(query)}&filter[is_published]=true&page[size]=${limit}`,
   );
 
-  return (data.data || []).map(p => {
+  return (data.data || []).map((p) => {
     const a = p.attributes || {};
     const date = a.date_published || a.date_created || '';
     const provider = p.relationships?.provider?.data?.id || '';
@@ -48,7 +48,7 @@ export async function osfSearch(query: string, limit = 10): Promise<LibraryResul
       title: a.title || 'Untitled',
       authors: [],
       year: date ? parseInt(date.substring(0, 4), 10) : undefined,
-      subjects: [...flatSubjects(a.subjects), ...((a.tags || []).slice(0, 3))],
+      subjects: [...flatSubjects(a.subjects), ...(a.tags || []).slice(0, 3)],
       hasFullText: Boolean(a.description),
       previewUrl: a.doi
         ? `https://doi.org/${a.doi}`
@@ -59,8 +59,11 @@ export async function osfSearch(query: string, limit = 10): Promise<LibraryResul
 }
 
 export async function osfRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const data = await fetchJSON<{ data?: OSFPreprint }>(`${BASE}/preprints/${id}/`);
   const a = data.data?.attributes || {};
@@ -76,7 +79,8 @@ export async function osfRead(id: string): Promise<{
 }
 
 register('osf', {
-  description: 'OSF Preprints — PsyArXiv, SocArXiv, EarthArXiv, engrXiv, and more via Open Science Framework. No API key required.',
+  description:
+    'OSF Preprints — PsyArXiv, SocArXiv, EarthArXiv, engrXiv, and more via Open Science Framework. No API key required.',
   supportsIngest: true,
   search: osfSearch,
   async read(id) {

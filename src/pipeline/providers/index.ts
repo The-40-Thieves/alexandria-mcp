@@ -18,7 +18,7 @@ export function resolveConfig(): ProviderConfig {
 }
 
 export async function buildEmbeddingProvider(
-  name: EmbeddingProviderName
+  name: EmbeddingProviderName,
 ): Promise<EmbeddingProvider> {
   switch (name) {
     case 'openai': {
@@ -28,14 +28,14 @@ export async function buildEmbeddingProvider(
     default:
       throw new Error(
         `Unknown embedding provider: "${name}". ` +
-        `Set EMBEDDING_PROVIDER to one of: openai. ` +
-        `To add a new provider, implement EmbeddingProvider and register it here.`
+          `Set EMBEDDING_PROVIDER to one of: openai. ` +
+          `To add a new provider, implement EmbeddingProvider and register it here.`,
       );
   }
 }
 
 export async function buildVectorStoreProvider(
-  name: VectorStoreProviderName
+  name: VectorStoreProviderName,
 ): Promise<VectorStoreProvider> {
   switch (name) {
     case 'supabase': {
@@ -45,8 +45,8 @@ export async function buildVectorStoreProvider(
     default:
       throw new Error(
         `Unknown vector store provider: "${name}". ` +
-        `Set VECTOR_STORE_PROVIDER to one of: supabase. ` +
-        `To add a new provider, implement VectorStoreProvider and register it here.`
+          `Set VECTOR_STORE_PROVIDER to one of: supabase. ` +
+          `To add a new provider, implement VectorStoreProvider and register it here.`,
       );
   }
 }

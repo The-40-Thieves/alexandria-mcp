@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://ntrs.nasa.gov/api';
 
@@ -25,9 +25,7 @@ interface NTRSResponse {
 
 function parseAuthors(aff?: NTRSAuthor[]): string[] {
   if (!aff) return [];
-  return aff
-    .map(a => a.meta?.author?.name)
-    .filter((n): n is string => Boolean(n));
+  return aff.map((a) => a.meta?.author?.name).filter((n): n is string => Boolean(n));
 }
 
 function parseYear(dateStr?: string): number | undefined {
@@ -38,9 +36,9 @@ function parseYear(dateStr?: string): number | undefined {
 
 export async function nasaSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<NTRSResponse>(
-    `${BASE}/citations/search?keyword=${encodeURIComponent(query)}&rows=${limit}`
+    `${BASE}/citations/search?keyword=${encodeURIComponent(query)}&rows=${limit}`,
   );
-  return (data.results || []).map(d => ({
+  return (data.results || []).map((d) => ({
     id: String(d.id),
     source: 'nasa' as const,
     title: d.title,
@@ -54,8 +52,11 @@ export async function nasaSearch(query: string, limit = 10): Promise<LibraryResu
 }
 
 export async function nasaRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const d = await fetchJSON<NTRSDoc>(`${BASE}/citations/${id}`);
   return {
@@ -68,7 +69,8 @@ export async function nasaRead(id: string): Promise<{
 }
 
 register('nasa', {
-  description: 'NASA NTRS — space science, aeronautics, and engineering technical reports. No API key required.',
+  description:
+    'NASA NTRS — space science, aeronautics, and engineering technical reports. No API key required.',
   supportsIngest: true,
   search: nasaSearch,
   async read(id) {

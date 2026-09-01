@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 // WDL content migrated to loc.gov in 2021.
@@ -33,7 +33,7 @@ export async function wdlSearch(query: string, limit: number): Promise<LibraryRe
 
   const data = await fetchJSON<LOCResponse>(`${LOC}/search/?${params}`);
 
-  return (data.results ?? []).slice(0, limit).map(r => ({
+  return (data.results ?? []).slice(0, limit).map((r) => ({
     id: r.id,
     source: 'wdl' as const,
     title: String(r.title ?? r.id),
@@ -41,13 +41,14 @@ export async function wdlSearch(query: string, limit: number): Promise<LibraryRe
     year: r.date ? parseInt(r.date, 10) : undefined,
     language: r.language?.[0],
     subjects: (r.subject ?? []).slice(0, 5),
-    hasFullText: (r.online_format ?? []).some(f => f.toLowerCase().includes('text')),
+    hasFullText: (r.online_format ?? []).some((f) => f.toLowerCase().includes('text')),
     previewUrl: r.url ?? `${LOC}/${r.id}`,
   }));
 }
 
 register('wdl', {
-  description: 'World Digital Library (via LOC) — 19k+ rare and unique cultural heritage items from 200 countries, 8000 BCE–present. Maps, manuscripts, photographs, films, sound recordings.',
+  description:
+    'World Digital Library (via LOC) — 19k+ rare and unique cultural heritage items from 200 countries, 8000 BCE–present. Maps, manuscripts, photographs, films, sound recordings.',
   supportsIngest: false,
   search: wdlSearch,
   async read(id) {

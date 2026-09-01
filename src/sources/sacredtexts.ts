@@ -1,12 +1,12 @@
 import { parse } from 'node-html-parser';
-import { fetchText } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchText } from '../utils/http.js';
 
 const BASE = 'https://sacred-texts.com';
 const RATE_LIMIT_MS = 1200; // polite: ~50 req/min max
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 // ─── Registry ──────────────────────────────────────────────────────────────
@@ -265,14 +265,11 @@ export const REGISTRY: RegistryEntry[] = [
 
 // ─── Search ────────────────────────────────────────────────────────────────
 
-export function sacredTextsSearch(
-  query: string,
-  limit = 10
-): LibraryResult[] {
+export function sacredTextsSearch(query: string, limit = 10): LibraryResult[] {
   const q = query.toLowerCase();
   const terms = q.split(/\s+/).filter(Boolean);
 
-  const scored = REGISTRY.map(entry => {
+  const scored = REGISTRY.map((entry) => {
     const haystack = [
       entry.title,
       ...entry.authors,
@@ -283,10 +280,7 @@ export function sacredTextsSearch(
       .join(' ')
       .toLowerCase();
 
-    const score = terms.reduce(
-      (sum, term) => sum + (haystack.includes(term) ? 1 : 0),
-      0
-    );
+    const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
 
     return { entry, score };
   })
@@ -364,16 +358,16 @@ async function fetchChapterUrls(tocUrl: string): Promise<string[]> {
 
   const links = root
     .querySelectorAll('a[href]')
-    .map(a => a.getAttribute('href') ?? '')
-    .filter(href => {
+    .map((a) => a.getAttribute('href') ?? '')
+    .filter((href) => {
       if (!href || href.startsWith('#') || href.startsWith('mailto:')) return false;
       if (href.startsWith('http') && !href.startsWith(BASE)) return false;
       // Only local .htm/.html files in the same or child directory
       const lower = href.toLowerCase();
       return lower.endsWith('.htm') || lower.endsWith('.html');
     })
-    .map(href => resolveUrl(href, tocUrl))
-    .filter(url => url.startsWith(tocDir)); // same dir only
+    .map((href) => resolveUrl(href, tocUrl))
+    .filter((url) => url.startsWith(tocDir)); // same dir only
 
   // Deduplicate while preserving order
   return [...new Set(links)];
@@ -388,13 +382,13 @@ export async function sacredTextsRead(id: string): Promise<{
   language?: string;
   year?: number;
 }> {
-  const entry = REGISTRY.find(e => e.id === id);
+  const entry = REGISTRY.find((e) => e.id === id);
   if (!entry) {
-    const ids = REGISTRY.map(e => e.id).join(', ');
+    const ids = REGISTRY.map((e) => e.id).join(', ');
     throw new Error(
       `Unknown Sacred Texts ID: "${id}". ` +
-      `Valid IDs: ${ids}. ` +
-      `Use library_search with source="sacredtexts" to find available texts.`
+        `Valid IDs: ${ids}. ` +
+        `Use library_search with source="sacredtexts" to find available texts.`,
     );
   }
 
@@ -431,7 +425,7 @@ export async function sacredTextsRead(id: string): Promise<{
   if (parts.length === 0) {
     throw new Error(
       `Could not extract text from any chapter of "${entry.title}". ` +
-      `The site structure may have changed. Check ${entry.tocUrl}`
+        `The site structure may have changed. Check ${entry.tocUrl}`,
     );
   }
 
@@ -445,8 +439,10 @@ export async function sacredTextsRead(id: string): Promise<{
 }
 
 import { register, truncateText } from './registry.js';
+
 register('sacredtexts', {
-  description: 'Sacred-Texts.com — curated registry of religious/philosophical texts: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism.',
+  description:
+    'Sacred-Texts.com — curated registry of religious/philosophical texts: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism.',
   supportsIngest: true,
   search: (query, limit) => Promise.resolve(sacredTextsSearch(query, limit)),
   async read(id) {

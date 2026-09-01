@@ -1,5 +1,5 @@
-import { ocrQualityScore } from '../utils/text-clean.js';
 import type { Chunk } from '../types.js';
+import { ocrQualityScore } from '../utils/text-clean.js';
 
 // Chunks below this threshold are dropped before ingestion.
 // 0.75 means at least 75% of characters must be "clean".
@@ -20,16 +20,13 @@ export function scoreChunk(chunk: Chunk): Chunk {
 
 export function filterChunks(
   chunks: Chunk[],
-  threshold = DEFAULT_QUALITY_THRESHOLD
+  threshold = DEFAULT_QUALITY_THRESHOLD,
 ): { passed: Chunk[]; dropped: number } {
   const passed: Chunk[] = [];
   let dropped = 0;
 
   for (const chunk of chunks) {
-    if (
-      chunk.text.length < MIN_CHUNK_LENGTH ||
-      chunk.metadata.qualityScore < threshold
-    ) {
+    if (chunk.text.length < MIN_CHUNK_LENGTH || chunk.metadata.qualityScore < threshold) {
       dropped++;
     } else {
       passed.push(chunk);

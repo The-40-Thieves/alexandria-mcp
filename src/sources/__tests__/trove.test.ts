@@ -1,5 +1,5 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { recordFullTextRead, resetFullTextWindow } from '../trove.js';
 
 test('trove full-text cap', async (t) => {
