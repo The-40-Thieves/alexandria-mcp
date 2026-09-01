@@ -1,5 +1,5 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import { runbergSearch } from '../projectruneberg.js';
 
 test('runbergSearch', async (t) => {
@@ -12,8 +12,8 @@ test('runbergSearch', async (t) => {
   await t.test('finds book by author', () => {
     const results = runbergSearch('Ibsen', 10);
     assert.equal(results.length, 2);
-    assert.ok(results.some(r => r.id === 'ibsen-doll-house'));
-    assert.ok(results.some(r => r.id === 'ibsen-peer-gynt'));
+    assert.ok(results.some((r) => r.id === 'ibsen-doll-house'));
+    assert.ok(results.some((r) => r.id === 'ibsen-peer-gynt'));
   });
 
   await t.test('is case insensitive', () => {

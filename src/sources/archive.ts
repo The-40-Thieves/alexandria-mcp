@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { cleanArchiveText } from '../utils/text-clean.js';
-import type { LibraryResult } from '../types.js';
 
 const IA_SEARCH = 'https://archive.org/advancedsearch.php';
 const IA_DOWNLOAD = 'https://archive.org/download';
@@ -43,10 +43,7 @@ function normaliseArray(val?: string | string[]): string[] {
   return Array.isArray(val) ? val : [val];
 }
 
-export async function archiveSearch(
-  query: string,
-  limit = 10
-): Promise<LibraryResult[]> {
+export async function archiveSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const params = new URLSearchParams({
     q: `${query} AND mediatype:texts`,
     'fl[]': 'identifier,title,creator,year,language,subject',
@@ -57,7 +54,7 @@ export async function archiveSearch(
 
   const data = await fetchJSON<IASearchResponse>(`${IA_SEARCH}?${params}`);
 
-  return data.response.docs.map(doc => ({
+  return data.response.docs.map((doc) => ({
     id: doc.identifier,
     source: 'archive' as const,
     title: doc.title ?? doc.identifier,
@@ -77,29 +74,25 @@ const PREFERRED_FORMATS = [
   'DjVuTXT',
   'Plain Text',
   'Additional Text',
-  'Abbyy GZ',  // last resort, needs unzipping — skipped for now
+  'Abbyy GZ', // last resort, needs unzipping — skipped for now
 ];
 
 async function resolveTextUrl(identifier: string): Promise<string | null> {
   const meta = await fetchJSON<IAMetadata>(`${IA_METADATA}/${identifier}`);
 
-  const textFile = PREFERRED_FORMATS
-    .map(fmt => meta.files.find(f => f.format === fmt))
-    .find(Boolean);
+  const textFile = PREFERRED_FORMATS.map((fmt) => meta.files.find((f) => f.format === fmt)).find(
+    Boolean,
+  );
 
   if (textFile) {
     return `${IA_DOWNLOAD}/${identifier}/${textFile.name}`;
   }
 
   // Fallback: guess common naming patterns
-  const candidates = [
-    `${identifier}_djvu.txt`,
-    `${identifier}.txt`,
-    `${identifier}_text.txt`,
-  ];
+  const candidates = [`${identifier}_djvu.txt`, `${identifier}.txt`, `${identifier}_text.txt`];
 
   for (const candidate of candidates) {
-    const exists = meta.files.find(f => f.name === candidate);
+    const exists = meta.files.find((f) => f.name === candidate);
     if (exists) return `${IA_DOWNLOAD}/${identifier}/${candidate}`;
   }
 
@@ -120,12 +113,12 @@ export async function archiveRead(identifier: string): Promise<{
   if (!textUrl) {
     throw new Error(
       `No plain-text version found for Archive.org item "${identifier}". ` +
-      `Check https://archive.org/details/${identifier} for available formats.`
+        `Check https://archive.org/details/${identifier} for available formats.`,
     );
   }
 
   // Polite rate limiting for IA
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const raw = await fetchText(textUrl);
   const text = cleanArchiveText(raw);
@@ -133,7 +126,7 @@ export async function archiveRead(identifier: string): Promise<{
   if (text.length < 500) {
     throw new Error(
       `Archive.org item "${identifier}" returned unexpectedly short text (${text.length} chars). ` +
-      `The OCR may be missing or empty.`
+        `The OCR may be missing or empty.`,
     );
   }
 
@@ -147,6 +140,7 @@ export async function archiveRead(identifier: string): Promise<{
 }
 
 import { register, truncateText } from './registry.js';
+
 register('archive', {
   description: 'Internet Archive — 41M+ texts, scanned books, historical documents.',
   supportsIngest: true,

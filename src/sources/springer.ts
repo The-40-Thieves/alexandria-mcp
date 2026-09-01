@@ -1,24 +1,34 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const META_BASE = 'https://api.springernature.com/meta/v2';
-const OA_BASE   = 'https://api.springernature.com/openaccess';
+const OA_BASE = 'https://api.springernature.com/openaccess';
 
 function metaKey(): string {
   const k = process.env.SPRINGER_META_API_KEY;
-  if (!k) throw new Error('SPRINGER_META_API_KEY is not set. Register at https://dev.springernature.com/');
+  if (!k)
+    throw new Error(
+      'SPRINGER_META_API_KEY is not set. Register at https://dev.springernature.com/',
+    );
   return k;
 }
 
 function oaKey(): string {
   const k = process.env.SPRINGER_OA_API_KEY;
-  if (!k) throw new Error('SPRINGER_OA_API_KEY is not set. Register at https://dev.springernature.com/');
+  if (!k)
+    throw new Error('SPRINGER_OA_API_KEY is not set. Register at https://dev.springernature.com/');
   return k;
 }
 
-interface SpringerCreator { creator?: string; }
-interface SpringerURL { value?: string; format?: string; platform?: string; }
+interface SpringerCreator {
+  creator?: string;
+}
+interface SpringerURL {
+  value?: string;
+  format?: string;
+  platform?: string;
+}
 interface SpringerRecord {
   identifier?: string;
   title?: string;
@@ -42,9 +52,11 @@ interface SpringerResponse {
 }
 
 function pickUrl(urls?: SpringerURL[]): string | undefined {
-  return urls?.find(u => u.format === 'html')?.value
-    ?? urls?.find(u => u.format === 'pdf')?.value
-    ?? urls?.[0]?.value;
+  return (
+    urls?.find((u) => u.format === 'html')?.value ??
+    urls?.find((u) => u.format === 'pdf')?.value ??
+    urls?.[0]?.value
+  );
 }
 
 function parseDoi(r: SpringerRecord): string {
@@ -59,7 +71,7 @@ function toResult(r: SpringerRecord): LibraryResult {
     id: doi,
     source: 'springer' as const,
     title: r.title || 'Untitled',
-    authors: (r.creators || []).map(c => c.creator || '').filter(Boolean),
+    authors: (r.creators || []).map((c) => c.creator || '').filter(Boolean),
     year: r.publicationDate ? parseInt(r.publicationDate.substring(0, 4), 10) : undefined,
     language: r.language,
     subjects: [...(r.subject || []), ...(r.keywords || [])],
@@ -72,29 +84,32 @@ function toResult(r: SpringerRecord): LibraryResult {
 // Search: Meta API — 16M+ records (OA + paywalled), abstracts only
 export async function springerSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<SpringerResponse>(
-    `${META_BASE}/json?q=${encodeURIComponent(query)}&s=1&p=${limit}&api_key=${metaKey()}`
+    `${META_BASE}/json?q=${encodeURIComponent(query)}&s=1&p=${limit}&api_key=${metaKey()}`,
   );
   return (data.records || []).map(toResult);
 }
 
 // Read: try OA API first (may have full text), fall back to Meta for abstract
 export async function springerRead(doi: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const encoded = encodeURIComponent(`doi:${doi}`);
 
   // Try OA API first
   try {
     const oaData = await fetchJSON<SpringerResponse>(
-      `${OA_BASE}/json?q=${encoded}&s=1&p=1&api_key=${oaKey()}`
+      `${OA_BASE}/json?q=${encoded}&s=1&p=1&api_key=${oaKey()}`,
     );
     const r = oaData.records?.[0];
     if (r?.abstract) {
       return {
         text: r.abstract,
         title: r.title || doi,
-        authors: (r.creators || []).map(c => c.creator || '').filter(Boolean),
+        authors: (r.creators || []).map((c) => c.creator || '').filter(Boolean),
         year: r.publicationDate ? parseInt(r.publicationDate.substring(0, 4), 10) : undefined,
         language: r.language,
       };
@@ -105,21 +120,22 @@ export async function springerRead(doi: string): Promise<{
 
   // Fall back to Meta API
   const metaData = await fetchJSON<SpringerResponse>(
-    `${META_BASE}/json?q=${encoded}&s=1&p=1&api_key=${metaKey()}`
+    `${META_BASE}/json?q=${encoded}&s=1&p=1&api_key=${metaKey()}`,
   );
   const r = metaData.records?.[0];
   if (!r) throw new Error(`Springer article not found: ${doi}`);
   return {
     text: r.abstract || `No abstract available for Springer article ${doi}`,
     title: r.title || doi,
-    authors: (r.creators || []).map(c => c.creator || '').filter(Boolean),
+    authors: (r.creators || []).map((c) => c.creator || '').filter(Boolean),
     year: r.publicationDate ? parseInt(r.publicationDate.substring(0, 4), 10) : undefined,
     language: r.language,
   };
 }
 
 register('springer', {
-  description: 'Springer Nature — 16M+ articles via Meta API (all content, abstracts) + OA API (open access full text). Requires SPRINGER_META_API_KEY and SPRINGER_OA_API_KEY (free at dev.springernature.com).',
+  description:
+    'Springer Nature — 16M+ articles via Meta API (all content, abstracts) + OA API (open access full text). Requires SPRINGER_META_API_KEY and SPRINGER_OA_API_KEY (free at dev.springernature.com).',
   supportsIngest: true,
   search: springerSearch,
   async read(id) {

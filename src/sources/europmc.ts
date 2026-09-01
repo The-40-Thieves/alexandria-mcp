@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://www.ebi.ac.uk/europepmc/webservices/rest';
 
@@ -25,16 +25,19 @@ interface EPMCResponse {
 function stripXml(xml: string): string {
   return xml
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 export async function europmcSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<EPMCResponse>(
-    `${BASE}/search?query=${encodeURIComponent(query)}&format=json&pageSize=${limit}&resultType=core`
+    `${BASE}/search?query=${encodeURIComponent(query)}&format=json&pageSize=${limit}&resultType=core`,
   );
-  return (data.resultList?.result || []).map(r => ({
+  return (data.resultList?.result || []).map((r) => ({
     id: r.pmid ? `MED:${r.pmid}` : `${r.source}:${r.id}`,
     source: 'europmc' as const,
     title: r.title,
@@ -48,8 +51,11 @@ export async function europmcSearch(query: string, limit = 10): Promise<LibraryR
 }
 
 export async function europmcRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const [src, srcId] = id.split(':');
 
@@ -59,7 +65,7 @@ export async function europmcRead(id: string): Promise<{
     const text = stripXml(xml);
     if (text.length > 500) {
       const meta = await fetchJSON<EPMCResponse>(
-        `${BASE}/search?query=ext_id:${srcId}&format=json&resultType=core`
+        `${BASE}/search?query=ext_id:${srcId}&format=json&resultType=core`,
       );
       const r = meta.resultList?.result?.[0];
       return {
@@ -70,10 +76,12 @@ export async function europmcRead(id: string): Promise<{
         language: 'en',
       };
     }
-  } catch { /* fall through to abstract */ }
+  } catch {
+    /* fall through to abstract */
+  }
 
   const data = await fetchJSON<EPMCResponse>(
-    `${BASE}/search?query=ext_id:${srcId}&format=json&resultType=core`
+    `${BASE}/search?query=ext_id:${srcId}&format=json&resultType=core`,
   );
   const r = data.resultList?.result?.[0];
   if (!r) throw new Error(`Europe PMC record not found: ${id}`);
@@ -87,7 +95,8 @@ export async function europmcRead(id: string): Promise<{
 }
 
 register('europmc', {
-  description: 'Europe PMC — 43M+ biomedical and life science literature. Full text for open access PMC articles.',
+  description:
+    'Europe PMC — 43M+ biomedical and life science literature. Full text for open access PMC articles.',
   supportsIngest: true,
   search: europmcSearch,
   async read(id) {

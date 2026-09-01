@@ -27,11 +27,7 @@ export class SupabaseVectorStoreProvider implements VectorStoreProvider {
     return (data?.length ?? 0) > 0;
   }
 
-  async upsert(
-    chunks: Chunk[],
-    embeddings: number[][],
-    mcpName: string
-  ): Promise<number> {
+  async upsert(chunks: Chunk[], embeddings: number[][], mcpName: string): Promise<number> {
     if (chunks.length === 0) return 0;
 
     const rows = chunks.map((chunk, i) => ({
@@ -47,10 +43,7 @@ export class SupabaseVectorStoreProvider implements VectorStoreProvider {
 
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH);
-      const { error, data } = await this.client
-        .from(this.table)
-        .insert(batch)
-        .select('id');
+      const { error, data } = await this.client.from(this.table).insert(batch).select('id');
 
       if (error) throw new Error(`Supabase insert error: ${error.message}`);
       written += data?.length ?? 0;

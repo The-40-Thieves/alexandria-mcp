@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 const API = 'https://directory.doabooks.org/rest/search';
@@ -12,7 +12,7 @@ interface DOABItem {
 }
 
 function getMeta(metadata: DOABItem['metadata'], key: string): string[] {
-  return (metadata ?? []).filter(m => m.key === key).map(m => m.value);
+  return (metadata ?? []).filter((m) => m.key === key).map((m) => m.value);
 }
 
 function firstMeta(metadata: DOABItem['metadata'], key: string): string | undefined {
@@ -31,11 +31,10 @@ export async function doabSearch(query: string, limit: number): Promise<LibraryR
     headers: { Accept: 'application/json' },
   });
 
-  return (data ?? []).slice(0, limit).map(item => {
+  return (data ?? []).slice(0, limit).map((item) => {
     const meta = item.metadata;
     const handle = firstMeta(meta, 'dc.identifier.uri') ?? item.link ?? item.uuid ?? '';
-    const year = firstMeta(meta, 'dc.date.issued')
-      ?? firstMeta(meta, 'dc.date.accessioned');
+    const year = firstMeta(meta, 'dc.date.issued') ?? firstMeta(meta, 'dc.date.accessioned');
 
     return {
       id: handle,
@@ -52,7 +51,8 @@ export async function doabSearch(query: string, limit: number): Promise<LibraryR
 }
 
 register('doab', {
-  description: 'Directory of Open Access Books — 70k+ peer-reviewed OA academic monographs across all disciplines. Metadata + external PDF links.',
+  description:
+    'Directory of Open Access Books — 70k+ peer-reviewed OA academic monographs across all disciplines. Metadata + external PDF links.',
   supportsIngest: false,
   search: doabSearch,
   async read(id) {

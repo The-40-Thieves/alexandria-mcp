@@ -10,7 +10,10 @@ interface Entry<T> {
 export class ResultCache<T> {
   private store = new Map<string, Entry<T>>();
 
-  constructor(private ttlMs: number, private max = 500) {}
+  constructor(
+    private ttlMs: number,
+    private max = 500,
+  ) {}
 
   get(key: string, now = Date.now()): T | undefined {
     const entry = this.store.get(key);
@@ -33,7 +36,19 @@ export class ResultCache<T> {
   }
 }
 
-const CACHE_TTL_MS = Number(process.env.ALEXANDRIA_CACHE_TTL_MS ?? 600_000);
+const DEFAULT_CACHE_TTL_MS = 600_000;
+
+// Number() on a non-numeric or missing value yields NaN, which passes the
+// `<= 0` disable check in ResultCache#set and makes entries never expire
+// (NaN <= 0 is false, and now + NaN is NaN, so entry.expiresAt <= now is
+// also always false). Fall back to the default for anything that isn't a
+// finite, non-negative number.
+export function parseTtlMs(raw: string | undefined, fallback = DEFAULT_CACHE_TTL_MS): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+const CACHE_TTL_MS = parseTtlMs(process.env.ALEXANDRIA_CACHE_TTL_MS);
 export const searchCache = new ResultCache<LibraryResult[]>(CACHE_TTL_MS);
 
 export function cacheKey(source: string, query: string, limit: number): string {

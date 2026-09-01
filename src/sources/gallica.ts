@@ -1,13 +1,17 @@
 import { XMLParser } from 'fast-xml-parser';
-import { fetchText } from '../utils/http.js';
-import { stripHtml, normaliseWhitespace } from '../utils/text-clean.js';
 import type { LibraryResult } from '../types.js';
+import { fetchText } from '../utils/http.js';
+import { normaliseWhitespace, stripHtml } from '../utils/text-clean.js';
 import { register, truncateText } from './registry.js';
 
 const SRU = 'https://gallica.bnf.fr/services/engine/search/sru';
 const FULLTEXT = 'https://gallica.bnf.fr/services/engine/fulltext';
 
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', textNodeName: '#text' });
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+});
 
 export async function gallicaSearch(query: string, limit: number): Promise<LibraryResult[]> {
   const params = new URLSearchParams({
@@ -25,8 +29,14 @@ export async function gallicaSearch(query: string, limit: number): Promise<Libra
 
   return records.slice(0, limit).map((r: unknown) => {
     const rec = r as Record<string, unknown>;
-    const dc = (rec['srw:recordData'] as Record<string, unknown>)?.['oai_dc:dc'] as Record<string, unknown> ?? {};
-    const id = String((dc['dc:identifier'] as string[] | string | undefined)?.[0] ?? dc['dc:identifier'] ?? '');
+    const dc =
+      ((rec['srw:recordData'] as Record<string, unknown>)?.['oai_dc:dc'] as Record<
+        string,
+        unknown
+      >) ?? {};
+    const id = String(
+      (dc['dc:identifier'] as string[] | string | undefined)?.[0] ?? dc['dc:identifier'] ?? '',
+    );
     const ark = id.includes('ark:') ? id : '';
 
     return {
@@ -44,14 +54,18 @@ export async function gallicaSearch(query: string, limit: number): Promise<Libra
 }
 
 export async function gallicaRead(ark: string): Promise<{
-  text: string; title: string; authors: string[];
+  text: string;
+  title: string;
+  authors: string[];
 }> {
   // ark format: ark:/12148/btv1b...  or just the btv1b... part
-  const cleanArk = ark.replace(/^.*ark:\//,'ark:/').replace(/^btv/, 'ark:/12148/btv');
+  const cleanArk = ark.replace(/^.*ark:\//, 'ark:/').replace(/^btv/, 'ark:/12148/btv');
 
   // Try full-text endpoint
-  await new Promise(r => setTimeout(r, 500));
-  const html = await fetchText(`${FULLTEXT}/${encodeURIComponent(cleanArk)}/f1.highres`).catch(() => '');
+  await new Promise((r) => setTimeout(r, 500));
+  const html = await fetchText(`${FULLTEXT}/${encodeURIComponent(cleanArk)}/f1.highres`).catch(
+    () => '',
+  );
 
   if (html && html.length > 500) {
     return {
@@ -63,7 +77,7 @@ export async function gallicaRead(ark: string): Promise<{
 
   throw new Error(
     `Full text not available for Gallica item "${ark}". ` +
-    `Not all Gallica items have OCR text — check https://gallica.bnf.fr/${ark} for available formats.`
+      `Not all Gallica items have OCR text — check https://gallica.bnf.fr/${ark} for available formats.`,
   );
 }
 
@@ -78,7 +92,8 @@ function extractYear(dateStr: string): number | undefined {
 }
 
 register('gallica', {
-  description: 'Gallica/BnF — 5M+ digitized documents from the French national library. Full text available for OCR\'d items.',
+  description:
+    "Gallica/BnF — 5M+ digitized documents from the French national library. Full text available for OCR'd items.",
   supportsIngest: true,
   search: gallicaSearch,
   async read(id) {

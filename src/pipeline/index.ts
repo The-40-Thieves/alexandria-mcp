@@ -1,11 +1,10 @@
-import type { Chunk, ChunkMetadata, IndexPreview, IngestResult } from '../types.js';
-import type { LibrarySource } from '../types.js';
-import { scoreChunk, filterChunks, avgQuality } from './quality.js';
+import type { Chunk, ChunkMetadata, IndexPreview, IngestResult, LibrarySource } from '../types.js';
 import {
-  resolveConfig,
   buildEmbeddingProvider,
   buildVectorStoreProvider,
+  resolveConfig,
 } from './providers/index.js';
+import { avgQuality, filterChunks, scoreChunk } from './quality.js';
 
 const TARGET_CHUNK_WORDS = 350;
 const MCP_NAME_PREFIX = 'library';
@@ -23,7 +22,7 @@ function detectHeading(line: string): string | null {
 
 export function chunkSemantic(
   text: string,
-  metadata: Omit<ChunkMetadata, 'chunkIndex' | 'totalChunks' | 'qualityScore' | 'section'>
+  metadata: Omit<ChunkMetadata, 'chunkIndex' | 'totalChunks' | 'qualityScore' | 'section'>,
 ): Chunk[] {
   const paragraphs = text.split(/\n{2,}/);
   const chunks: Omit<Chunk, 'metadata'>[] = [];
@@ -31,7 +30,6 @@ export function chunkSemantic(
 
   let currentWords = 0;
   let currentText = '';
-  let currentSection = '';
 
   for (const para of paragraphs) {
     const trimmed = para.trim();
@@ -39,7 +37,6 @@ export function chunkSemantic(
 
     const heading = detectHeading(trimmed);
     if (heading) {
-      currentSection = heading;
       sections.push(heading);
       continue;
     }
@@ -99,7 +96,7 @@ export function indexText(
   title: string,
   authors: string[],
   year?: number,
-  language?: string
+  language?: string,
 ): IndexPreview {
   const raw = chunkSemantic(text, {
     source,
@@ -111,10 +108,7 @@ export function indexText(
   });
 
   const { passed, dropped } = filterChunks(raw);
-  const estimatedTokens = passed.reduce(
-    (sum, c) => sum + Math.ceil(c.text.length / 4),
-    0
-  );
+  const estimatedTokens = passed.reduce((sum, c) => sum + Math.ceil(c.text.length / 4), 0);
 
   return {
     sourceId,
@@ -137,7 +131,7 @@ export async function ingestText(
   title: string,
   authors: string[],
   year?: number,
-  language?: string
+  language?: string,
 ): Promise<IngestResult> {
   const config = resolveConfig();
   const embedder = await buildEmbeddingProvider(config.embedding);
@@ -180,7 +174,7 @@ export async function ingestText(
     };
   }
 
-  const embeddings = await embedder.embed(passed.map(c => c.text));
+  const embeddings = await embedder.embed(passed.map((c) => c.text));
   const written = await store.upsert(passed, embeddings, mcpName);
 
   return {

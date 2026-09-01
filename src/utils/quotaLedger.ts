@@ -4,7 +4,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export class QuotaExceededError extends Error {
-  constructor(public source: string, public used: number, public cap: number) {
+  constructor(
+    public source: string,
+    public used: number,
+    public cap: number,
+  ) {
     super(`Daily quota for ${source} reached (${used}/${cap}). Try again after 00:00 UTC.`);
   }
 }
@@ -71,16 +75,28 @@ export function createLedger(): LedgerStore {
   return new MemoryLedgerStore();
 }
 
-export async function enforceQuota(
+// Atomically reserves one unit of a source's daily quota: increments the
+// ledger first, then checks the returned count against the cap. This
+// replaces the earlier separate enforceQuota() (read) + recordUsage()
+// (increment) pair, whose two awaits let two concurrent calls both read
+// used = cap - 1 and both pass. Reserving via a single increment closes
+// that window: MemoryLedgerStore#increment does not await before mutating
+// its Map, so calling it from N concurrent reserveQuota() calls hands out
+// N distinct, non-overlapping counts (JS run-to-completion semantics), and
+// SupabaseLedgerStore#increment is backed by the increment_quota RPC's
+// `insert ... on conflict do update set count = count + 1 returning count`,
+// which is atomic at the database row level.
+//
+// A failed adapter call does not roll back its reservation: the slot is
+// already spent by the time the call runs, matching the previous
+// finally-recorded-usage behavior.
+export async function reserveQuota(
   source: string,
   cap: number | undefined,
   store: LedgerStore,
 ): Promise<void> {
-  if (cap === undefined) return;
-  const used = await store.get(source, utcDay());
-  if (used >= cap) throw new QuotaExceededError(source, used, cap);
-}
-
-export async function recordUsage(source: string, store: LedgerStore): Promise<void> {
-  await store.increment(source, utcDay());
+  const count = await store.increment(source, utcDay());
+  if (cap !== undefined && count > cap) {
+    throw new QuotaExceededError(source, count, cap);
+  }
 }

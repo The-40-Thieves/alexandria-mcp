@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 
 const OL_BASE = 'https://openlibrary.org';
 
@@ -10,7 +10,7 @@ interface OLSearchDoc {
   first_publish_year?: number;
   language?: string[];
   subject?: string[];
-  ia?: string[];           // Internet Archive identifiers
+  ia?: string[]; // Internet Archive identifiers
   public_scan_b?: boolean; // true = full text available
   ebook_access?: string;
 }
@@ -20,23 +20,18 @@ interface OLSearchResponse {
   docs: OLSearchDoc[];
 }
 
-export async function openLibrarySearch(
-  query: string,
-  limit = 10
-): Promise<LibraryResult[]> {
+export async function openLibrarySearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const url =
     `${OL_BASE}/search.json?q=${encodeURIComponent(query)}` +
     `&limit=${limit}&fields=key,title,author_name,first_publish_year,language,subject,ia,public_scan_b,ebook_access`;
 
   const data = await fetchJSON<OLSearchResponse>(url);
 
-  return data.docs.map(doc => {
+  return data.docs.map((doc) => {
     const workId = doc.key.replace('/works/', '');
     const iaId = doc.ia?.[0];
     const hasFullText =
-      doc.public_scan_b === true ||
-      doc.ebook_access === 'public' ||
-      Boolean(iaId);
+      doc.public_scan_b === true || doc.ebook_access === 'public' || Boolean(iaId);
 
     return {
       id: workId,
@@ -48,9 +43,7 @@ export async function openLibrarySearch(
       subjects: (doc.subject ?? []).slice(0, 5),
       hasFullText,
       previewUrl: `${OL_BASE}/works/${workId}`,
-      downloadUrl: iaId
-        ? `https://archive.org/download/${iaId}/${iaId}_djvu.txt`
-        : undefined,
+      downloadUrl: iaId ? `https://archive.org/download/${iaId}/${iaId}_djvu.txt` : undefined,
     };
   });
 }
@@ -79,10 +72,10 @@ export async function openLibraryMeta(workId: string): Promise<{
   const authors: string[] = [];
   for (const ref of work.authors ?? []) {
     try {
-      interface OLAuthor { name: string }
-      const author = await fetchJSON<OLAuthor>(
-        `${OL_BASE}${ref.author.key}.json`
-      );
+      interface OLAuthor {
+        name: string;
+      }
+      const author = await fetchJSON<OLAuthor>(`${OL_BASE}${ref.author.key}.json`);
       authors.push(author.name);
     } catch {
       // skip unresolvable author
@@ -91,23 +84,19 @@ export async function openLibraryMeta(workId: string): Promise<{
 
   // Get an edition with IA link
   interface OLEditions {
-    entries: Array<{ ia?: string[]; publish_date?: string; languages?: Array<{ key: string }> }>
+    entries: Array<{ ia?: string[]; publish_date?: string; languages?: Array<{ key: string }> }>;
   }
-  const editions = await fetchJSON<OLEditions>(
-    `${OL_BASE}/works/${workId}/editions.json?limit=5`
-  );
+  const editions = await fetchJSON<OLEditions>(`${OL_BASE}/works/${workId}/editions.json?limit=5`);
 
-  const iaId = editions.entries.find(e => e.ia?.length)?.ia?.[0];
+  const iaId = editions.entries.find((e) => e.ia?.length)?.ia?.[0];
   const language = editions.entries
-    .find(e => e.languages?.length)
+    .find((e) => e.languages?.length)
     ?.languages?.[0]?.key.replace('/languages/', '');
 
   return {
     title: work.title,
     authors,
-    year: work.first_publish_date
-      ? parseInt(work.first_publish_date, 10)
-      : undefined,
+    year: work.first_publish_date ? parseInt(work.first_publish_date, 10) : undefined,
     language,
     subjects: (work.subjects ?? []).slice(0, 5),
     iaId,
@@ -115,8 +104,10 @@ export async function openLibraryMeta(workId: string): Promise<{
 }
 
 import { register } from './registry.js';
+
 register('openlibrary', {
-  description: 'Open Library — 30M+ records. Metadata and discovery; links to Archive.org for text.',
+  description:
+    'Open Library — 30M+ records. Metadata and discovery; links to Archive.org for text.',
   supportsIngest: false,
   search: openLibrarySearch,
   async read(id) {

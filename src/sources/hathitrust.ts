@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 const HT = 'https://catalog.hathitrust.org/api/v2';
@@ -28,7 +28,7 @@ export async function hathitrustSearch(query: string, limit: number): Promise<Li
 
   const data = await fetchJSON<HTSearchResponse>(`${HT}/volumes/search?${params}`);
 
-  return (data.docs ?? []).slice(0, limit).map(v => ({
+  return (data.docs ?? []).slice(0, limit).map((v) => ({
     id: v.htid,
     source: 'hathitrust' as const,
     title: v.title ?? v.htid,
@@ -41,7 +41,8 @@ export async function hathitrustSearch(query: string, limit: number): Promise<Li
 }
 
 register('hathitrust', {
-  description: 'HathiTrust — 18M+ volumes digitized from research libraries. Public domain texts available for download.',
+  description:
+    'HathiTrust — 18M+ volumes digitized from research libraries. Public domain texts available for download.',
   supportsIngest: false,
   search: hathitrustSearch,
   async read(id) {

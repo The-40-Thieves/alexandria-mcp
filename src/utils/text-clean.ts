@@ -4,10 +4,7 @@ const GUTENBERG_HEADER = /^[\s\S]*?\*{3}\s*START OF (THIS|THE) PROJECT GUTENBERG
 const GUTENBERG_FOOTER = /\*{3}\s*END OF (THIS|THE) PROJECT GUTENBERG EBOOK[\s\S]*$/i;
 
 export function stripGutenbergWrapper(text: string): string {
-  return text
-    .replace(GUTENBERG_HEADER, '')
-    .replace(GUTENBERG_FOOTER, '')
-    .trim();
+  return text.replace(GUTENBERG_HEADER, '').replace(GUTENBERG_FOOTER, '').trim();
 }
 
 // Strip HTML tags, decode common entities, normalise whitespace.

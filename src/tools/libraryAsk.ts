@@ -72,7 +72,10 @@ async function routeQuery(query: string, maxSources: number): Promise<RoutingDec
   const sources = listSources();
   // Include name + first sentence of description to keep the prompt compact
   const sourceList = sources
-    .map(s => `${s.name}: ${s.description.split('—')[1]?.split('.')[0]?.trim() ?? s.description.split('.')[0]}`)
+    .map(
+      (s) =>
+        `${s.name}: ${s.description.split('—')[1]?.split('.')[0]?.trim() ?? s.description.split('.')[0]}`,
+    )
     .join('\n');
 
   const response = await client.chat.completions.create({
@@ -113,13 +116,13 @@ export async function libraryAsk(
   const routing = await routeQuery(query, maxSources);
 
   // Validate — only keep routes whose source names actually exist
-  const validNames = new Set(listSources().map(s => s.name));
-  const validRoutes = routing.routes.filter(r =>
-    typeof r.source === 'string' && validNames.has(r.source)
+  const validNames = new Set(listSources().map((s) => s.name));
+  const validRoutes = routing.routes.filter(
+    (r) => typeof r.source === 'string' && validNames.has(r.source),
   );
 
   // Parallel search across all selected sources
-  const searches = validRoutes.map(async route => {
+  const searches = validRoutes.map(async (route) => {
     try {
       const adapter = getAdapter(route.source as LibrarySource);
       const results = await adapter.search(route.query, resultsPerSource);
@@ -144,14 +147,20 @@ export async function libraryAsk(
         errors.push({ source: r.value.source, error: r.value.error });
       }
     } else {
-      errors.push({ source: 'unknown', error: r.reason instanceof Error ? r.reason.message : String(r.reason) });
+      errors.push({
+        source: 'unknown',
+        error: r.reason instanceof Error ? r.reason.message : String(r.reason),
+      });
     }
   }
 
   // Deduplicate: normalize title to a short key
   const seen = new Set<string>();
-  const deduped = allResults.filter(r => {
-    const key = r.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 60);
+  const deduped = allResults.filter((r) => {
+    const key = r.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 60);
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -160,7 +169,7 @@ export async function libraryAsk(
   return {
     query,
     intent: routing.intent,
-    sources_searched: validRoutes.map(r => r.source),
+    sources_searched: validRoutes.map((r) => r.source),
     total_results: deduped.length,
     results: deduped,
     routing: validRoutes,

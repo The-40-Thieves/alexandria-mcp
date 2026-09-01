@@ -1,6 +1,6 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ResultCache, cacheKey } from './resultCache.js';
+import test from 'node:test';
+import { cacheKey, parseTtlMs, ResultCache } from './resultCache.js';
 
 test('resultCache', async (t) => {
   await t.test('returns undefined on miss', () => {
@@ -37,11 +37,21 @@ test('resultCache', async (t) => {
   });
 
   await t.test('cacheKey normalizes whitespace and case', () => {
-    assert.equal(cacheKey('arxiv', '  Attention   Is All  ', 5), cacheKey('arxiv', 'attention is all', 5));
+    assert.equal(
+      cacheKey('arxiv', '  Attention   Is All  ', 5),
+      cacheKey('arxiv', 'attention is all', 5),
+    );
   });
 
   await t.test('cacheKey distinguishes source and limit', () => {
     assert.notEqual(cacheKey('a', 'q', 5), cacheKey('b', 'q', 5));
     assert.notEqual(cacheKey('a', 'q', 5), cacheKey('a', 'q', 10));
   });
+
+  await t.test(
+    'parseTtlMs falls back to the default on a non-numeric value instead of yielding NaN',
+    () => {
+      assert.equal(parseTtlMs('not-a-number', 600_000), 600_000);
+    },
+  );
 });

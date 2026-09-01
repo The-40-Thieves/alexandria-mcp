@@ -37,7 +37,10 @@ export async function rateLimited<T>(
   });
   // Detach error handling from the queue chain so one failure doesn't break
   // subsequent calls; callers receive the original `next` and see real errors.
-  queues.set(key, next.catch(() => undefined));
+  queues.set(
+    key,
+    next.catch(() => undefined),
+  );
   return next;
 }
 

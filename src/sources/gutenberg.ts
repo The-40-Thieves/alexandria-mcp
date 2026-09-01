@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { cleanGutenbergText } from '../utils/text-clean.js';
-import type { LibraryResult } from '../types.js';
 import { register, truncateText } from './registry.js';
 
 const GUTENDEX_BASE = 'https://gutendex.com';
@@ -30,18 +30,15 @@ function pickTextUrl(formats: Record<string, string>): string | undefined {
   );
 }
 
-export async function gutenbergSearch(
-  query: string,
-  limit = 10
-): Promise<LibraryResult[]> {
+export async function gutenbergSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const url = `${GUTENDEX_BASE}/books/?search=${encodeURIComponent(query)}&page_size=${limit}`;
   const data = await fetchJSON<GutendexResponse>(url);
 
-  return data.results.map(book => ({
+  return data.results.map((book) => ({
     id: String(book.id),
     source: 'gutenberg' as const,
     title: book.title,
-    authors: book.authors.map(a => a.name),
+    authors: book.authors.map((a) => a.name),
     language: book.languages[0],
     subjects: book.subjects.slice(0, 5),
     hasFullText: Boolean(pickTextUrl(book.formats)),
@@ -64,12 +61,12 @@ export async function gutenbergRead(id: string): Promise<{
   if (!textUrl) {
     throw new Error(
       `No plain-text version available for Gutenberg book ${id}. ` +
-      `Available formats: ${Object.keys(book.formats).join(', ')}`
+        `Available formats: ${Object.keys(book.formats).join(', ')}`,
     );
   }
 
   // Rate limiting: Gutenberg asks for reasonable request rates
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const raw = await fetchText(textUrl);
   const text = cleanGutenbergText(raw);
@@ -81,7 +78,7 @@ export async function gutenbergRead(id: string): Promise<{
   return {
     text,
     title: book.title,
-    authors: book.authors.map(a => a.name),
+    authors: book.authors.map((a) => a.name),
     language: book.languages[0],
   };
 }

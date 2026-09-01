@@ -1,7 +1,7 @@
 import pLimit from 'p-limit';
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { normaliseWhitespace } from '../utils/text-clean.js';
-import type { LibraryResult } from '../types.js';
 import { register, truncateText } from './registry.js';
 
 const API = 'https://ctext.org/api.pl';
@@ -27,7 +27,7 @@ export async function ctextSearch(query: string, limit: number): Promise<Library
 
   const data = await fetchJSON<CtextSearchResult>(`${API}?${params}`);
 
-  return (data.result ?? []).slice(0, limit).map(item => ({
+  return (data.result ?? []).slice(0, limit).map((item) => ({
     id: item.id,
     source: 'ctext' as const,
     title: item.title,
@@ -40,12 +40,13 @@ export async function ctextSearch(query: string, limit: number): Promise<Library
 }
 
 export async function ctextRead(id: string): Promise<{
-  text: string; title: string; authors: string[]; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  language?: string;
 }> {
   // Fetch the text tree to get structure
-  const data = await fetchJSON<CtextTextNode>(
-    `${API}?if=gettextinfo&ci=${encodeURIComponent(id)}`
-  );
+  const data = await fetchJSON<CtextTextNode>(`${API}?if=gettextinfo&ci=${encodeURIComponent(id)}`);
 
   const title = data.title ?? id;
   const chapters = data.chapters ?? data.books ?? [];
@@ -53,7 +54,7 @@ export async function ctextRead(id: string): Promise<{
   if (chapters.length === 0) {
     // Leaf node — fetch text directly
     const textData = await fetchJSON<{ text: string }>(
-      `${API}?if=gettext&ci=${encodeURIComponent(id)}&ids=0`
+      `${API}?if=gettext&ci=${encodeURIComponent(id)}&ids=0`,
     );
     return { text: normaliseWhitespace(textData.text ?? ''), title, authors: [], language: 'zh' };
   }
@@ -66,14 +67,16 @@ export async function ctextRead(id: string): Promise<{
           await new Promise((r) => setTimeout(r, 300));
           try {
             const chData = await fetchJSON<{ text: string }>(
-              `${API}?if=gettext&ci=${encodeURIComponent(chapter.id)}&ids=0`
+              `${API}?if=gettext&ci=${encodeURIComponent(chapter.id)}&ids=0`,
             );
             const text = (chData.text ?? '').trim();
             if (text.length > 20) return `\n\n# ${chapter.title}\n\n${text}`;
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
           return null;
-        })
-      )
+        }),
+      ),
     )
   ).filter((res): res is string => res !== null);
 
@@ -86,7 +89,8 @@ export async function ctextRead(id: string): Promise<{
 }
 
 register('ctext', {
-  description: 'Chinese Text Project — pre-Qin and Han dynasty classical Chinese texts with English translations.',
+  description:
+    'Chinese Text Project — pre-Qin and Han dynasty classical Chinese texts with English translations.',
   supportsIngest: true,
   search: ctextSearch,
   async read(id) {

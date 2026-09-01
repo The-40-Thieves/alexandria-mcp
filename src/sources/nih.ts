@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.reporter.nih.gov/v2';
 
@@ -40,13 +40,19 @@ export async function nihSearch(query: string, limit = 10): Promise<LibraryResul
           search_text: query,
         },
       },
-      include_fields: ['ProjectTitle', 'AbstractText', 'FiscalYear', 'PrincipalInvestigators', 'ProjectNum'],
+      include_fields: [
+        'ProjectTitle',
+        'AbstractText',
+        'FiscalYear',
+        'PrincipalInvestigators',
+        'ProjectNum',
+      ],
       offset: 0,
       limit,
     }),
   });
 
-  return (data.results || []).map(p => ({
+  return (data.results || []).map((p) => ({
     id: p.project_num || '',
     source: 'nih' as const,
     title: p.project_title || 'Untitled',
@@ -62,15 +68,24 @@ export async function nihSearch(query: string, limit = 10): Promise<LibraryResul
 }
 
 export async function nihRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const data = await fetchJSON<NIHResponse>(`${BASE}/projects/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       criteria: { project_nums: [id] },
-      include_fields: ['ProjectTitle', 'AbstractText', 'FiscalYear', 'PrincipalInvestigators', 'ProjectNum'],
+      include_fields: [
+        'ProjectTitle',
+        'AbstractText',
+        'FiscalYear',
+        'PrincipalInvestigators',
+        'ProjectNum',
+      ],
     }),
   });
 
@@ -87,7 +102,8 @@ export async function nihRead(id: string): Promise<{
 }
 
 register('nih', {
-  description: 'NIH RePORTER — National Institutes of Health funded research projects and abstracts. No API key required.',
+  description:
+    'NIH RePORTER — National Institutes of Health funded research projects and abstracts. No API key required.',
   supportsIngest: true,
   search: nihSearch,
   async read(id) {

@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 const API = 'https://www.googleapis.com/books/v1/volumes';
@@ -40,7 +40,7 @@ function buildUrl(q: string, maxResults: number): string {
 export async function googleBooksSearch(query: string, limit: number): Promise<LibraryResult[]> {
   const data = await fetchJSON<GBResponse>(buildUrl(query, Math.min(limit, 40)));
 
-  return (data.items ?? []).slice(0, limit).map(v => {
+  return (data.items ?? []).slice(0, limit).map((v) => {
     const info = v.volumeInfo;
     const access = v.accessInfo ?? info.accessInfo;
     const publicDomain = access?.publicDomain ?? false;
@@ -59,10 +59,18 @@ export async function googleBooksSearch(query: string, limit: number): Promise<L
 }
 
 export async function googleBooksRead(id: string): Promise<{
-  title: string; authors: string[]; year?: number; language?: string;
-  text?: string; metadataOnly?: boolean; externalUrl?: string; note?: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
+  text?: string;
+  metadataOnly?: boolean;
+  externalUrl?: string;
+  note?: string;
 }> {
-  const data = await fetchJSON<GBVolume>(`${API}/${id}${process.env.GOOGLE_BOOKS_API_KEY ? `?key=${process.env.GOOGLE_BOOKS_API_KEY}` : ''}`);
+  const data = await fetchJSON<GBVolume>(
+    `${API}/${id}${process.env.GOOGLE_BOOKS_API_KEY ? `?key=${process.env.GOOGLE_BOOKS_API_KEY}` : ''}`,
+  );
   const info = data.volumeInfo;
   const access = data.accessInfo;
   const publicDomain = access?.publicDomain ?? false;
@@ -84,7 +92,9 @@ export async function googleBooksRead(id: string): Promise<{
           metadataOnly: false,
         };
       }
-    } catch { /* fall through to preview */ }
+    } catch {
+      /* fall through to preview */
+    }
   }
 
   // Non-public-domain or download failed — return description + metadata
@@ -102,7 +112,8 @@ export async function googleBooksRead(id: string): Promise<{
 }
 
 register('googlebooks', {
-  description: 'Google Books — 40M+ books. Full text for public domain titles; preview snippets for in-copyright works. Set GOOGLE_BOOKS_API_KEY for higher rate limits.',
+  description:
+    'Google Books — 40M+ books. Full text for public domain titles; preview snippets for in-copyright works. Set GOOGLE_BOOKS_API_KEY for higher rate limits.',
   supportsIngest: true,
   search: googleBooksSearch,
   async read(id) {

@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { normaliseWhitespace } from '../utils/text-clean.js';
-import type { LibraryResult } from '../types.js';
 import { register, truncateText } from './registry.js';
 
 const BASE = 'https://chroniclingamerica.loc.gov';
@@ -24,7 +24,10 @@ interface CAResponse {
   items: CAItem[];
 }
 
-export async function chroniclingAmericaSearch(query: string, limit: number): Promise<LibraryResult[]> {
+export async function chroniclingAmericaSearch(
+  query: string,
+  limit: number,
+): Promise<LibraryResult[]> {
   const params = new URLSearchParams({
     andtext: query,
     format: 'json',
@@ -32,13 +35,11 @@ export async function chroniclingAmericaSearch(query: string, limit: number): Pr
     sort: 'relevance',
   });
 
-  const data = await fetchJSON<CAResponse>(
-    `${BASE}/search/pages/results/?${params}`
-  );
+  const data = await fetchJSON<CAResponse>(`${BASE}/search/pages/results/?${params}`);
 
-  return (data.items ?? []).slice(0, limit).map(item => {
+  return (data.items ?? []).slice(0, limit).map((item) => {
     // Normalize URL: ensure it ends with /
-    const pageUrl = item.url.endsWith('/') ? item.url : item.url + '/';
+    const pageUrl = item.url.endsWith('/') ? item.url : `${item.url}/`;
 
     return {
       id: pageUrl,
@@ -56,7 +57,10 @@ export async function chroniclingAmericaSearch(query: string, limit: number): Pr
 }
 
 export async function chroniclingAmericaRead(pageUrl: string): Promise<{
-  text: string; title: string; authors: string[]; year?: number;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
 }> {
   // pageUrl looks like: https://chroniclingamerica.loc.gov/lccn/sn83030214/1865-04-15/ed-1/seq-1/
   const ocrUrl = pageUrl.endsWith('/') ? `${pageUrl}ocr.txt` : `${pageUrl}/ocr.txt`;
@@ -65,7 +69,7 @@ export async function chroniclingAmericaRead(pageUrl: string): Promise<{
   if (!text || text.length < 50) {
     throw new Error(
       `No OCR text found for ${pageUrl}. ` +
-      `The page may not have been digitized with text recognition.`
+        `The page may not have been digitized with text recognition.`,
     );
   }
 
@@ -83,20 +87,28 @@ export async function chroniclingAmericaRead(pageUrl: string): Promise<{
 
 // For ingest: fetch multiple pages from a search and concatenate.
 // This allows ingesting a topic across many newspaper pages.
-export async function chroniclingAmericaReadTopic(query: string, maxPages = 10): Promise<{
-  text: string; title: string; authors: string[]; year?: number;
+export async function chroniclingAmericaReadTopic(
+  query: string,
+  maxPages = 10,
+): Promise<{
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
 }> {
   const results = await chroniclingAmericaSearch(query, maxPages);
   const parts: string[] = [];
 
   for (const r of results) {
-    await new Promise(res => setTimeout(res, 500));
+    await new Promise((res) => setTimeout(res, 500));
     try {
       const page = await chroniclingAmericaRead(r.id);
       if (page.text.length > 100) {
         parts.push(`--- ${r.title} ---\n\n${page.text}`);
       }
-    } catch { /* skip failed OCR */ }
+    } catch {
+      /* skip failed OCR */
+    }
   }
 
   return {
@@ -107,7 +119,8 @@ export async function chroniclingAmericaReadTopic(query: string, maxPages = 10):
 }
 
 register('chroniclingamerica', {
-  description: 'Chronicling America (LOC) — full OCR text of US newspapers 1770–1963. Search returns individual pages; ingest via page URL or search query.',
+  description:
+    'Chronicling America (LOC) — full OCR text of US newspapers 1770–1963. Search returns individual pages; ingest via page URL or search query.',
   supportsIngest: true,
   search: chroniclingAmericaSearch,
   async read(id) {

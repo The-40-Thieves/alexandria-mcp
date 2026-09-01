@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.ies.ed.gov/eric';
 const FIELDS = 'id,title,author,publicationdateyear,description,subject,languagecode,url';
@@ -22,9 +22,9 @@ interface ERICResponse {
 
 export async function ericSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<ERICResponse>(
-    `${BASE}/?search=${encodeURIComponent(query)}&rows=${limit}&fields=${FIELDS}&format=json`
+    `${BASE}/?search=${encodeURIComponent(query)}&rows=${limit}&fields=${FIELDS}&format=json`,
   );
-  return (data.response?.docs || []).map(d => ({
+  return (data.response?.docs || []).map((d) => ({
     id: d.id,
     source: 'eric' as const,
     title: d.title,
@@ -39,12 +39,13 @@ export async function ericSearch(query: string, limit = 10): Promise<LibraryResu
 }
 
 export async function ericRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
-  const data = await fetchJSON<ERICResponse>(
-    `${BASE}/?id=${id}&fields=${FIELDS}&format=json`
-  );
+  const data = await fetchJSON<ERICResponse>(`${BASE}/?id=${id}&fields=${FIELDS}&format=json`);
   const d = data.response?.docs?.[0];
   if (!d) throw new Error(`ERIC record ${id} not found`);
   return {
@@ -57,7 +58,8 @@ export async function ericRead(id: string): Promise<{
 }
 
 register('eric', {
-  description: 'ERIC — 2M+ education research documents from the US Dept of Education. No API key required.',
+  description:
+    'ERIC — 2M+ education research documents from the US Dept of Education. No API key required.',
   supportsIngest: true,
   search: ericSearch,
   async read(id) {

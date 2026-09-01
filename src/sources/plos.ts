@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.plos.org/search';
 const FIELDS = 'id,title,author,publication_date,abstract,article_type,subject,journal';
@@ -22,9 +22,9 @@ interface PLOSResponse {
 
 export async function plosSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<PLOSResponse>(
-    `${BASE}?q=${encodeURIComponent(query)}&rows=${limit}&fl=${FIELDS}&wt=json`
+    `${BASE}?q=${encodeURIComponent(query)}&rows=${limit}&fl=${FIELDS}&wt=json`,
   );
-  return (data.response?.docs || []).map(d => ({
+  return (data.response?.docs || []).map((d) => ({
     id: d.id,
     source: 'plos' as const,
     title: d.title || 'Untitled',
@@ -39,11 +39,14 @@ export async function plosSearch(query: string, limit = 10): Promise<LibraryResu
 }
 
 export async function plosRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const data = await fetchJSON<PLOSResponse>(
-    `${BASE}?q=id:"${encodeURIComponent(id)}"&fl=${FIELDS}&wt=json`
+    `${BASE}?q=id:"${encodeURIComponent(id)}"&fl=${FIELDS}&wt=json`,
   );
   const d = data.response?.docs?.[0];
   if (!d) throw new Error(`PLOS article not found: ${id}`);
@@ -57,7 +60,8 @@ export async function plosRead(id: string): Promise<{
 }
 
 register('plos', {
-  description: 'PLOS — Public Library of Science journals. 100% open access. Biology, medicine, genetics, computational biology. No API key required.',
+  description:
+    'PLOS — Public Library of Science journals. 100% open access. Biology, medicine, genetics, computational biology. No API key required.',
   supportsIngest: true,
   search: plosSearch,
   async read(id) {

@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 const BASE = 'https://catalog.data.gov';
@@ -45,7 +45,7 @@ export async function dataGovSearch(query: string, limit: number): Promise<Libra
 
   const data = await fetchJSON<DataGovResponse>(`${BASE}/search?${params}`);
 
-  return (data.results ?? []).slice(0, limit).map(r => {
+  return (data.results ?? []).slice(0, limit).map((r) => {
     const id = r.identifier ?? r.slug ?? r.title ?? '';
     const landingPage = r.dcat?.landingPage ?? r.landingPage;
 
@@ -53,7 +53,7 @@ export async function dataGovSearch(query: string, limit: number): Promise<Libra
       id,
       source: 'datagov' as const,
       title: r.title ?? id,
-      authors: r.publisher ? [r.publisher] : (r.organization?.name ? [r.organization.name] : []),
+      authors: r.publisher ? [r.publisher] : r.organization?.name ? [r.organization.name] : [],
       year: r.dcat?.issued ? parseInt(r.dcat.issued.slice(0, 4), 10) : undefined,
       language: r.dcat?.language?.[0]?.replace('en-US', 'en'),
       subjects: [...(r.keyword ?? []), ...(r.theme ?? [])].slice(0, 5),
@@ -64,14 +64,13 @@ export async function dataGovSearch(query: string, limit: number): Promise<Libra
 }
 
 register('datagov', {
-  description: 'Data.gov — US government open data catalog. 300k+ datasets from federal, state, local, and tribal agencies. No key required. Metadata and discovery.',
+  description:
+    'Data.gov — US government open data catalog. 300k+ datasets from federal, state, local, and tribal agencies. No key required. Metadata and discovery.',
   supportsIngest: false,
   search: dataGovSearch,
   async read(id) {
     // Try to get the harvest record for full metadata
-    const landingPage = id.startsWith('http')
-      ? id
-      : `https://catalog.data.gov/dataset/${id}`;
+    const landingPage = id.startsWith('http') ? id : `https://catalog.data.gov/dataset/${id}`;
 
     return {
       title: id,

@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const GRAPH = 'https://api.semanticscholar.org/graph/v1';
 const REC = 'https://api.semanticscholar.org/recommendations/v1';
@@ -36,11 +36,12 @@ function mapPaper(p: S2Paper): LibraryResult {
     id: p.paperId,
     source: 'semanticscholar' as const,
     title: p.title || 'Untitled',
-    authors: (p.authors || []).map(a => a.name),
+    authors: (p.authors || []).map((a) => a.name),
     year: p.year,
     subjects: p.fieldsOfStudy || [],
     hasFullText: Boolean(p.openAccessPdf?.url || p.abstract),
-    previewUrl: p.openAccessPdf?.url ||
+    previewUrl:
+      p.openAccessPdf?.url ||
       (p.externalIds?.DOI ? `https://doi.org/${p.externalIds.DOI}` : undefined),
     description: p.abstract?.substring(0, 300),
   };
@@ -49,27 +50,30 @@ function mapPaper(p: S2Paper): LibraryResult {
 export async function s2Search(query: string, limit = 10): Promise<LibraryResult[]> {
   const data = await fetchJSON<S2SearchResponse>(
     `${GRAPH}/paper/search?query=${encodeURIComponent(query)}&fields=${FIELDS}&limit=${limit}`,
-    { headers: headers() }
+    { headers: headers() },
   );
   return (data.data || []).map(mapPaper);
 }
 
 export async function s2Read(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
-  const p = await fetchJSON<S2Paper>(
-    `${GRAPH}/paper/${id}?fields=${FIELDS}`,
-    { headers: headers() }
-  );
+  const p = await fetchJSON<S2Paper>(`${GRAPH}/paper/${id}?fields=${FIELDS}`, {
+    headers: headers(),
+  });
   const text = p.abstract || '';
-  if (!text) throw new Error(
-    `Semantic Scholar paper ${id} has no abstract. OA PDF: ${p.openAccessPdf?.url || 'none'}`
-  );
+  if (!text)
+    throw new Error(
+      `Semantic Scholar paper ${id} has no abstract. OA PDF: ${p.openAccessPdf?.url || 'none'}`,
+    );
   return {
     text,
     title: p.title || id,
-    authors: (p.authors || []).map(a => a.name),
+    authors: (p.authors || []).map((a) => a.name),
     year: p.year,
     language: 'en',
   };
@@ -78,13 +82,14 @@ export async function s2Read(id: string): Promise<{
 export async function s2Recommend(paperId: string, limit = 20): Promise<LibraryResult[]> {
   const data = await fetchJSON<S2RecommendResponse>(
     `${REC}/papers/forpaper/${paperId}?fields=${FIELDS}&limit=${limit}`,
-    { headers: headers() }
+    { headers: headers() },
   );
   return (data.recommendedPapers || []).map(mapPaper);
 }
 
 register('semanticscholar', {
-  description: 'Semantic Scholar — 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend.',
+  description:
+    'Semantic Scholar — 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend.',
   supportsIngest: true,
   search: s2Search,
   async read(id) {

@@ -1,7 +1,13 @@
-import { describe, it } from 'node:test';
-import test from 'node:test';
 import { strict as assert } from 'node:assert';
-import { truncateText, READ_MAX_CHARS, register, listSources, catalog, getAdapter } from './registry.js';
+import test, { describe, it } from 'node:test';
+import {
+  catalog,
+  getAdapter,
+  listSources,
+  READ_MAX_CHARS,
+  register,
+  truncateText,
+} from './registry.js';
 
 describe('truncateText', () => {
   it('returns exact string if below max limit', () => {
@@ -44,10 +50,15 @@ test('registry v2', async (t) => {
     register('t_defaults', {
       description: 'x',
       supportsIngest: false,
-      async search() { return []; },
-      async read() { return { title: '', authors: [] }; },
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
     });
-    const s = listSources().find(x => x.name === 't_defaults')!;
+    const s = listSources().find((x) => x.name === 't_defaults');
+    assert.ok(s);
     assert.equal(s.kind, 'rest');
     assert.equal(s.freshness, 'static');
     assert.equal(s.timeoutMs, 15000);
@@ -59,10 +70,14 @@ test('registry v2', async (t) => {
       description: 'x',
       supportsIngest: false,
       auth: { type: 'query', env: 'T_KEY', param: 'key' },
-      async search() { return []; },
-      async read() { return { title: '', authors: [] }; },
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
     });
-    assert.ok(!catalog().some(c => c.name === 't_keyed'));
+    assert.ok(!catalog().some((c) => c.name === 't_keyed'));
     assert.ok(getAdapter('t_keyed'));
   });
 
@@ -72,8 +87,13 @@ test('registry v2', async (t) => {
       description: 'x',
       supportsIngest: false,
       pacing: { dailyCap: 2 },
-      async search() { calls++; return []; },
-      async read() { return { title: '', authors: [] }; },
+      async search() {
+        calls++;
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
     });
     const adapter = getAdapter('t_capped');
     await adapter.search('q1', 1);
@@ -82,13 +102,43 @@ test('registry v2', async (t) => {
     assert.equal(calls, 2);
   });
 
+  await t.test(
+    'getAdapter reserves quota atomically: 6 concurrent calls against dailyCap 3 yield exactly 3 successes and 3 QuotaExceededError rejections',
+    async () => {
+      register('t_concurrent', {
+        description: 'x',
+        supportsIngest: false,
+        pacing: { dailyCap: 3 },
+        async search() {
+          return [];
+        },
+        async read() {
+          return { title: '', authors: [] };
+        },
+      });
+      const adapter = getAdapter('t_concurrent');
+      const outcomes = await Promise.allSettled(
+        Array.from({ length: 6 }, (_, i) => adapter.search(`q${i}`, 1)),
+      );
+      const fulfilled = outcomes.filter((o) => o.status === 'fulfilled');
+      const rejected = outcomes.filter((o) => o.status === 'rejected');
+      assert.equal(fulfilled.length, 3);
+      assert.equal(rejected.length, 3);
+    },
+  );
+
   await t.test('getAdapter caches an identical search without re-calling the adapter', async () => {
     let calls = 0;
     register('t_cached', {
       description: 'x',
       supportsIngest: false,
-      async search() { calls++; return []; },
-      async read() { return { title: '', authors: [] }; },
+      async search() {
+        calls++;
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
     });
     const adapter = getAdapter('t_cached');
     await adapter.search('same query', 3);
@@ -100,8 +150,12 @@ test('registry v2', async (t) => {
     register('t_stable', {
       description: 'x',
       supportsIngest: false,
-      async search() { return []; },
-      async read() { return { title: '', authors: [] }; },
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
     });
     assert.equal(getAdapter('t_stable'), getAdapter('t_stable'));
   });

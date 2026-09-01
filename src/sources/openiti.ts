@@ -1,6 +1,6 @@
+import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
-import type { LibraryResult } from '../types.js';
 
 const GH_API = 'https://api.github.com';
 const GH_RAW = 'https://raw.githubusercontent.com';
@@ -14,10 +14,10 @@ function ghHeaders(): Record<string, string> {
 function cleanMarkdown(text: string): string {
   return text
     .replace(/^######OpenITI#[\s\S]*?#META#END#/m, '') // strip metadata header
-    .replace(/PageV\d+P\d+/g, '')                      // strip page markers
-    .replace(/^### \|/gm, '')                           // strip section markers
-    .replace(/^# /gm, '')                               // strip paragraph markers
-    .replace(/\.Milestone\d+/g, '')                    // strip milestones
+    .replace(/PageV\d+P\d+/g, '') // strip page markers
+    .replace(/^### \|/gm, '') // strip section markers
+    .replace(/^# /gm, '') // strip paragraph markers
+    .replace(/\.Milestone\d+/g, '') // strip milestones
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -39,10 +39,10 @@ export async function openitiSearch(query: string, limit = 10): Promise<LibraryR
   // Search for files in OpenITI org by filename/path (author+work in filename)
   const data = await fetchJSON<GHCodeResponse>(
     `${GH_API}/search/code?q=${encodeURIComponent(query)}+org:${ORG}+in:path&per_page=${limit}`,
-    { headers: { ...ghHeaders(), Accept: 'application/vnd.github+json' } }
+    { headers: { ...ghHeaders(), Accept: 'application/vnd.github+json' } },
   );
 
-  return (data.items || []).map(item => {
+  return (data.items || []).map((item) => {
     // Path like: data/0505Ghazali/0505Ghazali.IhyaCulumDin/0505Ghazali.IhyaCulumDin.Shamela0011606-ara1
     const parts = item.name.split('.');
     const authorWork = parts.slice(0, 2).join(' — ') || item.name;
@@ -60,8 +60,11 @@ export async function openitiSearch(query: string, limit = 10): Promise<LibraryR
 }
 
 export async function openitiRead(id: string): Promise<{
-  text: string; title: string; authors: string[];
-  year?: number; language?: string;
+  text: string;
+  title: string;
+  authors: string[];
+  year?: number;
+  language?: string;
 }> {
   const sep = id.indexOf('||');
   if (sep === -1) throw new Error(`Invalid OpenITI ID format: ${id}. Expected {repo}||{path}`);
@@ -94,7 +97,8 @@ export async function openitiRead(id: string): Promise<{
 }
 
 register('openiti', {
-  description: 'OpenITI — 10,000+ Islamicate texts in Arabic and Persian (OpenITI mARkdown). Set GITHUB_TOKEN for higher rate limits.',
+  description:
+    'OpenITI — 10,000+ Islamicate texts in Arabic and Persian (OpenITI mARkdown). Set GITHUB_TOKEN for higher rate limits.',
   supportsIngest: true,
   search: openitiSearch,
   async read(id) {

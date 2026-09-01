@@ -1,5 +1,5 @@
-import { fetchJSON } from '../utils/http.js';
 import type { LibraryResult } from '../types.js';
+import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 const API = 'https://api.europeana.eu/v2/record/search.json';
@@ -7,9 +7,10 @@ const KEY_URL = 'https://pro.europeana.eu/page/developer-keys';
 
 function getKey(): string {
   const key = process.env.EUROPEANA_API_KEY;
-  if (!key) throw new Error(
-    `Europeana requires a free API key. Register at: ${KEY_URL} then set EUROPEANA_API_KEY in your environment.`
-  );
+  if (!key)
+    throw new Error(
+      `Europeana requires a free API key. Register at: ${KEY_URL} then set EUROPEANA_API_KEY in your environment.`,
+    );
   return key;
 }
 
@@ -39,7 +40,7 @@ export async function europeanaSearch(query: string, limit: number): Promise<Lib
 
   const data = await fetchJSON<EuropeanaResponse>(`${API}?${params}`);
 
-  return (data.items ?? []).slice(0, limit).map(item => ({
+  return (data.items ?? []).slice(0, limit).map((item) => ({
     id: item.id,
     source: 'europeana' as const,
     title: item.title?.[0] ?? item.id,
@@ -53,7 +54,8 @@ export async function europeanaSearch(query: string, limit: number): Promise<Lib
 }
 
 register('europeana', {
-  description: 'Europeana — 50M+ cultural heritage items from European museums, libraries, and archives. Requires free EUROPEANA_API_KEY.',
+  description:
+    'Europeana — 50M+ cultural heritage items from European museums, libraries, and archives. Requires free EUROPEANA_API_KEY.',
   supportsIngest: false,
   search: europeanaSearch,
   async read(id) {
