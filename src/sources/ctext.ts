@@ -1,3 +1,4 @@
+import pLimit from 'p-limit';
 import { fetchJSON } from '../utils/http.js';
 import { normaliseWhitespace } from '../utils/text-clean.js';
 import type { LibraryResult } from '../types.js';
@@ -57,17 +58,24 @@ export async function ctextRead(id: string): Promise<{
     return { text: normaliseWhitespace(textData.text ?? ''), title, authors: [], language: 'zh' };
   }
 
-  const parts: string[] = [];
-  for (const chapter of chapters.slice(0, 100)) {
-    await new Promise(r => setTimeout(r, 300));
-    try {
-      const chData = await fetchJSON<{ text: string }>(
-        `${API}?if=gettext&ci=${encodeURIComponent(chapter.id)}&ids=0`
-      );
-      const text = (chData.text ?? '').trim();
-      if (text.length > 20) parts.push(`\n\n# ${chapter.title}\n\n${text}`);
-    } catch { /* skip */ }
-  }
+  const limit = pLimit(5);
+  const parts = (
+    await Promise.all(
+      chapters.slice(0, 100).map((chapter) =>
+        limit(async () => {
+          await new Promise((r) => setTimeout(r, 300));
+          try {
+            const chData = await fetchJSON<{ text: string }>(
+              `${API}?if=gettext&ci=${encodeURIComponent(chapter.id)}&ids=0`
+            );
+            const text = (chData.text ?? '').trim();
+            if (text.length > 20) return `\n\n# ${chapter.title}\n\n${text}`;
+          } catch { /* skip */ }
+          return null;
+        })
+      )
+    )
+  ).filter((res): res is string => res !== null);
 
   return {
     text: normaliseWhitespace(parts.join('\n')),

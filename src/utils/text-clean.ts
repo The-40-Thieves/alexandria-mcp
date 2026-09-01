@@ -39,7 +39,7 @@ export function normaliseWhitespace(text: string): string {
 export function ocrQualityScore(text: string): number {
   if (!text || text.length === 0) return 0;
 
-  const clean = (text.match(/[a-zA-Z0-9\s.,!?;:'"()\-–—]/g) || []).length;
+  const clean = (text.match(/[\p{L}\p{N}\s.,!?;:'"()\-–—]/gu) || []).length;
   return clean / text.length;
 }
 

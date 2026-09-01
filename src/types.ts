@@ -4,15 +4,16 @@ export type LibrarySource =
   | 'loc' | 'hathitrust' | 'dpla' | 'ndl'
   | 'gallica' | 'europeana' | 'trove' | 'bhl' | 'digitalnz'
   | 'internetclassics' | 'marxists' | 'projectruneberg' | 'cervantes'
-  | 'doab' | 'oapen' | 'googlebooks' | 'chroniclingamerica'
+  | 'doab' | 'googlebooks' | 'chroniclingamerica'
   | 'ccel' | 'feedbooks' | 'wdl' | 'datagov'
   | 'arxiv' | 'core' | 'europmc' | 'nasa' | 'osti'
   | 'eric' | 'nsf' | 'courtlistener' | 'biorxiv' | 'zenodo' | 'semanticscholar'
   | 'govinfo' | 'nih' | 'nbnorway' | 'legislation' | 'osf'
   | 'earlyprint' | 'openiti' | 'legislationscot'
-  | 'openalex' | 'plos' | 'crossref' | 'nasaads' | 'smithsonian' | 'doaj' | 'nara' | 'springer'
+  | 'openalex' | 'plos' | 'nasaads' | 'smithsonian' | 'doaj' | 'nara' | 'springer'
   | 'harvardlib' | 'apollo' | 'ora' | 'base'
-  | 'codewiki';
+  | 'codewiki'
+  | 'youtube';
 
 export interface LibraryResult {
   id: string;

@@ -73,7 +73,10 @@ export async function marxistsRead(id: string): Promise<{
   text: string; title: string; authors: string[];
 }> {
   const entry = CURATED.find(e => e.id === id);
-  const url = entry?.url ?? (id.startsWith('http') ? id : `${BASE}${id}`);
+  let url = entry?.url ?? (id.startsWith('http') ? id : `${BASE}${id}`);
+  if (url.startsWith('http') && !url.startsWith(BASE)) {
+      throw new Error(`Invalid URL: ${url}`);
+  }
 
   const html = await fetchText(url);
   const root = parse(html);

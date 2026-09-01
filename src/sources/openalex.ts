@@ -3,7 +3,8 @@ import { register, truncateText } from './registry.js';
 import type { LibraryResult } from '../types.js';
 
 const BASE = 'https://api.openalex.org';
-const MAILTO = 'contact@the13thletter.co';
+const MAILTO = process.env.CONTACT_EMAIL || '';
+if (!MAILTO) console.warn('CONTACT_EMAIL environment variable is not set');
 
 interface OAWork {
   id: string;

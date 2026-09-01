@@ -1,12 +1,12 @@
 # Alexandria
 
-A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 61 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
+A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 59 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
 
 ## Tools
 
 | Tool | Description |
 |---|---|
-| `library_list_sources` | List all 61 sources with descriptions and full-text capabilities |
+| `library_list_sources` | List all 59 sources with descriptions and full-text capabilities |
 | `library_ask(query, max_sources?, results_per_source?)` | **Natural language search** — routes your query to the best sources, searches in parallel, returns unified deduplicated results |
 | `library_search(query, source, limit?)` | Search a specific source by title, author, or keywords |
 | `library_read(id, source)` | Fetch full text or metadata for an item (200k char limit) |
@@ -16,9 +16,9 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 `library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts.
 
-## Sources (61)
+## Sources (59)
 
-### Public Domain Literature (29)
+### Public Domain Literature (28)
 
 | Source | Coverage | Full Text |
 |---|---|---|
@@ -44,7 +44,6 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 | `projectruneberg` | Nordic literature and history | Yes |
 | `cervantes` | Biblioteca Virtual Miguel de Cervantes — Spanish literature | Yes |
 | `doab` | Directory of Open Access Books — 70k+ peer-reviewed OA books | Metadata only |
-| `oapen` | Open Access Publishing in European Networks — humanities & social sciences | Yes |
 | `googlebooks` | Google Books — metadata and preview snippets | Metadata only |
 | `chroniclingamerica` | Library of Congress — US historic newspapers 1770–1963 | Yes |
 | `ccel` | Christian Classics Ethereal Library | Yes |
@@ -86,13 +85,12 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 | `openiti` | OpenITI — Arabic/Persian Islamic texts (GitHub-based) | Yes |
 | `legislationscot` | Scottish legislation | Yes |
 
-### Research Aggregators (8)
+### Research Aggregators (7)
 
 | Source | Coverage | Full Text |
 |---|---|---|
 | `openalex` | OpenAlex — 240M+ scholarly works, open catalog | Metadata only |
 | `plos` | PLOS journals — open access science | Yes |
-| `crossref` | Crossref — 150M+ DOI metadata records | Metadata only |
 | `nasaads` | NASA Astrophysics Data System | Yes |
 | `smithsonian` | Smithsonian Institution — collections and research | Metadata only |
 | `doaj` | Directory of Open Access Journals — 20k+ journals | Metadata only |
@@ -160,7 +158,7 @@ Some sources require their own API key. These are free registrations. Sources wi
 ## Setup
 
 ```bash
-git clone https://github.com/suavecito585/alexandria-mcp
+git clone https://github.com/The-40-Thieves/alexandria-mcp
 cd alexandria-mcp
 npm install
 npm run build
@@ -275,7 +273,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", sources: 61 }`.
+Health check: `GET /health` returns `{ status: "ok", sources: 59 }`.
 
 ## Adding Custom Providers
 

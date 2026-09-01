@@ -32,7 +32,6 @@ import './sources/marxists.js';
 import './sources/projectruneberg.js';
 import './sources/cervantes.js';
 import './sources/doab.js';
-import './sources/oapen.js';
 import './sources/googlebooks.js';
 import './sources/chroniclingamerica.js';
 import './sources/ccel.js';
@@ -60,7 +59,6 @@ import './sources/openiti.js';
 import './sources/legislationscot.js';
 import './sources/openalex.js';
 import './sources/plos.js';
-import './sources/crossref.js';
 import './sources/nasaads.js';
 import './sources/smithsonian.js';
 import './sources/doaj.js';
@@ -71,8 +69,9 @@ import './sources/apollo.js';
 import './sources/ora.js';
 import './sources/base.js';
 import './sources/codewiki.js';
+import './sources/youtube.js';
 
-const server = new McpServer({ name: 'alexandria', version: '9.0.0' });
+const server = new McpServer({ name: 'alexandria', version: '9.2.0' });
 
 const ALL_SOURCES = [
   'gutenberg', 'openlibrary', 'archive', 'sacredtexts',
@@ -80,14 +79,15 @@ const ALL_SOURCES = [
   'loc', 'hathitrust', 'dpla', 'ndl',
   'europeana', 'trove', 'bhl', 'digitalnz',
   'internetclassics', 'marxists', 'projectruneberg', 'cervantes',
-  'doab', 'oapen', 'googlebooks', 'chroniclingamerica', 'ccel', 'feedbooks', 'wdl', 'datagov',
+  'doab', 'googlebooks', 'chroniclingamerica', 'ccel', 'feedbooks', 'wdl', 'datagov',
   'arxiv', 'core', 'europmc', 'nasa', 'osti', 'eric', 'nsf',
   'courtlistener', 'biorxiv', 'zenodo', 'semanticscholar',
   'govinfo', 'nih', 'nbnorway', 'legislation', 'osf',
   'earlyprint', 'openiti', 'legislationscot',
-  'openalex', 'plos', 'crossref', 'nasaads', 'smithsonian', 'doaj', 'nara', 'springer',
+  'openalex', 'plos', 'nasaads', 'smithsonian', 'doaj', 'nara', 'springer',
   'harvardlib', 'apollo', 'ora', 'base',
   'codewiki',
+  'youtube',
 ] as const;
 
 const SourceSchema = z.enum(ALL_SOURCES).describe('Library source. Run library_list_sources for descriptions.');
@@ -96,7 +96,7 @@ function toStructured(val: unknown): Record<string, unknown> { return JSON.parse
 // ── library_list_sources ─────────────────────────────────────────────────────
 server.registerTool('library_list_sources', {
   title: 'List Available Library Sources',
-  description: 'List all 61 library sources with descriptions and capabilities.',
+  description: 'List all 60 library sources with descriptions and capabilities.',
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 }, async () => {
@@ -108,7 +108,7 @@ server.registerTool('library_list_sources', {
 // ── library_ask (natural language) ───────────────────────────────────────────
 server.registerTool('library_ask', {
   title: 'Natural Language Library Search',
-  description: `Ask for content in plain English. Automatically selects the best sources from all 61 libraries, generates optimized per-source queries, and searches in parallel. Returns unified, deduplicated results.
+  description: `Ask for content in plain English. Automatically selects the best sources from all 60 libraries, generates optimized per-source queries, and searches in parallel. Returns unified, deduplicated results.
 
 Examples:
   "recent papers on diffusion models for music generation"

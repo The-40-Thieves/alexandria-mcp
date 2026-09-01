@@ -5,16 +5,23 @@ import type { LibraryResult } from '../types.js';
 const API = 'https://export.arxiv.org/api/query';
 const HTML = 'https://arxiv.org/html';
 
+import { parse as parseHtml } from 'node-html-parser';
+
 function xmlField(xml: string, tag: string): string {
-  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i'));
-  return m ? m[1].replace(/<[^>]+>/g, '').trim() : '';
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  if (!m) return '';
+  const root = parseHtml(m[1]);
+  return root.textContent.replace(/\s+/g, ' ').trim();
 }
 
 function xmlAll(xml: string, tag: string): string[] {
   const out: string[] = [];
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'gi');
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
   let m;
-  while ((m = re.exec(xml)) !== null) out.push(m[1].replace(/<[^>]+>/g, '').trim());
+  while ((m = re.exec(xml)) !== null) {
+    const root = parseHtml(m[1]);
+    out.push(root.textContent.replace(/\s+/g, ' ').trim());
+  }
   return out;
 }
 
