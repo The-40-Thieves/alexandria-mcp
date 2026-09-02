@@ -1,0 +1,48 @@
+{
+  "results": [
+    {
+      "id": 20070034695,
+      "title": "Cassini-Huygens Mars Exploration Rover",
+      "abstract": "A viewgraph presentation on the Cassini-Huygens Mars Exploration Rover is shown. The contents include: 1) Deep Space Network (DSN); 2) Saturn Cassini-Huygens; 3) Mars Exploration Rover; and 4) Referen",
+      "publicationDate": null,
+      "keywords": [
+        "Cassini",
+        "Mars Exploration Rover (MER)"
+      ],
+      "authorAffiliations": [
+        {
+          "meta": {
+            "author": {
+              "name": "Liepack, Otfrid G."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 20060036278,
+      "title": "Integrated Thermal Control for Mars Rover",
+      "abstract": "The Mars Rover has been built, environmentally tested and qualified for the 1996 launch of the Pathfinder mission to Mars.  The basic structure for the thermal control for the Mars  Rover is the Warm ",
+      "publicationDate": null,
+      "keywords": [
+        "Mars Rover Pathfinder Mars Warm Electronics BoxWEB aerogel"
+      ],
+      "authorAffiliations": [
+        {
+          "meta": {
+            "author": {
+              "name": "Hickey, Gregory S."
+            }
+          }
+        },
+        {
+          "meta": {
+            "author": {
+              "name": "Braun, David"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
