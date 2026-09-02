@@ -1,0 +1,20 @@
+{
+  "total_count": 1,
+  "incomplete_results": false,
+  "items": [
+    {
+      "name": "rate_limit.rb",
+      "path": "lib/octokit/rate_limit.rb",
+      "sha": "e4fd0b5a4a2c4c8a2e5a2b2b2b2b2b2b2b2b2b2b",
+      "url": "https://api.github.com/repositories/1234567/contents/lib/octokit/rate_limit.rb",
+      "git_url": "https://api.github.com/repositories/1234567/git/blobs/e4fd0b5a4a2c4c8a2e5a2b2b2b2b2b2b2b2b2b2b",
+      "html_url": "https://github.com/octokit/octokit.rb/blob/main/lib/octokit/rate_limit.rb",
+      "repository": {
+        "id": 1234567,
+        "full_name": "octokit/octokit.rb",
+        "html_url": "https://github.com/octokit/octokit.rb"
+      },
+      "score": 1.0
+    }
+  ]
+}

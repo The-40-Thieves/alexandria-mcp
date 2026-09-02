@@ -68,6 +68,7 @@ import './depsdev.js';
 import './stackexchange.js';
 import './hn.js';
 import './devto.js';
+import './githubsearch.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';
