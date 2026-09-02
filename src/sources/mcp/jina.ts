@@ -173,6 +173,11 @@ defineMcpSource({
     // an unguarded id turns this source into an SSRF proxy: same threat the
     // web fetch tier guards, one hop removed. Reuse that guard rather than
     // writing a second one. It runs before any pool call.
+    // Runs the fetch tier's own URL check before the URL leaves this process.
+    // The hosted server (mcp.jina.ai) then fetches from jina's network, so a
+    // redirect it follows never touches this host's tailnet or metadata
+    // endpoint; the redirect re-check that fetchTier applies to its own fetches
+    // has nothing to protect here.
     guard: (id) => assertFetchableUrl(id),
   },
   expectTools: ['search_web', 'read_url'],

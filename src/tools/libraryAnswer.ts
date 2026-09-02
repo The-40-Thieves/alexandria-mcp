@@ -132,13 +132,22 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
 // <source ...> or </source> sequence so a page cannot close its own block
 // early and have the rest of its bytes read as prompt instructions, or
 // forge an extra numbered source. Entity-escaping the angle bracket keeps
-// the text readable while making the tag inert. Whitespace between the
-// bracket, the slash, and the tag name is tolerated by lenient readers, so
-// the match tolerates it too; otherwise "< source" would slip through.
+// the text readable while making the tag inert. Whitespace and zero-width
+// characters between the bracket, the slash, and the tag name are ignored
+// by lenient readers (a model included), so the match ignores them too;
+// otherwise "< source" or "<\u200B/source" would slip through.
+//
+// The same pass rewrites citation-shaped markers in the page text ("[3]",
+// "[1, 2]") to "[ref 3]". Citations are only ever extracted from the
+// model's answer, never from source text, but a model that echoes a page
+// sentence verbatim would carry its "[3]" along and mint a citation to
+// source 3 that the page, not the model, chose. "[ref 3]" reads the same
+// and does not match CITATION_BRACKET_RE.
+const SOURCE_TAG_BRACKET_RE = /<(?=[\s\u200B-\u200D\uFEFF]*\/?[\s\u200B-\u200D\uFEFF]*source)/gi;
 export function escapeSourceText(text: string): string {
   // Escapes only the angle bracket, so the rest of the sequence (including
   // its original casing and spacing) is preserved as readable text.
-  return text.replace(/<(?=\s*\/?\s*source)/gi, '&lt;');
+  return text.replace(SOURCE_TAG_BRACKET_RE, '&lt;').replace(CITATION_BRACKET_RE, '[ref $1]');
 }
 
 // Same reasoning for the title, which lands inside a quoted attribute:
