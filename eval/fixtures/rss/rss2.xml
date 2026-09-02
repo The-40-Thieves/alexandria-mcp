@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Sample Security Feed</title>
+    <link>https://example.org/</link>
+    <description>Fixture feed for rss.test.ts</description>
+    <item>
+      <title>Older advisory about a buffer overflow</title>
+      <link>https://example.org/advisory/1</link>
+      <description>A stack buffer overflow was found in an older release.</description>
+      <guid isPermaLink="true">https://example.org/advisory/1</guid>
+      <pubDate>Mon, 01 Jun 2026 09:00:00 GMT</pubDate>
+      <dc:creator>Older Author</dc:creator>
+    </item>
+    <item>
+      <title>New critical remote code execution flaw</title>
+      <link>https://example.org/advisory/2</link>
+      <description>A newly disclosed remote code execution issue affects the parser.</description>
+      <guid isPermaLink="true">https://example.org/advisory/2</guid>
+      <pubDate>Tue, 01 Sep 2026 09:00:00 GMT</pubDate>
+      <dc:creator>New Author</dc:creator>
+    </item>
+  </channel>
+</rss>

@@ -34,6 +34,33 @@ export const PROBE_QUERIES: Record<string, string> = {
   // postings client-side, so the probe query needs to be common enough to
   // hit within the first page or two rather than exhausting MAX_PAGES.
   biorxiv: 'cell',
+  // The RSS-kind sources and nhk filter client-side by exact token match
+  // against whatever happens to be in the feed right now; an empty query
+  // skips that filter and returns the newest items, which is a reliable
+  // live probe. googlenews is a real per-query search API, so it gets an
+  // ordinary query instead.
+  exploitdb: '',
+  msrc: '',
+  projectzero: '',
+  'cisco-psirt': '',
+  bleepingcomputer: '',
+  allafrica: '',
+  arabnews: '',
+  'thehindu-intl': '',
+  'abc-world': '',
+  'folha-en': '',
+  dw: '',
+  france24: '',
+  aljazeera: '',
+  almonitor: '',
+  thediplomat: '',
+  nikkeiasia: '',
+  dailymaverick: '',
+  restofworld: '',
+  scmp: '',
+  'nist-csrc': '',
+  nhk: '',
+  googlenews: 'technology',
 };
 const DEFAULT_QUERY = 'history of science';
 
