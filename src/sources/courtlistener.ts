@@ -6,7 +6,11 @@ const BASE = 'https://www.courtlistener.com/api/rest/v4';
 
 function headers(): Record<string, string> {
   const key = process.env.COURTLISTENER_API_KEY;
-  if (!key) throw new Error('COURTLISTENER_API_KEY is not set');
+  if (!key)
+    throw new Error(
+      'CourtListener requires COURTLISTENER_API_KEY. Register a free key at: https://www.courtlistener.com/help/api/ ' +
+        'then set COURTLISTENER_API_KEY in your environment.',
+    );
   return { Authorization: `Token ${key}` };
 }
 
@@ -47,11 +51,7 @@ interface CLSearchResponse {
   results: CLResult[];
 }
 
-export async function courtlistenerSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<CLSearchResponse>(
-    `${BASE}/search/?q=${encodeURIComponent(query)}&type=o&order_by=score+desc&page_size=${limit}`,
-    { headers: headers() },
-  );
+export function normalizeCourtlistener(data: CLSearchResponse): LibraryResult[] {
   return (data.results || []).map((r) => {
     const filed = r.dateFiled || r.date_filed;
     return {
@@ -66,6 +66,14 @@ export async function courtlistenerSearch(query: string, limit = 10): Promise<Li
       description: r.snippet?.substring(0, 300),
     };
   });
+}
+
+export async function courtlistenerSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const data = await fetchJSON<CLSearchResponse>(
+    `${BASE}/search/?q=${encodeURIComponent(query)}&type=o&order_by=score+desc&page_size=${limit}`,
+    { headers: headers() },
+  );
+  return normalizeCourtlistener(data);
 }
 
 export async function courtlistenerRead(id: string): Promise<{
@@ -103,8 +111,14 @@ export async function courtlistenerRead(id: string): Promise<{
 
 register('courtlistener', {
   description:
-    'CourtListener — US federal and state court opinions. Free Law Project. Rate limit: 125 req/day.',
+    'CourtListener — US federal and state court opinions. Free Law Project. Requires free COURTLISTENER_API_KEY (125 req/day authenticated cap since 2026-05-07).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'law',
+  freshness: 'daily',
+  homepage: 'https://www.courtlistener.com',
+  auth: { type: 'header', env: 'COURTLISTENER_API_KEY', header: 'Authorization' },
+  pacing: { minIntervalMs: 12000, dailyCap: 120 },
   search: courtlistenerSearch,
   async read(id) {
     const raw = await courtlistenerRead(id);
