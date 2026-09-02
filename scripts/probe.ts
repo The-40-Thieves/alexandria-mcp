@@ -61,6 +61,9 @@ export const PROBE_QUERIES: Record<string, string> = {
   'nist-csrc': '',
   nhk: '',
   googlenews: 'technology',
+  // osv.dev's package query needs an ecosystem:name pair and rejects a bare
+  // keyword; a direct advisory id exercises the GET lookup branch instead.
+  osv: 'CVE-2021-44228',
 };
 const DEFAULT_QUERY = 'history of science';
 

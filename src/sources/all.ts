@@ -65,3 +65,4 @@ import './feeds/standards.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';
+import './osv.js';

