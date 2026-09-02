@@ -6,8 +6,9 @@ import { parseFeed } from 'feedsmith';
 import type { LibraryResult, ReadResult } from '../../types.js';
 import { fetchText } from '../../utils/http.js';
 import { stripHtml } from '../../utils/text-clean.js';
+import { fetchAsText } from '../../web/fetchTier.js';
 import type { Cluster, Freshness } from '../registry.js';
-import { register } from '../registry.js';
+import { register, truncateText } from '../registry.js';
 
 export interface FeedConfig {
   name: string;
@@ -152,17 +153,27 @@ export function defineRssSource(cfg: FeedConfig): void {
     return matched.slice(0, limit).map((item) => toResult(cfg.name, item));
   }
 
-  // TODO(stage-6): fetchTier. Once the web fetch tier lands, read(id) should
-  // retrieve and extract the article body at the item's link instead of
-  // returning metadata only.
+  // Retrieves and extracts the article body at the item's link via the
+  // fetch tier (defuddle, then jina, then crawl4ai, whichever is
+  // configured). A feed item's link is arbitrary third-party web content
+  // that fetchAsText can fail on for all sorts of reasons (paywall, robots
+  // block, the whole chain unconfigured) that aren't a bug in this source,
+  // so a failure here falls back to metadata-only with the error recorded
+  // in `note` rather than throwing.
   async function read(id: string): Promise<ReadResult> {
-    return {
-      title: id,
-      authors: [],
-      metadataOnly: true,
-      externalUrl: id,
-      note: 'Full-text fetch for RSS sources arrives in a later stage; this is metadata only.',
-    };
+    try {
+      const page = await fetchAsText(id);
+      return { title: page.title || id, authors: [], externalUrl: id, ...truncateText(page.text) };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        title: id,
+        authors: [],
+        metadataOnly: true,
+        externalUrl: id,
+        note: `Full-text fetch failed; showing metadata only: ${message}`,
+      };
+    }
   }
 
   register(cfg.name, {
