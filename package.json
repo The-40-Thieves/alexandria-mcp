@@ -22,7 +22,8 @@
     "eval:routing": "npx tsx scripts/eval-routing.ts",
     "docs": "npx tsx scripts/gen-docs.ts",
     "lint": "biome check .",
-    "gate": "npm run typecheck && npm run build && npm test && npm run lint",
+    "knip": "knip",
+    "gate": "npm run typecheck && npm run build && npm test && npm run lint && npm run knip",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -65,14 +66,12 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@types/express": "^5.0.6",
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
+    "knip": "^6.34.0",
     "tsx": "^4.23.13",
-    "typescript": "^5.0.0"
+    "typescript": "^7.0.2"
   },
   "engines": {
-    "node": ">=22.0.0"
-  },
-  "optionalDependencies": {
-    "@google/genai": "*"
+    "node": ">=24.0.0"
   }
 }
