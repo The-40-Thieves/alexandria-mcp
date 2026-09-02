@@ -2,9 +2,9 @@
 // Works keyless; CONTEXT7_API_KEY, if set, is sent as a bearer header for a
 // higher rate. A custom register() rather than defineRest(): the context
 // endpoint (read()) returns plain text, not JSON, so defineRest()'s
-// JSON-only read() doesn't fit. Kept even though a later stage adds an
-// `mcp`-kind variant of this source (per the plan); that stage should
-// prefer the mcp kind when configured, keeping both.
+// JSON-only read() doesn't fit. Kept alongside the `mcp`-kind variant of
+// this source (context7mcp), which supersedes it for routing; this REST
+// source stays registered and callable by name.
 import type { LibraryResult, ReadResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { register, truncateText } from './registry.js';

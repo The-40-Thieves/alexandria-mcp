@@ -61,13 +61,18 @@ export async function newsdataSearch(query: string, limit: number): Promise<Libr
   return results;
 }
 
-// TODO(stage-6): fetchTier
+// Stays metadata-only, and not for want of a fetch tier. A newsdata result's
+// id is the opaque `article_id`, not a URL: the article link is carried in
+// the result's `url` field but is not what read() is handed, and the free
+// tier's article-by-id lookup is not available, so there is nothing here to
+// fetch. Callers wanting the body should pass the result's `url` to the
+// webfetch source.
 export async function newsdataRead(id: string): Promise<ReadResult> {
   return {
     title: id,
     authors: [],
     metadataOnly: true,
-    note: 'Full-text fetch for newsdata arrives in a later stage; this is metadata only.',
+    note: "newsdata ids are opaque article ids, not URLs; pass the result's url to the webfetch source for the article body.",
   };
 }
 

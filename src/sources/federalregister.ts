@@ -4,8 +4,8 @@
 // same TODO convention used by mdn.ts, nhk.ts and kinds/rss.ts), since a
 // Federal Register document body is an HTML page, not a JSON API.
 import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import { fetchJSON, fetchText } from '../utils/http.js';
+import { register, truncateText } from './registry.js';
 
 const BASE = 'https://www.federalregister.gov/api/v1';
 
@@ -51,15 +51,53 @@ export async function federalRegisterSearch(
   return (data.results ?? []).map(normalizeFederalRegister);
 }
 
-// TODO(stage-6): fetchTier
+// Federal Register full text does NOT go through the web fetch tier. Its
+// html_url is behind bot protection: a plain GET is 302'd to
+// unblock.federalregister.gov (measured 2026-09-02), so every tier would
+// extract an interstitial rather than the document. The API instead
+// publishes the document's plain text at `raw_text_url`, which answers 200
+// directly, so read() takes that path. As elsewhere, a fetch failure
+// degrades to metadata rather than throwing.
+interface FederalRegisterDocument {
+  title?: string;
+  publication_date?: string;
+  html_url?: string;
+  raw_text_url?: string;
+}
+
 export async function federalRegisterRead(id: string): Promise<ReadResult> {
-  return {
-    title: id,
-    authors: [],
-    metadataOnly: true,
-    externalUrl: `https://www.federalregister.gov/documents/${id}`,
-    note: 'Full-text fetch for Federal Register arrives in a later stage; this is metadata only.',
-  };
+  const fallbackUrl = `https://www.federalregister.gov/documents/${id}`;
+  try {
+    const doc = await fetchJSON<FederalRegisterDocument>(`${BASE}/documents/${id}.json`);
+    const externalUrl = doc.html_url ?? fallbackUrl;
+    if (!doc.raw_text_url) {
+      return {
+        title: doc.title ?? id,
+        authors: [],
+        year: yearOf(doc.publication_date),
+        metadataOnly: true,
+        externalUrl,
+        note: 'This document publishes no plain-text rendition; showing metadata only.',
+      };
+    }
+    const text = await fetchText(doc.raw_text_url);
+    return {
+      title: doc.title ?? id,
+      authors: [],
+      year: yearOf(doc.publication_date),
+      externalUrl,
+      ...truncateText(text),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      title: id,
+      authors: [],
+      metadataOnly: true,
+      externalUrl: fallbackUrl,
+      note: `Full-text fetch failed; showing metadata only: ${message}`,
+    };
+  }
 }
 
 register('federalregister', {
