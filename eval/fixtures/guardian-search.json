@@ -1,0 +1,22 @@
+{
+  "response": {
+    "status": "ok",
+    "userTier": "developer",
+    "total": 187375,
+    "results": [
+      {
+        "id": "australia-news/2026/may/27/morning-mail-wednesday-ntwnfb",
+        "type": "article",
+        "sectionId": "australia-news",
+        "sectionName": "Australia news",
+        "webPublicationDate": "2026-05-26T21:17:10Z",
+        "webTitle": "Morning Mail: Labor's budget faces poll test",
+        "webUrl": "https://www.theguardian.com/australia-news/2026/may/27/morning-mail-wednesday-ntwnfb",
+        "apiUrl": "https://content.guardianapis.com/australia-news/2026/may/27/morning-mail-wednesday-ntwnfb",
+        "fields": {
+          "trailText": "A quick summary of the day's news."
+        }
+      }
+    ]
+  }
+}

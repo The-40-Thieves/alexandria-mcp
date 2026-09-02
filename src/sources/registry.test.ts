@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import test, { describe, it } from 'node:test';
+import { fetchJSON } from '../utils/http.js';
 import {
   catalog,
   getAdapter,
@@ -159,4 +160,63 @@ test('registry v2', async (t) => {
     });
     assert.equal(getAdapter('t_stable'), getAdapter('t_stable'));
   });
+
+  await t.test(
+    'a registry timeout aborts the ambient signal, so fetchWithRetry cancels the in-flight fetch and never retries',
+    async () => {
+      const originalFetch = globalThis.fetch;
+      let fetchCalls = 0;
+      let capturedSignal: AbortSignal | undefined;
+      // A fetch that never settles on its own, matching a hung real
+      // request, except by rejecting once its (combined) signal aborts,
+      // the same as a real fetch() call behaves when its signal fires.
+      globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+        fetchCalls++;
+        const signal = init?.signal;
+        capturedSignal = signal ?? undefined;
+        return new Promise<Response>((_resolve, reject) => {
+          if (!signal) return;
+          const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+          if (signal.aborted) onAbort();
+          else signal.addEventListener('abort', onAbort, { once: true });
+        });
+      }) as typeof fetch;
+
+      try {
+        register('t_timeout_abort', {
+          description: 'x',
+          supportsIngest: false,
+          timeoutMs: 100,
+          async search() {
+            // Default retries and timeoutMs (unchanged): the registry's own
+            // 100ms source timeout above is what should cut this short, not
+            // fetchJSON's own (much longer) default per-attempt timeout.
+            await fetchJSON('https://example.invalid/t-timeout-abort');
+            return [];
+          },
+          async read() {
+            return { title: '', authors: [] };
+          },
+        });
+
+        const start = Date.now();
+        await assert.rejects(
+          getAdapter('t_timeout_abort').search('q', 1),
+          /This operation was aborted/,
+        );
+        const elapsed = Date.now() - start;
+        assert.ok(elapsed >= 80 && elapsed < 500, `expected a ~100ms timeout, got ${elapsed}ms`);
+        assert.equal(fetchCalls, 1);
+
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        assert.equal(fetchCalls, 1, 'no retry should have started after the caller aborted');
+        assert.ok(
+          capturedSignal?.aborted,
+          'the ambient signal should be aborted after the timeout',
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  );
 });

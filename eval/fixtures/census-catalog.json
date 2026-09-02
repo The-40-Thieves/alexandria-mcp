@@ -1,0 +1,12 @@
+{
+  "dataset": [
+    {
+      "c_dataset": ["nonemp"],
+      "c_vintage": 1997,
+      "title": "1997 Nonemployer Statistics: Non Employer Statistics",
+      "description": "Nonemployer Statistics is an annual series that provides subnational economic data for businesses that have no paid employees and are subject to federal income tax.",
+      "modified": "2017-02-09",
+      "c_documentationLink": "http://www.census.gov/developer/"
+    }
+  ]
+}

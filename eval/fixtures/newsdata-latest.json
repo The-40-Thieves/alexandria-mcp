@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "totalResults": 1,
+  "results": [
+    {
+      "article_id": "abc123",
+      "title": "Central bank holds rates steady",
+      "link": "https://example.com/news/central-bank-rates",
+      "description": "The central bank left interest rates unchanged for a third straight meeting.",
+      "pubDate": "2026-09-01 08:00:00"
+    }
+  ]
+}

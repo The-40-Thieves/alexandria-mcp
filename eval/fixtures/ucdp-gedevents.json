@@ -1,0 +1,20 @@
+{
+  "TotalCount": 1,
+  "TotalPages": 1,
+  "PageSize": 25,
+  "Page": 1,
+  "Result": [
+    {
+      "id": 512345,
+      "relid": "UKR-2026-1-1",
+      "year": 2026,
+      "type_of_violence": 1,
+      "conflict_name": "Government of Ukraine - Government of Russia",
+      "side_a": "Government of Ukraine",
+      "side_b": "Government of Russia",
+      "country": "Ukraine",
+      "date_start": "2026-06-15",
+      "best": 12
+    }
+  ]
+}

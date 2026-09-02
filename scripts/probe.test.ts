@@ -44,6 +44,24 @@ test('probe classification', async (t) => {
       }),
       'KEY_MISSING',
     );
+    // Stage-4B keyed sources whose env var names don't contain "key",
+    // "token", or "env" (e.g. reliefweb's RELIEFWEB_APPNAME, hapi's
+    // HDX_APP_IDENTIFIER): the regex also matches "email", "identifier",
+    // and "appname".
+    assert.equal(
+      classify({
+        results: null,
+        error: new Error('x requires CONTACT_EMAIL'),
+      }),
+      'KEY_MISSING',
+    );
+    assert.equal(
+      classify({
+        results: null,
+        error: new Error('x requires HDX_APP_IDENTIFIER'),
+      }),
+      'KEY_MISSING',
+    );
   });
 
   await t.test('regressions lists sources that were OK and are not', () => {

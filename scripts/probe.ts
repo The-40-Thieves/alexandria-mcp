@@ -87,12 +87,25 @@ export const PROBE_QUERIES: Record<string, string> = {
   swiftevolution: '',
   ietf: 'tls',
   w3c: 'css',
+  coingecko: 'bitcoin',
+  frankfurter: 'USD EUR',
+  // comtrade's search() only accepts an HS commodity code; the default
+  // free-text query isn't one and would return [] by design.
+  comtrade: '0101',
+  census: 'population',
+  // openFDA returns HTTP 404 (not an empty array) for a zero-result query.
+  openfda: 'tylenol',
+  epatri: 'BASF',
+  gdelt: 'ukraine',
+  wikicurrent: '',
+  ukparliament: 'education',
 };
 const DEFAULT_QUERY = 'history of science';
 
 export function classify(x: { results: unknown[] | null; error: Error | null }): ProbeStatus {
   if (x.error) {
-    if (/requires .*(key|token|env)/i.test(x.error.message)) return 'KEY_MISSING';
+    if (/requires .*(key|token|env|email|identifier|appname)/i.test(x.error.message))
+      return 'KEY_MISSING';
     return /abort/i.test(x.error.message) ? 'TIMEOUT' : 'ERROR';
   }
   return (x.results?.length ?? 0) > 0 ? 'OK' : 'EMPTY';
