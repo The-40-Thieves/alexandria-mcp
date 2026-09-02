@@ -52,12 +52,12 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 Most tools query external library APIs directly and need no credentials at all. The two optional dependencies are scoped to specific tools:
 
-### OpenAI — optional ([platform.openai.com](https://platform.openai.com/api-keys))
+### OpenAI, optional ([platform.openai.com](https://platform.openai.com/api-keys))
 
 Required by two tools only:
 
-- **`library_ask`** — uses `gpt-4o-mini` to route your natural language query to the right sources and generate optimized per-source search terms. Without this key, use `library_search` to query sources directly.
-- **`library_ingest`** — uses `text-embedding-3-small` to embed chunked text before writing to the vector store.
+- **`library_ask`**: uses `gpt-4o-mini` to route your natural language query to the right sources and generate optimized per-source search terms. Without this key, use `library_search` to query sources directly.
+- **`library_ingest`**: uses `text-embedding-3-small` to embed chunked text before writing to the vector store.
 
 `library_list_sources`, `library_search`, `library_read`, `library_index`, and `library_recommend` all work without an OpenAI key.
 
