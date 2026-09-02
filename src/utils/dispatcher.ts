@@ -23,29 +23,55 @@
 // underneath it would double the effective retry count and reorder when
 // Retry-After is read.
 //
-// Version note: package.json pins the `undici` dependency to ^7.29.0, NOT
-// to Node's own currently-bundled version. The real constraint (verified
-// against node_modules/undici/lib/core/util.js's assertRequestHandler,
-// and live on both Node 24 (bundled undici 7.x) and Node 26 (bundled undici
-// 8.x)): undici 7.x's request-handler assertion accepts BOTH the legacy
-// (onConnect/onHeaders/onData/onComplete) shape and the newer
-// (onRequestStart/onResponseStart/...) shape, so a 7.x Agent handed to
-// Node's OWN bundled global fetch() works regardless of which of those two
-// shapes that bundled fetch happens to construct. undici 8.x DROPPED the
-// legacy branch, so an 8.x Agent passed as an explicit `dispatcher` option
-// throws ("invalid onRequestStart method") against any Node whose bundled
-// fetch still constructs the legacy shape (Node 24, at minimum - the exact
-// range engines/mise.toml still permit for this package). The rule is
-// therefore one-directional and package-version-scoped, not tied to
-// matching Node's own version: stay on undici 7.x in this package for as
-// long as any Node version this repo supports bundles a 7.x fetch; do NOT
-// move to 8.x until Node 24 support is dropped. A dispatcher set globally
-// via setGlobalDispatcher() is unaffected either way (confirmed live, see
-// the report's two-line check), so sourceDispatcher below has no such
-// constraint; only guardedDispatcher's explicit `dispatcher:` fetch option
-// depends on it. dispatcher.test.ts's "global fetch honors an explicit
-// dispatcher option (undici 7.x/legacy-handler compatibility)" test fails
-// loudly the day this constraint is violated (e.g. a bump to undici 8.x).
+// Version note: package.json pins the `undici` dependency to ^7.29.0.
+// This is conservatism, not a version-matching requirement - 7.x is the
+// current, maintained undici line and there is no reason to move ahead of
+// it. The specific, reproduced reason to stay off 8.x while this repo still
+// supports Node 24 (mechanism traced in node_modules/undici's own source,
+// result reproduced live and TWICE on this exact box, not merely asserted):
+//
+//   - Node's global fetch() is Node's OWN bundled undici build (7.29.0 on
+//     Node 24.20.0, checked via process.versions.undici).
+//   - undici 8.x DOES carry a legacy-handler compatibility shim
+//     (Dispatcher1Wrapper/LegacyHandlerWrapper, lib/dispatcher/
+//     dispatcher1-wrapper.js) - but it is wired in ONLY inside
+//     setGlobalDispatcher() (lib/global.js): that function publishes both
+//     the agent itself (current-shape symbol) AND a Dispatcher1Wrapper-
+//     wrapped copy under the OLD global-dispatcher symbol
+//     (Symbol.for('undici.globalDispatcher.1')), which is what Node's OWN
+//     bundled 7.x fetch reads when no explicit `dispatcher` option is
+//     given. That is why a dispatcher installed via setGlobalDispatcher()
+//     works regardless of the installed undici package's major version
+//     (reproduced live both directions - see the report's two-line check
+//     and its undici-8.x re-run) - sourceDispatcher below has no
+//     version constraint for exactly this reason.
+//   - An EXPLICIT `dispatcher` option on a fetch call (guardedDispatcher's
+//     pattern, in fetchTier.ts) bypasses that global-symbol lookup and
+//     global.js's wrapping entirely: Node's bundled 7.x fetch hands the RAW
+//     Agent (unwrapped) a legacy-shape handler
+//     (onConnect/onHeaders/onData/onComplete) directly. undici 7.x's own
+//     Agent.dispatch() -> assertRequestHandler accepts that legacy shape
+//     natively (confirmed against node_modules/undici/lib/core/util.js);
+//     undici 8.x's does not (assertRequestHandler there requires the
+//     current onRequestStart shape), so it throws.
+//
+// Reproduced on this box, Node v24.20.0 (bundled undici 7.29.0), package
+// undici temporarily bumped to 8.10.1 (`npm install undici@8.10.1
+// --no-save`): passing `new Agent()` or an Agent with `connect.lookup` set
+// (guardedDispatcher's own shape) as an explicit `{ dispatcher }` option to
+// the real global fetch() throws `InvalidArgumentError: invalid
+// onRequestStart method` (code UND_ERR_INVALID_ARG) both times, run twice
+// for reproducibility. A composed dns+cache Agent (sourceDispatcher's
+// shape) does not throw that same error under the same conditions but hangs
+// instead - also a failure, just a different failure mode - though
+// sourceDispatcher never takes this explicit-option code path in
+// production. dispatcher.test.ts's "global fetch honors an explicit
+// dispatcher option" test exercises exactly guardedDispatcher's own shape
+// through the real global fetch and is a genuine, currently-passing
+// regression trap for this constraint: it fails the same way the moment a
+// dependency bump moves this package to 8.x while Node 24 is still
+// supported (verified by temporarily bumping the installed package and
+// re-running the suite).
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LookupAddress, LookupOptions } from 'node:dns';
 import fs from 'node:fs';
@@ -58,7 +84,7 @@ const HEADERS_TIMEOUT_MS = 15_000;
 const BODY_TIMEOUT_MS = 15_000;
 const DNS_MAX_TTL_MS = 60_000;
 const CACHE_MAX_SIZE_BYTES = 256 * 1024 * 1024;
-const CACHE_MAX_ENTRY_SIZE_BYTES = 5 * 1024 * 1024;
+const CACHE_MAX_ENTRY_SIZE_BYTES = 1 * 1024 * 1024;
 
 // Resolved from import.meta.dirname rather than process.cwd(), matching
 // catalogIndex.ts's DEFAULT_CACHE_PATH: the default must not depend on where
@@ -86,16 +112,31 @@ export function resetHttpCacheWarningForTests(): void {
 
 // SqliteCacheStore has no maxSize (total-bytes) knob - only maxCount and
 // maxEntrySize (confirmed against undici's current CacheStore docs), so the
-// 256 MB budget from the brief can only be approximated there via maxCount.
-// SQLITE_MAX_COUNT is the worst-case bound: if every single cached entry
-// happened to be the full 5 MB maxEntrySize ceiling, this many entries is
-// the most that still fits inside 256 MB, so on-disk usage can never exceed
-// the budget regardless of what gets cached. Real responses (JSON API
-// payloads, RSS/HTML pages) are almost always far smaller than 5 MB, so
-// day-to-day capacity - the number of distinct URLs actually held before
-// eviction - is effectively much higher than this worst-case count.
+// 256 MB budget can only be applied there via maxCount * maxEntrySize.
+// 256 * 1 MB = 256 MB exactly: SQLITE_MAX_COUNT (256) times
+// CACHE_MAX_ENTRY_SIZE_BYTES (1 MB) is the worst-case bound - on-disk usage
+// can never exceed the budget regardless of what gets cached, even if every
+// single entry hit the maxEntrySize ceiling.
+//
+// maxEntrySize is 1 MB rather than the brief's original 5 MB (a controller
+// ruling on review, replacing the round-1 fix's maxCount=51/maxEntrySize=5 MB
+// pair, which bounded disk usage correctly but left too little cross-run
+// capacity for ~130 distinct origins at the same 256 MB budget). Most of
+// this registry's responses (JSON API pages, RSS/HTML) are well under 1 MB,
+// so raising maxCount 5x (51 -> 256) for a lower per-entry ceiling trades
+// away caching the occasional large response for caching far more distinct
+// URLs, which is the better trade for a dispatcher shared by ~130 sources.
+// NOTE on a claim from review: the ruling that set these two values also
+// said a response over 1 MB is a full-text read already covered by
+// src/utils/resultCache.ts. Checked against src/sources/registry.ts and
+// that is not accurate: searchCache there wraps only search(), not read(),
+// so a read response over 1 MB is genuinely uncached at every layer here,
+// not backed by another cache. The maxCount/capacity tradeoff above (more
+// distinct URLs cached vs. occasionally missing a large one) stands on its
+// own regardless of that claim.
 // MemoryCacheStore (the fallback below) gets the 256 MB budget directly via
-// its own maxSize option instead; maxEntrySize (5 MB) applies to both.
+// its own maxSize option instead (unchanged); maxEntrySize (1 MB) applies to
+// both stores.
 const SQLITE_MAX_COUNT = Math.floor(CACHE_MAX_SIZE_BYTES / CACHE_MAX_ENTRY_SIZE_BYTES);
 
 export function buildCacheStore(

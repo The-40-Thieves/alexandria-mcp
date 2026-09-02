@@ -42,15 +42,18 @@ export async function fetchWithRetry(
       // Node's global fetch is its OWN bundled undici build. The `undici`
       // package this repo installs for Agent/interceptors
       // (src/utils/dispatcher.ts) is kept on the 7.x line (package.json:
-      // "^7.29.0") because 7.x's request-handler assertion accepts both the
-      // legacy and current handler shapes, so a 7.x Agent passed here as an
-      // explicit `dispatcher` option is accepted by the ambient global
-      // fetch's own (differently-versioned) bundled undici regardless of
-      // which shape that bundled fetch constructs. undici 8.x dropped the
-      // legacy branch and throws "invalid onRequestStart method" against a
-      // Node whose bundled fetch still constructs it (Node 24, at minimum).
-      // See dispatcher.ts's module comment for the full rule and the
-      // report for the confirming two-line check.
+      // "^7.29.0") as conservatism - 7.x is current and maintained - but it
+      // is also a reproduced (not merely asserted) requirement for exactly
+      // this call site: an explicit `dispatcher` option, like the one
+      // fetchTier.ts's guarded fetches pass, is handed by Node's bundled
+      // fetch straight to the Agent's own dispatch(), with no version
+      // compatibility shim in between (that shim exists in undici 8.x, but
+      // only inside setGlobalDispatcher() - irrelevant to an explicit
+      // per-call option). Reproduced live on Node 24.20.0 (bundled undici
+      // 7.29.0) with the installed package temporarily bumped to 8.10.1:
+      // this exact call shape throws "invalid onRequestStart method" (code
+      // UND_ERR_INVALID_ARG). See dispatcher.ts's module comment for the
+      // full mechanism, the exact reproduction command, and the report.
       const response = await fetch(url, {
         ...options,
         signal,

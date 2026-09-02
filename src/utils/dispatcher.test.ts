@@ -209,20 +209,19 @@ test('installDispatcher', async (t) => {
   await t.test(
     'the global fetch honors an explicit dispatcher option (undici 7.x/legacy-handler compatibility)',
     async () => {
-      // The constraint package.json's undici pin actually protects (see
-      // dispatcher.ts's module comment): Node's global fetch() is its OWN
-      // bundled undici build, a different copy from this package; passing
-      // it an explicit `dispatcher` built by THIS package must still work
-      // as long as this package stays on the 7.x line. guardedDispatcher is
-      // exactly what fetchTier.ts's guarded fetches pass as that option, so
-      // exercising it here - through the real global fetch, not undiciFetch
-      // - is what would fail loudly (a thrown "invalid onRequestStart
-      // method") the day a dependency bump moves this package to 8.x while
-      // Node 24 (bundled undici 7.x) is still supported. A literal-IP
-      // target, so guardedDispatcher's connect.lookup pin is never even
-      // consulted (undici's connector skips DNS/connect.lookup entirely for
-      // a literal IP) - this test is purely about whether the global fetch
-      // accepts the `dispatcher` option at all, decoupled from pinning.
+      // A smoke test: proves the real global fetch() accepts guardedDispatcher
+      // - the exact object fetchTier.ts's guarded fetches pass as an
+      // explicit `dispatcher` option - as it stands today. It is also a
+      // verified (not merely hoped-for) regression trap for the specific
+      // constraint package.json's undici pin exists to protect: re-run
+      // manually with the installed `undici` package temporarily bumped to
+      // 8.10.1 (`npm install undici@8.10.1 --no-save`), this exact test
+      // fails with "invalid onRequestStart method" - see dispatcher.ts's
+      // module comment for the full mechanism. A literal-IP target, so
+      // guardedDispatcher's connect.lookup pin is never even consulted
+      // (undici's connector skips DNS/connect.lookup entirely for a literal
+      // IP) - this test is purely about whether the global fetch accepts
+      // the `dispatcher` option at all, decoupled from pinning.
       const server = await startFixtureServer();
       t.after(() => server.close());
 
