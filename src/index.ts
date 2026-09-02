@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 import { z } from 'zod';
 import { indexText, ingestText } from './pipeline/index.js';
-import { getAdapter, listSources } from './sources/registry.js';
+import { getAdapter, healthSummary, listSources } from './sources/registry.js';
 import { s2Recommend } from './sources/semanticscholar.js';
 import { libraryAnswer } from './tools/libraryAnswer.js';
 import { libraryAsk } from './tools/libraryAsk.js';
@@ -13,7 +13,15 @@ import type { LibrarySource } from './types.js';
 
 import './sources/all.js';
 
-const server = new McpServer({ name: 'alexandria', version: '9.2.0' });
+const server = new McpServer({ name: 'alexandria', version: '10.0.0' });
+
+// The nine public tools registered below (library_list_sources, library_ask,
+// library_search, library_read, library_index, library_ingest,
+// library_recommend, library_answer, library_research). Kept as a literal
+// count rather than introspected from the SDK: tools/list must not vary per
+// connection (see the plan's Global Constraints), so this is a fixed fact
+// about this file, not a runtime measurement.
+const TOOL_COUNT = 9;
 
 const SourceSchema = z
   .string()
@@ -27,7 +35,7 @@ server.registerTool(
   'library_list_sources',
   {
     title: 'List Available Library Sources',
-    description: `List all ${listSources().length} library sources with descriptions and capabilities.`,
+    description: `List all ${listSources().length} library sources (count computed from the live registry at startup) with descriptions and capabilities.`,
     inputSchema: {},
     annotations: {
       readOnlyHint: true,
@@ -470,7 +478,18 @@ async function runHTTP(): Promise<void> {
   app.post('/mcp', handleMcpRequest);
   app.get('/mcp', handleMcpRequest);
   app.delete('/mcp', handleMcpRequest);
-  app.get('/health', (_req, res) => res.json({ status: 'ok', sources: listSources().length }));
+  app.get('/health', (_req, res) => {
+    const { sources, visible, hidden, byKind } = healthSummary();
+    res.json({
+      status: 'ok',
+      version: '10.0.0',
+      sources,
+      visible,
+      hidden,
+      byKind,
+      tools: TOOL_COUNT,
+    });
+  });
   const port = parseInt(process.env.PORT ?? '3000', 10);
   app.listen(port, () =>
     console.error(`alexandria — ${listSources().length} sources — http://localhost:${port}/mcp`),
