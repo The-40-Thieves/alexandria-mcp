@@ -64,6 +64,10 @@ export const PROBE_QUERIES: Record<string, string> = {
   // osv.dev's package query needs an ecosystem:name pair and rejects a bare
   // keyword; a direct advisory id exercises the GET lookup branch instead.
   osv: 'CVE-2021-44228',
+  // kev filters its whole-catalog download client-side by exact token
+  // match; an empty query skips the filter and returns the first entries,
+  // a reliable live probe (like the RSS-kind sources above).
+  kev: '',
 };
 const DEFAULT_QUERY = 'history of science';
 

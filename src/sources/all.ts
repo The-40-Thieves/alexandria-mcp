@@ -67,3 +67,4 @@ import './nhk.js';
 import './circl.js';
 import './osv.js';
 import './ghsa.js';
+import './kev.js';
