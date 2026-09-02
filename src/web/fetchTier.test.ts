@@ -24,8 +24,10 @@ interface FixtureServer {
 // (a redirect to a private-network target, to exercise per-hop guarding),
 // /huge (a 6 MB body sent chunked with no Content-Length, to exercise the
 // streaming size cap), and /huge-declared (a 6 MB body with an honest,
-// oversized Content-Length, to exercise the fast-reject path).
-function startFixtureServer(crawlResponse?: unknown): Promise<FixtureServer> {
+// oversized Content-Length, to exercise the fast-reject path). `hugeCrawl`
+// makes /crawl itself stream an oversized chunked body instead of its
+// normal JSON, to exercise the same streaming size cap on tier 3.
+function startFixtureServer(crawlResponse?: unknown, hugeCrawl = false): Promise<FixtureServer> {
   const crawlRequests: unknown[] = [];
   return new Promise((resolve) => {
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
@@ -90,6 +92,21 @@ function startFixtureServer(crawlResponse?: unknown): Promise<FixtureServer> {
         });
         req.on('end', () => {
           crawlRequests.push(JSON.parse(body || '{}'));
+          if (hugeCrawl) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            const chunk = 'x'.repeat(1024 * 1024); // 1 MB, sent 6 times: no Content-Length (chunked)
+            let sent = 0;
+            const writeNext = () => {
+              if (sent >= 6) {
+                res.end();
+                return;
+              }
+              sent += 1;
+              res.write(chunk, () => writeNext());
+            };
+            writeNext();
+            return;
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(
             JSON.stringify(
@@ -441,4 +458,52 @@ test('fetchAsText', async (t) => {
       );
     },
   );
+
+  await t.test('the 5 MB cap also applies to the jina reader tier', async () => {
+    delete process.env.ALEXANDRIA_JINA_READER;
+    delete process.env.CRAWL4AI_URL;
+    process.env.JINA_API_KEY = 'test-jina-key';
+    const server = await startFixtureServer();
+    t.after(() => server.close());
+
+    globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
+      const url = String(input);
+      if (url.startsWith('https://r.jina.ai/')) {
+        // No Content-Length, streamed: exercises the same abort-while-
+        // streaming path as tier 1's /huge fixture above, not the
+        // fast-reject-on-a-declared-header path.
+        const chunk = 'x'.repeat(1024 * 1024);
+        const stream = new ReadableStream({
+          start(controller) {
+            for (let i = 0; i < 6; i++) controller.enqueue(new TextEncoder().encode(chunk));
+            controller.close();
+          },
+        });
+        return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+      }
+      return originalFetch(input as string, init);
+    }) as typeof fetch;
+
+    await assert.rejects(
+      () => fetchAsText(`${server.url}/tiny`),
+      /jina: response for .* exceeded the 5242880-byte cap/,
+    );
+
+    delete process.env.JINA_API_KEY;
+  });
+
+  await t.test('the 5 MB cap also applies to the crawl4ai tier', async () => {
+    delete process.env.JINA_API_KEY;
+    delete process.env.ALEXANDRIA_JINA_READER;
+    const server = await startFixtureServer(undefined, true);
+    t.after(() => server.close());
+    process.env.CRAWL4AI_URL = server.url;
+
+    await assert.rejects(
+      () => fetchAsText(`${server.url}/tiny`),
+      /crawl4ai: response for .* exceeded the 5242880-byte cap/,
+    );
+
+    delete process.env.CRAWL4AI_URL;
+  });
 });
