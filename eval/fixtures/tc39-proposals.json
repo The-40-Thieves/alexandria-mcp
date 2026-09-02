@@ -1,0 +1,22 @@
+[
+  {
+    "id": "proposal-amount",
+    "name": "Amount",
+    "description": "Numbers with precision and a unit for JavaScript",
+    "stage": 2,
+    "authors": [
+      "Ben Allen"
+    ],
+    "url": "https://github.com/tc39/proposal-amount"
+  },
+  {
+    "id": "proposal-thenable-curtailment",
+    "name": "Curtailing the power of \"Thenables\"",
+    "description": "A proposal to curtail the power of \"thenable\" objects.",
+    "stage": 2,
+    "authors": [
+      "Matthew Gaudet"
+    ],
+    "url": "https://github.com/tc39/proposal-thenable-curtailment"
+  }
+]

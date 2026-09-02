@@ -83,6 +83,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // working tag-filtered branch instead.
   devto: 'rust',
   peps: 'style guide',
+  tc39: '',
 };
 const DEFAULT_QUERY = 'history of science';
 
