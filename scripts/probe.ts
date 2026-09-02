@@ -59,6 +59,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   restofworld: '',
   scmp: '',
   'nist-csrc': '',
+  lobsters: '',
   nhk: '',
   googlenews: 'technology',
   // osv.dev's package query needs an ecosystem:name pair and rejects a bare
