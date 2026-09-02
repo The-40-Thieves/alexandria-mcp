@@ -1,6 +1,1 @@
-[
-  "hf_fs",
-  "hf_whoami",
-  "hub_repo_details",
-  "hub_repo_search"
-]
+["hf_fs", "hf_whoami", "hub_repo_details", "hub_repo_search"]
