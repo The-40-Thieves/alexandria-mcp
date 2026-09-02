@@ -1,0 +1,41 @@
+{
+  "hits": {
+    "hits": [
+      {
+        "id": 13235113,
+        "doi": "10.5281/zenodo.13235113",
+        "metadata": {
+          "title": "plastic-waste-database/Rainfall-and-Kalumpang-Malaysia: Rainfall and Terrain Data",
+          "description": "<p>You can use this Malaysian rainfall and terrain data on scattered data interpolation or other suitable techniques</p>",
+          "creators": [
+            {
+              "name": "machine learning",
+              "affiliation": null
+            }
+          ],
+          "publication_date": "2024-08-06",
+          "keywords": null,
+          "language": null
+        }
+      },
+      {
+        "id": 13827422,
+        "doi": "10.5281/zenodo.13827422",
+        "metadata": {
+          "title": "RGB and RGNIR Plastic Waste Database",
+          "description": "RGB and RGNIR Plastic Waste Database",
+          "creators": [
+            {
+              "name": "machine learning",
+              "affiliation": null
+            }
+          ],
+          "publication_date": "2024-09-23",
+          "keywords": null,
+          "language": null
+        }
+      }
+    ],
+    "total": 300646
+  }
+}

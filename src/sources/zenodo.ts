@@ -1,5 +1,5 @@
 import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
+import { fetchWithRetry } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
 
 const BASE = 'https://zenodo.org/api';
@@ -7,6 +7,23 @@ const BASE = 'https://zenodo.org/api';
 function headers(): Record<string, string> {
   const key = process.env.ZENODO_API_KEY;
   return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Honor a 429's Retry-After header (seconds) rather than failing
+// immediately or relying on the caller's fixed pacing interval alone.
+async function zenodoFetch<T>(url: string): Promise<T> {
+  let res = await fetchWithRetry(url, { headers: headers() });
+  if (res.status === 429) {
+    const retryAfterSec = Number(res.headers.get('retry-after'));
+    await sleep((Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec : 2) * 1000);
+    res = await fetchWithRetry(url, { headers: headers() });
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${url}`);
+  return res.json() as Promise<T>;
 }
 
 interface ZenodoRecord {
@@ -34,11 +51,7 @@ function cleanHtml(s?: string): string {
     .trim();
 }
 
-export async function zenodoSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<ZenodoSearchResponse>(
-    `${BASE}/records?q=${encodeURIComponent(query)}&size=${limit}&sort=bestmatch`,
-    { headers: headers() },
-  );
+export function normalizeZenodo(data: ZenodoSearchResponse): LibraryResult[] {
   return (data.hits?.hits || []).map((r) => ({
     id: String(r.id),
     source: 'zenodo' as const,
@@ -55,6 +68,13 @@ export async function zenodoSearch(query: string, limit = 10): Promise<LibraryRe
   }));
 }
 
+export async function zenodoSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const data = await zenodoFetch<ZenodoSearchResponse>(
+    `${BASE}/records?q=${encodeURIComponent(query)}&size=${limit}&sort=bestmatch`,
+  );
+  return normalizeZenodo(data);
+}
+
 export async function zenodoRead(id: string): Promise<{
   text: string;
   title: string;
@@ -62,7 +82,7 @@ export async function zenodoRead(id: string): Promise<{
   year?: number;
   language?: string;
 }> {
-  const r = await fetchJSON<ZenodoRecord>(`${BASE}/records/${id}`, { headers: headers() });
+  const r = await zenodoFetch<ZenodoRecord>(`${BASE}/records/${id}`);
   return {
     text: cleanHtml(r.metadata.description) || `No description available for Zenodo record ${id}`,
     title: r.metadata.title || id,
@@ -78,6 +98,11 @@ register('zenodo', {
   description:
     'Zenodo — CERN open repository: papers, datasets, software. 2M+ records across all disciplines.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://zenodo.org',
+  pacing: { minIntervalMs: 2100 },
   search: zenodoSearch,
   async read(id) {
     const raw = await zenodoRead(id);
