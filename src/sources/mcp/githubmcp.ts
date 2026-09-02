@@ -112,5 +112,6 @@ defineMcpSource({
     normalize: (text, _structured, id) => normalizeGithubMcpRead(text, id),
   },
   expectTools: ['search_code', 'get_file_contents'],
+  auth: { type: 'bearer', env: 'GITHUB_TOKEN' },
   verifiedAt: '2026-09-02',
 });

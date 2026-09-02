@@ -45,6 +45,12 @@ export interface SourceMeta {
   pacing?: { minIntervalMs?: number; dailyCap?: number };
   verifiedAt?: string; // ISO date the adapter was last probed OK by a human/CI
   hidden?: boolean; // registered but excluded from routing (e.g., needs a key not present)
+  // Env vars the source reads but does not require: the source works
+  // without them, they only raise a quota, unlock a better backend, or
+  // add an optional capability. Unlike `auth` these never hide a source.
+  // scripts/gen-docs.ts emits them into .env.example so a reader can find
+  // every key the code looks at, not just the mandatory ones.
+  optionalEnv?: string[];
 }
 
 export interface SourceAdapter extends Partial<SourceMeta> {
@@ -78,6 +84,16 @@ const ledger: LedgerStore = createLedger();
 export function isConfigured(auth?: AuthSpec): boolean {
   if (!auth || auth.type === 'none') return true;
   return Boolean(auth.env && process.env[auth.env]);
+}
+
+// Throws the standard "<name> requires <ENV>" message when an env var a
+// source cannot work without is absent. scripts/probe.ts's classify()
+// matches that exact wording to report KEY_MISSING instead of ERROR, so
+// hand-written adapters must use this rather than their own phrasing.
+export function requireKey(name: string, env: string): string {
+  const value = process.env[env];
+  if (!value) throw new Error(`${name} requires ${env}`);
+  return value;
 }
 
 export function register(name: string, adapter: SourceAdapter): void {
@@ -245,6 +261,7 @@ export function listSources(): Array<
     pacing: adapter.pacing,
     verifiedAt: adapter.verifiedAt,
     hidden: adapter.hidden,
+    optionalEnv: adapter.optionalEnv,
   }));
 }
 

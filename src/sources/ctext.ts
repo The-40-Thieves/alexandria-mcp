@@ -135,6 +135,8 @@ register('ctext', {
   freshness: 'static',
   homepage: 'https://ctext.org',
   verifiedAt: '2026-09-01',
+  // Raises the anonymous quota; the source works without one.
+  optionalEnv: ['CTEXT_API_KEY'],
   search: ctextSearch,
   async read(id) {
     const raw = await ctextRead(id);

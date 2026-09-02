@@ -107,6 +107,8 @@ register('openalex', {
   freshness: 'daily',
   homepage: 'https://openalex.org',
   verifiedAt: '2026-09-01',
+  // Either raises OpenAlex priority (premium key, or the polite pool via a contact email); neither is required.
+  optionalEnv: ['OPENALEX_API_KEY', 'CONTACT_EMAIL'],
   pacing: { dailyCap: 900 },
   search: openalexSearch,
   async read(id) {

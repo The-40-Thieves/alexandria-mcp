@@ -170,6 +170,9 @@ defineMcpSource({
     normalize: (text, _structured, id) => normalizeJinaRead(text, id),
   },
   expectTools: ['search_web', 'read_url'],
+  // JINA_API_KEY is a feature env (it also enables fetch tier 2). The
+  // server connects keyless; search calls need it in practice.
+  optionalEnv: ['JINA_API_KEY'],
   verifiedAt: '2026-09-02',
 });
 
@@ -189,6 +192,7 @@ defineMcpSourceWithDelegatedRead(
       normalize: (text) => normalizeJinaArxiv(text),
     },
     expectTools: ['search_arxiv'],
+    optionalEnv: ['JINA_API_KEY'],
     verifiedAt: '2026-09-02',
   },
   (id) => (/^\d{4}\.\d{4,5}$/.test(id) ? getAdapter('arxiv').read(id) : jinaArxivFallbackRead(id)),

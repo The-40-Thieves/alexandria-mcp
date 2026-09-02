@@ -1,16 +1,11 @@
 import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import { register, requireKey, truncateText } from './registry.js';
 
 const BASE = 'https://api.adsabs.harvard.edu/v1';
 
 function headers(): Record<string, string> {
-  const key = process.env.NASA_ADS_API_KEY;
-  if (!key)
-    throw new Error(
-      'NASA_ADS_API_KEY is not set. Register free at https://ui.adsabs.harvard.edu/user/settings/token',
-    );
-  return { Authorization: `Bearer ${key}` };
+  return { Authorization: `Bearer ${requireKey('nasaads', 'NASA_ADS_API_KEY')}` };
 }
 
 const FIELDS = 'bibcode,title,author,year,abstract,identifier,keyword,doctype';
@@ -84,6 +79,8 @@ register('nasaads', {
   freshness: 'daily',
   homepage: 'https://ui.adsabs.harvard.edu',
   verifiedAt: '2026-09-01',
+  // Free token from https://ui.adsabs.harvard.edu/user/settings/token
+  auth: { type: 'bearer', env: 'NASA_ADS_API_KEY' },
   search: nasaadsSearch,
   async read(id) {
     const raw = await nasaadsRead(id);

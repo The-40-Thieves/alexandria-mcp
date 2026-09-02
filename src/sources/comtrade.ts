@@ -91,6 +91,8 @@ register('comtrade', {
   freshness: 'daily',
   homepage: 'https://comtradeplus.un.org',
   verifiedAt: '2026-09-01',
+  // Subscription key raises the free-tier rate limit; the source works without one.
+  optionalEnv: ['UN_COMTRADE_KEY'],
   pacing: { dailyCap: 450 },
   search: comtradeSearch,
   read: comtradeRead,

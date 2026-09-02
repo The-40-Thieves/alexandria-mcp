@@ -66,6 +66,8 @@ register('context7', {
   freshness: 'daily',
   homepage: 'https://context7.com',
   verifiedAt: '2026-09-01',
+  // Raises the anonymous rate limit; the source works without one.
+  optionalEnv: ['CONTEXT7_API_KEY'],
   search: context7Search,
   read: context7Read,
 });

@@ -117,6 +117,8 @@ register('semanticscholar', {
   freshness: 'daily',
   homepage: 'https://www.semanticscholar.org',
   verifiedAt: '2026-09-01',
+  // Raises the shared anonymous rate limit; the source works without one.
+  optionalEnv: ['SEMANTIC_SCHOLAR_API_KEY'],
   pacing: { minIntervalMs: 1100 },
   search: s2Search,
   async read(id) {

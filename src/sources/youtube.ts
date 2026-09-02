@@ -71,8 +71,10 @@ interface YTSearchResponse {
 }
 
 export async function youtubeSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  // Deliberately the standard "<name> requires <ENV>" wording, not a
+  // registry `auth` declaration: see the register() call below.
   const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) throw new Error('youtube requires YOUTUBE_API_KEY for search');
+  if (!apiKey) throw new Error('youtube requires YOUTUBE_API_KEY');
 
   const params = new URLSearchParams({
     part: 'snippet',
@@ -289,6 +291,16 @@ register('youtube', {
   freshness: 'realtime',
   homepage: 'https://www.youtube.com',
   verifiedAt: '2026-09-01',
+  // No `auth` declared on purpose. The registry's auth field is
+  // source-level: declaring it would hide youtube entirely without
+  // YOUTUBE_API_KEY, but read() needs no Data API key at all (it uses
+  // Supadata when SUPADATA_API_KEY is set, otherwise the keyless
+  // Innertube path), so the source stays useful and must stay visible.
+  // Only search() requires the key, and it throws the same
+  // "<name> requires <ENV>" text an auth declaration would produce, so
+  // scripts/probe.ts still classifies it KEY_MISSING rather than ERROR.
+  // Declaring auth per method would need a registry contract change.
+  optionalEnv: ['YOUTUBE_API_KEY', 'SUPADATA_API_KEY'],
   pacing: { dailyCap: 90 },
   search: youtubeSearch,
   async read(id) {

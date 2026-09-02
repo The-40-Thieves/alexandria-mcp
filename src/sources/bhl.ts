@@ -1,18 +1,12 @@
 import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
 import { normaliseWhitespace } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import { register, requireKey, truncateText } from './registry.js';
 
 const API = 'https://www.biodiversitylibrary.org/api3';
-const KEY_URL = 'https://www.biodiversitylibrary.org/getapikey.aspx';
 
 function getKey(): string {
-  const key = process.env.BHL_API_KEY;
-  if (!key)
-    throw new Error(
-      `BHL requires a free API key. Register at: ${KEY_URL} then set BHL_API_KEY in your environment.`,
-    );
-  return key;
+  return requireKey('bhl', 'BHL_API_KEY');
 }
 
 interface BHLTitle {
@@ -91,6 +85,8 @@ register('bhl', {
   freshness: 'daily',
   homepage: 'https://www.biodiversitylibrary.org',
   verifiedAt: '2026-09-01',
+  // Free key from https://www.biodiversitylibrary.org/getapikey.aspx
+  auth: { type: 'query', env: 'BHL_API_KEY', param: 'apikey' },
   search: bhlSearch,
   async read(id) {
     const raw = await bhlRead(id);

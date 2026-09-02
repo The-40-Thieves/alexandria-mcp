@@ -53,6 +53,8 @@ defineRest<NvdSearchResponse>({
   homepage: 'https://nvd.nist.gov',
   supportsIngest: true,
   verifiedAt: '2026-09-01',
+  // Raises the NVD rate limit from 5 to 50 requests per 30s; the source works without one.
+  optionalEnv: ['NVD_API_KEY'],
   headers: apiKey ? { apiKey } : undefined,
   pacing: { minIntervalMs: apiKey ? 700 : 6500 },
   search: {

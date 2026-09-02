@@ -6,7 +6,7 @@
 import type { LibraryResult, ReadResult } from '../../types.js';
 import { DEFAULT_TIMEOUT_MS, fetchJSON } from '../../utils/http.js';
 import type { AuthSpec, Cluster, Freshness, SourceMeta } from '../registry.js';
-import { register } from '../registry.js';
+import { register, requireKey } from '../registry.js';
 
 export interface RestSpec<TRaw> {
   name: string;
@@ -16,6 +16,7 @@ export interface RestSpec<TRaw> {
   homepage: string;
   supportsIngest: boolean;
   auth?: AuthSpec;
+  optionalEnv?: string[];
   pacing?: SourceMeta['pacing'];
   timeoutMs?: number;
   headers?: Record<string, string>;
@@ -35,14 +36,11 @@ export interface RestSpec<TRaw> {
   };
 }
 
-// Throws "<name> requires <ENV>" when auth is declared and its env var is
-// absent; scripts/probe.ts's classify() matches that exact wording to
-// report KEY_MISSING instead of ERROR.
+// Throws "<name> requires <ENV>" via registry.ts's requireKey() when auth
+// is declared and its env var is absent.
 function requireAuthValue(name: string, auth?: AuthSpec): string | undefined {
-  if (!auth || auth.type === 'none') return undefined;
-  const value = auth.env ? process.env[auth.env] : undefined;
-  if (!value) throw new Error(`${name} requires ${auth.env}`);
-  return value;
+  if (!auth || auth.type === 'none' || !auth.env) return undefined;
+  return requireKey(name, auth.env);
 }
 
 function applyAuth(
@@ -114,6 +112,7 @@ export function defineRest<TRaw>(spec: RestSpec<TRaw>): void {
     timeoutMs,
     headers: spec.headers,
     auth: spec.auth,
+    optionalEnv: spec.optionalEnv,
     pacing: spec.pacing,
     verifiedAt: spec.verifiedAt,
     search,
