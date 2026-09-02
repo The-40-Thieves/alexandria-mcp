@@ -96,8 +96,13 @@ export async function harvardlibRead(id: string): Promise<{
 
 register('harvardlib', {
   description:
-    'Harvard LibraryCloud — 20M+ records from Harvard Libraries: books, archives, manuscripts, maps, photographs, theses. Public REST API, no key required.',
+    'Harvard LibraryCloud — 20M+ records from Harvard Libraries: books, archives, manuscripts, maps, photographs, theses. Public REST API, no key required. Hidden: api.lib.harvard.edu returns 429 from its load balancer for datacenter clients as of 2026-09; revisit.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://library.harvard.edu',
+  hidden: true,
   search: harvardlibSearch,
   async read(id) {
     const raw = await harvardlibRead(id);
