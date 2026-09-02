@@ -17,6 +17,7 @@ export interface LibraryResult {
   description?: string;
   published?: string;
   url?: string;
+  cluster?: string; // set by libraryAsk's fan-out from the source's registry.ts cluster
 }
 
 export interface Chunk {
