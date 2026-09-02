@@ -252,14 +252,14 @@ function stripBrackets(hostname: string): string {
 // attacker-controlled DNS / DNS rebinding).
 //
 // TOCTOU: the address(es) validated here are not, on their own, what pins
-// the actual TCP connection Node's fetch/undici makes a moment later — a
-// second DNS answer at connect time (rebinding between this check and the
+// the actual TCP connection Node's fetch/undici makes a moment later, and
+// a second DNS answer at connect time (rebinding between this check and the
 // fetch) would not be caught by validation alone. resolveFetchTarget()
 // below closes that gap for the one fetch that actually connects to a
 // caller-supplied hostname (tier 1, via fetchFollowingRedirects): it reuses
 // THIS SAME dns.lookup() call as the pin fetchFollowingRedirects then
 // forces guardedDispatcher's connection to, via withPinnedAddress() (see
-// dispatcher.ts) — a second, independent lookup to build the pin would just
+// dispatcher.ts): a second, independent lookup to build the pin would just
 // reopen the race it exists to close. assertFetchableUrl() below is a thin
 // wrapper that keeps the original validate-only signature for callers that
 // only need the guard (e.g. src/sources/mcp/jina.ts, which never performs
