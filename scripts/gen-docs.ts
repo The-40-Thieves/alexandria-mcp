@@ -127,12 +127,14 @@ function buildHealthExample(sources: Source[]): string {
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of sources) byKind[s.kind]++;
   const kindStr = `{ rest: ${byKind.rest}, hub: ${byKind.hub}, rss: ${byKind.rss}, mcp: ${byKind.mcp}, scrape: ${byKind.scrape} }`;
-  // quota/cache are runtime counters (Task 4's StateStore); the doc example
-  // shows a freshly-started process (nothing reserved or cached yet) rather
-  // than today's actual date, so this line does not drift day to day.
+  // quota/cache/calls/errors are runtime counters (Task 4's StateStore,
+  // Task 5's per-source metrics); the doc example shows a freshly-started
+  // process (nothing reserved, cached, or called yet) rather than today's
+  // actual date, so this line does not drift day to day.
+  const sourcesStr = `{ total: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, calls: 0, errors: 0 }`;
   const quotaStr = '{ day: "2026-09-02", reserved: 0, sources: 0 }';
   const cacheStr = '{ entries: 0 }';
-  return `{ status: "ok", version: "${VERSION}", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
+  return `{ status: "ok", version: "${VERSION}", sources: ${sourcesStr}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
 }
 
 function applyReadmeSubstitutions(content: string, sources: Source[]): string {

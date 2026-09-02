@@ -1,6 +1,13 @@
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { requestContext } from '../utils/http.ts';
-import { createLedger, type LedgerStore, reserveQuota, utcDay } from '../utils/quotaLedger.ts';
+import { sourceMetrics } from '../utils/metrics.ts';
+import {
+  createLedger,
+  type LedgerStore,
+  QuotaExceededError,
+  reserveQuota,
+  utcDay,
+} from '../utils/quotaLedger.ts';
 import { rateLimited } from '../utils/rateLimit.ts';
 import { cacheKey, searchCache } from '../utils/resultCache.ts';
 import { stateStore } from '../utils/stateStore.ts';
@@ -118,10 +125,16 @@ export function register(name: string, adapter: SourceAdapter): void {
 // wired to via requestContext, see withGuards()) cancels its in-flight
 // fetch and stops retrying instead of continuing after this caller has
 // already given up.
+// A distinct subclass (message text unchanged, so scripts/probe.ts's
+// /abort/i match still holds) lets withGuards() below classify a guard
+// timeout into metrics.ts's `timeouts` counter via `instanceof` rather than
+// string-matching the message a second time.
+export class GuardTimeoutError extends Error {}
+
 function withTimeout<T>(p: Promise<T>, ms: number, controller: AbortController): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      const err = new Error('This operation was aborted');
+      const err = new GuardTimeoutError('This operation was aborted');
       controller.abort(err);
       reject(err);
     }, ms);
@@ -188,43 +201,81 @@ function chainAbort(inner: AbortController): () => void {
   return () => outer.removeEventListener('abort', onOuterAbort);
 }
 
+// Runs `fn` inside a fresh signal (chained/merged with whatever's already
+// ambient, see chainAbort()/this function) while keeping the outer store's
+// reqId/tool (set by index.ts's withRequestContext() around the whole MCP
+// tool call) intact, so log.ts's requestLogger() and providers.ts's
+// llmCalls counter can still attribute to that tool from inside a guarded
+// adapter call. A plain `requestContext.run({ signal }, fn)` would instead
+// REPLACE the store for this inner scope, dropping reqId/tool.
+function runGuarded<T>(controller: AbortController, fn: () => Promise<T>): Promise<T> {
+  const outer = requestContext.getStore();
+  return requestContext.run({ ...outer, signal: controller.signal }, fn);
+}
+
+// Classifies a failed guarded call into exactly one of metrics.ts's
+// error-shaped counters (quotaRejections / timeouts / errors), mutually
+// exclusive so `calls` decomposes cleanly into "succeeded" plus these three.
+function recordFailure(metrics: ReturnType<typeof sourceMetrics>, err: unknown): void {
+  if (err instanceof QuotaExceededError) metrics.quotaRejections++;
+  else if (err instanceof GuardTimeoutError) metrics.timeouts++;
+  else metrics.errors++;
+}
+
 function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
   return {
     ...adapter,
     async search(query, limit) {
       const key = cacheKey(name, query, limit);
       const cached = searchCache.get(key);
-      if (cached) return cached;
+      const metrics = sourceMetrics(name);
+      if (cached) {
+        metrics.cacheHits++;
+        return cached;
+      }
       const controller = new AbortController();
       const unchain = chainAbort(controller);
+      metrics.calls++;
+      const start = Date.now();
       try {
         const result = await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
           await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
           return withTimeout(
-            requestContext.run({ signal: controller.signal }, () => adapter.search(query, limit)),
+            runGuarded(controller, () => adapter.search(query, limit)),
             adapter.timeoutMs,
             controller,
           );
         });
         searchCache.set(key, result);
         return result;
+      } catch (err) {
+        recordFailure(metrics, err);
+        throw err;
       } finally {
+        metrics.latencyMsTotal += Date.now() - start;
         unchain();
       }
     },
     async read(id) {
       const controller = new AbortController();
       const unchain = chainAbort(controller);
+      const metrics = sourceMetrics(name);
+      metrics.calls++;
+      const start = Date.now();
       try {
         return await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
           await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
           return withTimeout(
-            requestContext.run({ signal: controller.signal }, () => adapter.read(id)),
+            runGuarded(controller, () => adapter.read(id)),
             adapter.timeoutMs,
             controller,
           );
         });
+      } catch (err) {
+        recordFailure(metrics, err);
+        throw err;
       } finally {
+        metrics.latencyMsTotal += Date.now() - start;
         unchain();
       }
     },

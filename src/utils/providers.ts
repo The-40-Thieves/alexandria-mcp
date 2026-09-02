@@ -13,6 +13,8 @@
 import OpenAI from 'openai';
 import type { z } from 'zod';
 import { config } from '../config.ts';
+import { requestContext } from './http.ts';
+import { toolMetrics } from './metrics.ts';
 
 export type Role = 'router' | 'synth' | 'research' | 'embeddings' | 'rerank';
 
@@ -50,6 +52,15 @@ function defaultModel(role: Role): string {
 
 function envKey(role: Role, suffix: 'BASE_URL' | 'API_KEY' | 'MODEL' | 'JSON_MODE'): string {
   return `ALEXANDRIA_${role.toUpperCase()}_${suffix}`;
+}
+
+// Attributed to whichever MCP tool is currently in flight (index.ts wraps
+// every tool handler in requestContext.run() with its name - see
+// src/utils/http.ts's RequestContextStore), or "unknown" for a call made
+// outside that context (a script, a direct unit test).
+function recordLlmCall(): void {
+  const tool = requestContext.getStore()?.tool ?? 'unknown';
+  toolMetrics(tool).llmCalls++;
 }
 
 // config's keys are literally the env var names (see config.ts's module
@@ -180,6 +191,7 @@ async function callChat(
   jsonMode: boolean,
 ): Promise<string> {
   const client = clientFor(config);
+  recordLlmCall();
   const response = await client.chat.completions.create({
     model: config.model,
     messages,
@@ -305,6 +317,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
   const results: number[][] = [];
   for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
     const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
+    recordLlmCall();
     const response = await client.embeddings.create({ model: config.model, input: batch });
     for (const item of response.data) {
       if (cachedEmbeddingDimensions === undefined) {

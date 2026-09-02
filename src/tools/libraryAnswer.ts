@@ -4,6 +4,7 @@
 // `synth` role for a cited answer. Every LLM call goes through
 // src/utils/providers.ts; nothing here imports openai directly.
 import { config } from '../config.ts';
+import { requestLogger } from '../log.ts';
 import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
 import { llmRerank, rrf } from '../utils/fuse.ts';
@@ -90,11 +91,10 @@ async function fetchKnowledgeResults(query: string, limit: number): Promise<Libr
       url: hit.url,
     }));
   } catch (err) {
-    if (process.env.DEBUG) {
-      console.error(
-        `[library_answer] knowledge_search failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    requestLogger().debug(
+      { err: err instanceof Error ? err.message : String(err) },
+      'knowledge_search failed',
+    );
     return [];
   }
 }
@@ -118,11 +118,10 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
       if (result.metadataOnly || !result.text) continue;
       sources.push({ item, text: result.text.slice(0, READ_CHAR_LIMIT) });
     } catch (err) {
-      if (process.env.DEBUG) {
-        console.error(
-          `[library_answer] read failed for ${item.source}:${item.id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+      requestLogger().debug(
+        { source: item.source, id: item.id, err: err instanceof Error ? err.message : String(err) },
+        'read failed',
+      );
     }
   }
   return sources;

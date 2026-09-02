@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { cacheStores, fetch as undiciFetch } from 'undici';
+import { destinationOverride } from '../log.ts';
 import {
   buildCacheStore,
   buildSourceDispatcher,
@@ -114,21 +115,17 @@ test('buildCacheStore: memory fallback', async (t) => {
     writeFileSync(notADirectory, 'not a directory');
     const unwritableLocation = path.join(notADirectory, 'nested', 'http-cache.db');
 
-    let warned = 0;
-    const originalError = console.error;
-    console.error = (...args: unknown[]) => {
-      warned += 1;
-      void args;
-    };
+    const lines: string[] = [];
+    destinationOverride.value = { write: (msg: string) => void lines.push(msg) };
     try {
       const store = buildCacheStore(unwritableLocation);
       assert.ok(
         store instanceof cacheStores.MemoryCacheStore,
         'an unwritable sqlite location must fall back to MemoryCacheStore',
       );
-      assert.equal(warned, 1, 'the fallback is logged exactly once');
+      assert.equal(lines.length, 1, 'the fallback is logged exactly once');
     } finally {
-      console.error = originalError;
+      destinationOverride.value = undefined;
     }
   });
 

@@ -10,12 +10,27 @@ export const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
 const RETRY_DELAY_MS = 1_000;
 
-// An ambient abort signal a caller can set up around a whole call (registry.ts's
-// withGuards() does this, scoped to its own timeout). fetchWithRetry() below
-// reads it so that once the caller has given up, the in-flight fetch attempt
-// is cancelled immediately and no further retry is started, instead of the
-// retry loop running to completion after the caller already stopped waiting.
-export const requestContext = new AsyncLocalStorage<{ signal: AbortSignal }>();
+// Task 5 (review 3.6): reqId/tool ride the same store as the ambient abort
+// signal rather than a second AsyncLocalStorage, so any code already
+// reading one (fetchWithRetry, mcpClientPool.ts, registry.ts's
+// chainAbort()) sees the others for free. `signal` stays as it was: set up
+// by registry.ts's withGuards() around one adapter search()/read() call, so
+// fetchWithRetry() can cancel an in-flight fetch the instant that guard's
+// timeout or the caller's own abort fires, instead of the retry loop
+// running to completion after the caller already stopped waiting.
+// `reqId`/`tool` are set once, wider: index.ts wraps an entire MCP tool
+// invocation in requestContext.run() with them (see withRequestContext()),
+// so log.ts's child logger and providers.ts's llmCalls counter can attribute
+// to "which tool call is this" without threading an extra parameter through
+// every call in between. registry.ts's own inner run() (a narrower, signal-
+// only scope nested inside that wider one) merges the outer store in rather
+// than replacing it, so reqId/tool survive into a guarded adapter call too.
+export interface RequestContextStore {
+  signal?: AbortSignal;
+  reqId?: string;
+  tool?: string;
+}
+export const requestContext = new AsyncLocalStorage<RequestContextStore>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

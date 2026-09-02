@@ -78,6 +78,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Agent, cacheStores, type Dispatcher, interceptors, setGlobalDispatcher } from 'undici';
 import { config } from '../config.ts';
+import { log } from '../log.ts';
 
 const CONNECTIONS = 64;
 const KEEP_ALIVE_TIMEOUT_MS = 30_000;
@@ -103,7 +104,7 @@ let warnedFallback = false;
 function warnFallbackOnce(reason: string): void {
   if (warnedFallback) return;
   warnedFallback = true;
-  console.error(`[alexandria] http cache: falling back to an in-memory store (${reason})`);
+  log.warn({ reason }, 'http cache: falling back to an in-memory store');
 }
 
 /** Test-only: clears the "already warned" latch so a test can observe the warning fire again. */

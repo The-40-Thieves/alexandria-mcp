@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { destinationOverride } from '../log.ts';
 import {
   createStateStore,
   MemoryStateStore,
@@ -208,16 +209,15 @@ test('createStateStore selection', async (t) => {
     const blocker = tmpDbPath('blocker-file');
     fs.writeFileSync(blocker, '');
     const unwritable = path.join(blocker, 'nested', 'alexandria.db');
-    const originalError = console.error;
     const warnings: string[] = [];
-    console.error = (msg: string) => warnings.push(msg);
+    destinationOverride.value = { write: (msg: string) => void warnings.push(msg) };
     try {
       const store = createStateStore({ ALEXANDRIA_STATE_DB: unwritable } as NodeJS.ProcessEnv);
       assert.ok(store instanceof MemoryStateStore);
       store.close();
       assert.equal(warnings.length, 1);
     } finally {
-      console.error = originalError;
+      destinationOverride.value = undefined;
     }
   });
 });

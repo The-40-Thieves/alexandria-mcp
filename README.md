@@ -255,7 +255,9 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: 138, visible: 103, hidden: 35, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0 }, cache: { entries: 0 }, tools: 9 }`.
+Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: { total: 138, visible: 103, hidden: 35, calls: 0, errors: 0 }, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0 }, cache: { entries: 0 }, tools: 9 }`.
+
+Metrics: `GET /metrics` returns per-source counters (calls, errors, timeouts, cacheHits, quotaRejections, latencyMsTotal) and per-tool counters (invocations, llmCalls) as JSON, e.g. `{ "sources": { "arxiv": { "calls": 12, "errors": 0, "timeouts": 0, "cacheHits": 3, "quotaRejections": 0, "latencyMsTotal": 4210 } }, "tools": { "library_ask": { "invocations": 5, "llmCalls": 5 } } }`. Only sources/tools actually called since the process started appear.
 
 ## Adding Custom Providers
 

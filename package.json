@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "dev": "node src/index.ts",
-    "test": "ALEXANDRIA_STATE_DB=:memory: node --test --test-reporter=spec --test-concurrency=4 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
+    "test": "ALEXANDRIA_STATE_DB=:memory: NODE_ENV=test node --test --test-reporter=spec --test-concurrency=4 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
     "probe": "node scripts/probe.ts",
     "probe:baseline": "node scripts/probe.ts --baseline",
     "eval:routing": "node scripts/eval-routing.ts",
@@ -61,6 +61,7 @@
     "node-html-parser": "^9.0.2",
     "openai": "^7.8.0",
     "p-limit": "^7.3.0",
+    "pino": "^10.3.1",
     "undici": "^7.29.0",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"

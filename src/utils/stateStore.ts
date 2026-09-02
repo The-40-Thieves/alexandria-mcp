@@ -41,6 +41,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { Config } from '../config.ts';
 import { config } from '../config.ts';
+import { log } from '../log.ts';
 
 export interface StateStore {
   /** Current reserved count for `source` on `day` (0 if never reserved). */
@@ -270,7 +271,7 @@ let warnedFallback = false;
 function warnFallbackOnce(reason: string): void {
   if (warnedFallback) return;
   warnedFallback = true;
-  console.error(`[alexandria] state store: falling back to an in-memory store (${reason})`);
+  log.warn({ reason }, 'state store: falling back to an in-memory store');
 }
 
 /** Test-only: clears the "already warned" latch so a test can observe the warning fire again. */
