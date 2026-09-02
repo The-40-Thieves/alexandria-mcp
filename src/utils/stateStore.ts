@@ -39,6 +39,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import type { Config } from '../config.ts';
+import { config } from '../config.ts';
+import { log } from '../log.ts';
 
 export interface StateStore {
   /** Current reserved count for `source` on `day` (0 if never reserved). */
@@ -268,7 +271,7 @@ let warnedFallback = false;
 function warnFallbackOnce(reason: string): void {
   if (warnedFallback) return;
   warnedFallback = true;
-  console.error(`[alexandria] state store: falling back to an in-memory store (${reason})`);
+  log.warn({ reason }, 'state store: falling back to an in-memory store');
 }
 
 /** Test-only: clears the "already warned" latch so a test can observe the warning fire again. */
@@ -279,7 +282,10 @@ export function resetStateStoreWarningForTests(): void {
 // default: sqlite at ALEXANDRIA_STATE_DB (or data/alexandria.db); memory
 // when that var is literally ':memory:', or when the sqlite file can't be
 // created (permissions, read-only filesystem, etc - logged once).
-export function createStateStore(env: NodeJS.ProcessEnv = process.env): StateStore {
+// `env` takes just the one field it needs (not the whole Config) so a test
+// can keep passing a bare `{ ALEXANDRIA_STATE_DB: ... }` object, exactly as
+// it did against process.env before.
+export function createStateStore(env: Pick<Config, 'ALEXANDRIA_STATE_DB'> = config): StateStore {
   const raw = env.ALEXANDRIA_STATE_DB;
   if (raw === ':memory:') return new MemoryStateStore();
   const dbPath = raw ?? DEFAULT_STATE_DB_PATH;

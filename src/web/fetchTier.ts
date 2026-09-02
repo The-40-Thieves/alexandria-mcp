@@ -29,6 +29,7 @@
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
 import { parseHTML } from 'linkedom';
+import { config } from '../config.ts';
 import { type AddressPin, guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
 
@@ -185,7 +186,7 @@ function throwForIpClass(cls: Exclude<IpClass, null>, rawUrl: string, detail?: s
 // the unit test suite runs its fetch tier tests against.
 function assertIpClassAllowed(cls: IpClass, rawUrl: string, detail?: string): void {
   if (!cls) return;
-  if (cls === 'loopback' && process.env.ALEXANDRIA_ALLOW_LOOPBACK === '1') return;
+  if (cls === 'loopback' && config.ALEXANDRIA_ALLOW_LOOPBACK === '1') return;
   throwForIpClass(cls, rawUrl, detail);
 }
 
@@ -199,8 +200,7 @@ function assertIpClassAllowed(cls: IpClass, rawUrl: string, detail?: string): vo
 // port scanner for the box crawl4ai and SearXNG run on.
 export function configuredServiceOrigins(): Set<string> {
   const origins = new Set<string>();
-  for (const envVar of ['CRAWL4AI_URL', 'SEARXNG_URL']) {
-    const value = process.env[envVar];
+  for (const value of [config.CRAWL4AI_URL, config.SEARXNG_URL]) {
     if (!value) continue;
     try {
       origins.add(new URL(value).origin.toLowerCase());
@@ -503,7 +503,7 @@ async function tryJinaReader(url: string): Promise<FetchedPage> {
   // (r.jina.ai), so the target is re-validated here too rather than
   // trusting that every future call site remembers to check first.
   await assertFetchableUrl(url);
-  const key = process.env.JINA_API_KEY;
+  const key = config.JINA_API_KEY;
   const headers: Record<string, string> = { Accept: 'text/plain' };
   if (key) headers.Authorization = `Bearer ${key}`;
   const response = await fetchWithRetry(`https://r.jina.ai/${url}`, { headers }, FETCH_TIMEOUT_MS);
@@ -536,10 +536,10 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
   // network, so a private target reaching it is a real internal-network
   // exposure, not just a wasted call.
   await assertFetchableUrl(url);
-  const base = process.env.CRAWL4AI_URL;
+  const base = config.CRAWL4AI_URL;
   if (!base) throw new Error('crawl4ai: CRAWL4AI_URL is not set');
   const headers: Record<string, string> = { Accept: 'application/json' };
-  const token = process.env.CRAWL4AI_API_TOKEN;
+  const token = config.CRAWL4AI_API_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
   const crawlUrl = `${base.replace(/\/$/, '')}/crawl`;
   // This server's own outbound call, so it is checked against the
@@ -594,7 +594,7 @@ export async function fetchAsText(url: string): Promise<FetchedPage> {
     lastError = err instanceof Error ? err : new Error(String(err));
   }
 
-  if (process.env.JINA_API_KEY || process.env.ALEXANDRIA_JINA_READER === '1') {
+  if (config.JINA_API_KEY || config.ALEXANDRIA_JINA_READER === '1') {
     try {
       return await tryJinaReader(url);
     } catch (err) {
@@ -602,7 +602,7 @@ export async function fetchAsText(url: string): Promise<FetchedPage> {
     }
   }
 
-  if (process.env.CRAWL4AI_URL) {
+  if (config.CRAWL4AI_URL) {
     try {
       return await tryCrawl4ai(url);
     } catch (err) {

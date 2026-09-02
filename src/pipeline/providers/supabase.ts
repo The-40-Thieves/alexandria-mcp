@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { config } from '../../config.ts';
 import type { Chunk, VectorStoreProvider } from '../../types.ts';
 
 export class SupabaseVectorStoreProvider implements VectorStoreProvider {
@@ -6,14 +7,14 @@ export class SupabaseVectorStoreProvider implements VectorStoreProvider {
   private table: string;
 
   constructor() {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const url = config.SUPABASE_URL;
+    const key = config.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!url) throw new Error('SUPABASE_URL is not set');
     if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
 
     this.client = createClient(url, key);
-    this.table = process.env.SUPABASE_TABLE || 'knowledge_chunks';
+    this.table = config.SUPABASE_TABLE || 'knowledge_chunks';
   }
 
   async isDuplicate(sourceId: string, mcpName: string): Promise<boolean> {

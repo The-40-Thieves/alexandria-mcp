@@ -1,8 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { z } from 'zod';
+import { config, loadConfig } from './config.ts';
+import { log } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
@@ -11,6 +14,8 @@ import { libraryAsk } from './tools/libraryAsk.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
 import type { LibrarySource } from './types.ts';
 import { installDispatcher } from './utils/dispatcher.ts';
+import { requestContext } from './utils/http.ts';
+import { metricsSnapshot, sourceCallTotals, toolMetrics } from './utils/metrics.ts';
 import { VERSION } from './version.ts';
 
 import './sources/all.ts';
@@ -28,6 +33,20 @@ const SourceSchema = z
   .describe('Library source name. Run library_list_sources for the current list and descriptions.');
 function toStructured(val: unknown): Record<string, unknown> {
   return JSON.parse(JSON.stringify(val)) as Record<string, unknown>;
+}
+
+// Wraps one MCP tool invocation: bumps that tool's `invocations` counter
+// (src/utils/metrics.ts) and runs the handler inside a fresh reqId/tool
+// AsyncLocalStorage scope (src/utils/http.ts's requestContext), so
+// log.ts's requestLogger() and providers.ts's llmCalls counter can
+// attribute to "which tool call is this" without a parameter threaded
+// through every function in between. registry.ts's own inner
+// requestContext.run() (scoped to one adapter search()/read() call) merges
+// this outer store rather than replacing it, so reqId/tool survive into a
+// guarded adapter call too.
+function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise<T> {
+  toolMetrics(tool).invocations++;
+  return requestContext.run({ reqId: randomUUID(), tool }, handler);
 }
 
 /**
@@ -56,16 +75,17 @@ export function createServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async () => {
-      const sources = listSources();
-      const text = sources
-        .map(
-          (s) =>
-            `${s.name} [${s.kind}/${s.cluster}] [${s.supportsIngest ? 'full text' : 'metadata'}]: ${s.description}`,
-        )
-        .join('\n');
-      return { content: [{ type: 'text', text }], structuredContent: { sources } };
-    },
+    async () =>
+      withRequestContext('library_list_sources', async () => {
+        const sources = listSources();
+        const text = sources
+          .map(
+            (s) =>
+              `${s.name} [${s.kind}/${s.cluster}] [${s.supportsIngest ? 'full text' : 'metadata'}]: ${s.description}`,
+          )
+          .join('\n');
+        return { content: [{ type: 'text', text }], structuredContent: { sources } };
+      }),
   );
 
   // ── library_ask (natural language) ───────────────────────────────────────────
@@ -112,22 +132,23 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, max_sources, results_per_source }) => {
-      try {
-        const result = await libraryAsk(query, max_sources, results_per_source);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          structuredContent: toStructured(result),
-        };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+    async ({ query, max_sources, results_per_source }) =>
+      withRequestContext('library_ask', async () => {
+        try {
+          const result = await libraryAsk(query, max_sources, results_per_source);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            structuredContent: toStructured(result),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
   );
 
   // ── library_search ────────────────────────────────────────────────────────────
@@ -153,23 +174,24 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, source, limit }) => {
-      try {
-        const results = await getAdapter(source).search(query, limit);
-        const text =
-          results.length === 0
-            ? `No results for "${query}" on ${source}.`
-            : JSON.stringify(results, null, 2);
-        return { content: [{ type: 'text', text }], structuredContent: { results } };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+    async ({ query, source, limit }) =>
+      withRequestContext('library_search', async () => {
+        try {
+          const results = await getAdapter(source).search(query, limit);
+          const text =
+            results.length === 0
+              ? `No results for "${query}" on ${source}.`
+              : JSON.stringify(results, null, 2);
+          return { content: [{ type: 'text', text }], structuredContent: { results } };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
   );
 
   // ── library_read ──────────────────────────────────────────────────────────────
@@ -191,22 +213,23 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ id, source }) => {
-      try {
-        const result = await getAdapter(source).read(id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          structuredContent: toStructured(result),
-        };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+    async ({ id, source }) =>
+      withRequestContext('library_read', async () => {
+        try {
+          const result = await getAdapter(source).read(id);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            structuredContent: toStructured(result),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
   );
 
   // ── library_index ─────────────────────────────────────────────────────────────
@@ -224,42 +247,43 @@ export function createServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ id, source }) => {
-      try {
-        const adapter = getAdapter(source);
-        if (!adapter.supportsIngest)
+    async ({ id, source }) =>
+      withRequestContext('library_index', async () => {
+        try {
+          const adapter = getAdapter(source);
+          if (!adapter.supportsIngest)
+            return {
+              content: [{ type: 'text', text: `"${source}" is metadata-only.` }],
+              isError: true,
+            };
+          const result = await adapter.read(id);
+          if (!result.text)
+            return {
+              content: [{ type: 'text', text: `No text for ${source}:${id}` }],
+              isError: true,
+            };
+          const preview = indexText(
+            result.text,
+            source as LibrarySource,
+            id,
+            result.title,
+            result.authors,
+            result.year,
+            result.language,
+          );
           return {
-            content: [{ type: 'text', text: `"${source}" is metadata-only.` }],
+            content: [{ type: 'text', text: JSON.stringify(preview, null, 2) }],
+            structuredContent: toStructured(preview),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
             isError: true,
           };
-        const result = await adapter.read(id);
-        if (!result.text)
-          return {
-            content: [{ type: 'text', text: `No text for ${source}:${id}` }],
-            isError: true,
-          };
-        const preview = indexText(
-          result.text,
-          source as LibrarySource,
-          id,
-          result.title,
-          result.authors,
-          result.year,
-          result.language,
-        );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(preview, null, 2) }],
-          structuredContent: toStructured(preview),
-        };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+        }
+      }),
   );
 
   // ── library_ingest ────────────────────────────────────────────────────────────
@@ -277,42 +301,43 @@ export function createServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ id, source }) => {
-      try {
-        const adapter = getAdapter(source);
-        if (!adapter.supportsIngest)
+    async ({ id, source }) =>
+      withRequestContext('library_ingest', async () => {
+        try {
+          const adapter = getAdapter(source);
+          if (!adapter.supportsIngest)
+            return {
+              content: [{ type: 'text', text: `"${source}" is metadata-only.` }],
+              isError: true,
+            };
+          const result = await adapter.read(id);
+          if (!result.text)
+            return {
+              content: [{ type: 'text', text: `No text for ${source}:${id}` }],
+              isError: true,
+            };
+          const ingestResult = await ingestText(
+            result.text,
+            source as LibrarySource,
+            id,
+            result.title,
+            result.authors,
+            result.year,
+            result.language,
+          );
           return {
-            content: [{ type: 'text', text: `"${source}" is metadata-only.` }],
+            content: [{ type: 'text', text: JSON.stringify(ingestResult, null, 2) }],
+            structuredContent: toStructured(ingestResult),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
             isError: true,
           };
-        const result = await adapter.read(id);
-        if (!result.text)
-          return {
-            content: [{ type: 'text', text: `No text for ${source}:${id}` }],
-            isError: true,
-          };
-        const ingestResult = await ingestText(
-          result.text,
-          source as LibrarySource,
-          id,
-          result.title,
-          result.authors,
-          result.year,
-          result.language,
-        );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(ingestResult, null, 2) }],
-          structuredContent: toStructured(ingestResult),
-        };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+        }
+      }),
   );
 
   // ── library_recommend ─────────────────────────────────────────────────────────
@@ -332,23 +357,24 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ id, limit }) => {
-      try {
-        const results = await s2Recommend(id, limit);
-        const text =
-          results.length === 0
-            ? `No recommendations for paper ${id}.`
-            : JSON.stringify(results, null, 2);
-        return { content: [{ type: 'text', text }], structuredContent: { results } };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+    async ({ id, limit }) =>
+      withRequestContext('library_recommend', async () => {
+        try {
+          const results = await s2Recommend(id, limit);
+          const text =
+            results.length === 0
+              ? `No recommendations for paper ${id}.`
+              : JSON.stringify(results, null, 2);
+          return { content: [{ type: 'text', text }], structuredContent: { results } };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
   );
 
   // ── library_answer ────────────────────────────────────────────────────────────
@@ -393,26 +419,27 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, max_sources, results_per_source, read_top }) => {
-      try {
-        const result = await libraryAnswer(query, {
-          maxSources: max_sources,
-          resultsPerSource: results_per_source,
-          readTop: read_top,
-        });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          structuredContent: toStructured(result),
-        };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+    async ({ query, max_sources, results_per_source, read_top }) =>
+      withRequestContext('library_answer', async () => {
+        try {
+          const result = await libraryAnswer(query, {
+            maxSources: max_sources,
+            resultsPerSource: results_per_source,
+            readTop: read_top,
+          });
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            structuredContent: toStructured(result),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
   );
 
   // ── library_research ──────────────────────────────────────────────────────────
@@ -448,37 +475,38 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, depth, breadth, max_minutes }, extra) => {
-      try {
-        const progressToken = extra._meta?.progressToken;
-        const onProgress: ProgressCallback = async (info) => {
-          if (progressToken !== undefined) {
-            await extra.sendNotification({
-              method: 'notifications/progress',
-              params: { progressToken, progress: info.round, message: info.message },
-            });
-          } else {
-            await server.sendLoggingMessage({ level: 'info', data: info.message });
-          }
-        };
-        const result = await libraryResearch(
-          query,
-          { depth, breadth, maxMinutes: max_minutes },
-          onProgress,
-        );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          structuredContent: toStructured(result),
-        };
-      } catch (err) {
-        return {
-          content: [
-            { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
-          ],
-          isError: true,
-        };
-      }
-    },
+    async ({ query, depth, breadth, max_minutes }, extra) =>
+      withRequestContext('library_research', async () => {
+        try {
+          const progressToken = extra._meta?.progressToken;
+          const onProgress: ProgressCallback = async (info) => {
+            if (progressToken !== undefined) {
+              await extra.sendNotification({
+                method: 'notifications/progress',
+                params: { progressToken, progress: info.round, message: info.message },
+              });
+            } else {
+              await server.sendLoggingMessage({ level: 'info', data: info.message });
+            }
+          };
+          const result = await libraryResearch(
+            query,
+            { depth, breadth, maxMinutes: max_minutes },
+            onProgress,
+          );
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            structuredContent: toStructured(result),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
   );
 
   return server;
@@ -525,7 +553,7 @@ function jsonRpcErrorHandler(
   next: express.NextFunction,
 ): void {
   const message = err instanceof Error ? err.message : String(err);
-  console.error('[alexandria] request failed:', message);
+  log.error({ err: message }, 'request failed');
   if (res.headersSent) {
     next(err);
     return;
@@ -546,17 +574,19 @@ export function createHttpApp(): express.Express {
   app.delete('/mcp', handleMcpRequest);
   app.get('/health', (_req, res) => {
     const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
+    const { calls, errors } = sourceCallTotals();
     res.json({
       status: 'ok',
       version: VERSION,
-      sources,
-      visible,
-      hidden,
+      sources: { total: sources, visible, hidden, calls, errors },
       byKind,
       quota,
       cache,
       tools: TOOL_COUNT,
     });
+  });
+  app.get('/metrics', (_req, res) => {
+    res.json(metricsSnapshot());
   });
   app.use(jsonRpcErrorHandler);
   return app;
@@ -564,9 +594,12 @@ export function createHttpApp(): express.Express {
 
 async function runHTTP(): Promise<void> {
   const app = createHttpApp();
-  const port = parseInt(process.env.PORT ?? '3000', 10);
+  const port = config.PORT;
   app.listen(port, () =>
-    console.error(`alexandria — ${listSources().length} sources — http://localhost:${port}/mcp`),
+    log.info(
+      { sources: listSources().length, url: `http://localhost:${port}/mcp` },
+      'alexandria started',
+    ),
   );
 }
 
@@ -574,19 +607,33 @@ async function runStdio(): Promise<void> {
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`alexandria — ${listSources().length} sources`);
+  log.info({ sources: listSources().length }, 'alexandria started');
 }
 
 function main(): void {
+  // Explicit, first thing: registry.ts, dispatcher.ts, and the rest of
+  // config's ~50 consumers all read it lazily (see config.ts's module
+  // comment), so an invalid env (a bad TRANSPORT, a non-numeric PORT)
+  // would otherwise only surface on whatever config field the FIRST
+  // registered source's first guarded call happens to touch - a confusing
+  // place to learn startup failed. console.error, not log.error: log.ts's
+  // own level()/destination() read config too, and would throw the exact
+  // same way trying to report this failure.
+  try {
+    loadConfig();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
   // Before the transport starts: every source's fetchWithRetry() call picks
   // up the composed dispatcher (connection pooling, dns cache, RFC 9111
   // http cache) with no per-call change, since it's installed as undici's
   // global dispatcher. See src/utils/dispatcher.ts.
   installDispatcher();
-  const transportMode = process.env.TRANSPORT ?? 'stdio';
-  const run = transportMode === 'http' ? runHTTP : runStdio;
+  const run = config.TRANSPORT === 'http' ? runHTTP : runStdio;
   run().catch((err) => {
-    console.error(err);
+    log.error({ err: err instanceof Error ? err.message : String(err) }, 'fatal startup error');
     process.exit(1);
   });
 }

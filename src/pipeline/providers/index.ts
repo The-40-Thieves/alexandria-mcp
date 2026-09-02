@@ -1,3 +1,4 @@
+import { config } from '../../config.ts';
 import type { EmbeddingProvider, VectorStoreProvider } from '../../types.ts';
 
 export type { EmbeddingProvider, VectorStoreProvider };
@@ -12,8 +13,8 @@ export interface ProviderConfig {
 
 export function resolveConfig(): ProviderConfig {
   return {
-    embedding: (process.env.EMBEDDING_PROVIDER as EmbeddingProviderName) || 'openai',
-    vectorStore: (process.env.VECTOR_STORE_PROVIDER as VectorStoreProviderName) || 'supabase',
+    embedding: (config.EMBEDDING_PROVIDER as EmbeddingProviderName) || 'openai',
+    vectorStore: (config.VECTOR_STORE_PROVIDER as VectorStoreProviderName) || 'supabase',
   };
 }
 

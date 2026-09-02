@@ -2,6 +2,7 @@
 // default, or (when configured) a Supabase table shared across processes.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { config } from '../config.ts';
 import { stateStore as defaultStateStore, type StateStore } from './stateStore.ts';
 
 export class QuotaExceededError extends Error {
@@ -100,7 +101,7 @@ export function utcDay(now = new Date()): string {
 }
 
 export function createLedger(store: StateStore = defaultStateStore): LedgerStore {
-  const { ALEXANDRIA_LEDGER, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+  const { ALEXANDRIA_LEDGER, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = config;
   if (ALEXANDRIA_LEDGER === 'supabase' && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     return new SupabaseLedgerStore(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   }

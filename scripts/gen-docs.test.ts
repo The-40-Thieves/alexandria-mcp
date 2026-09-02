@@ -79,9 +79,7 @@ test('buildReadmeSourcesBlock', async (t) => {
 test('buildHealthExample', async (t) => {
   await t.test('reports total, visible, hidden, and per-kind counts', () => {
     const example = buildHealthExample(FIXTURES);
-    assert.match(example, /sources: 3/);
-    assert.match(example, /visible: 2/);
-    assert.match(example, /hidden: 1/);
+    assert.match(example, /sources: \{ total: 3, visible: 2, hidden: 1, calls: 0, errors: 0 \}/);
     assert.match(example, /rest: 1/);
     assert.match(example, /mcp: 1/);
     assert.match(example, /rss: 1/);

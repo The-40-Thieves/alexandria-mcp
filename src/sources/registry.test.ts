@@ -413,3 +413,48 @@ describe('withGuards guard ordering', () => {
     );
   });
 });
+
+// Regression: registry.ts's ledger used to be built eagerly at module
+// load (`const ledger = createLedger()`), and createLedger() reads
+// config.ALEXANDRIA_LEDGER/SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY - a
+// single config field access runs the FULL schema.safeParse(process.env)
+// (config.ts's module comment), so an unrelated malformed ambient var
+// (a bad TRANSPORT, here) threw merely by IMPORTING registry.ts, before a
+// caller ever asked for anything ledger-related. registry.ts is imported
+// by nearly everything (gen-docs, probe, eval-routing, every registry
+// test), so that was the least diagnosable place for it to fail. A fresh
+// module instance (cache-busting query string, the only way to re-run
+// this module's top-level code within one process) proves the actual
+// `getLedger()` lazy path, not a stand-in.
+describe('config laziness', () => {
+  it('importing registry.ts under a malformed unrelated env var succeeds; the failure surfaces only on first ledger use', async () => {
+    const originalTransport = process.env.TRANSPORT;
+    process.env.TRANSPORT = 'not-a-real-transport'; // invalid per config.ts's TRANSPORT enum
+    try {
+      const mod = (await import(`./registry.ts?lazy-config-test=${Date.now()}`)) as {
+        register: typeof register;
+        getAdapter: typeof getAdapter;
+      };
+
+      // The import itself must not throw.
+      mod.register('t_lazy_config', {
+        description: 'x',
+        supportsIngest: false,
+        async search() {
+          return [];
+        },
+        async read() {
+          return { title: '', authors: [] };
+        },
+      });
+
+      // The first guarded call reaches getLedger() -> createLedger() ->
+      // config.ALEXANDRIA_LEDGER, which is where the deferred failure
+      // must actually surface, naming the bad variable.
+      await assert.rejects(mod.getAdapter('t_lazy_config').search('q', 1), /TRANSPORT/);
+    } finally {
+      if (originalTransport === undefined) delete process.env.TRANSPORT;
+      else process.env.TRANSPORT = originalTransport;
+    }
+  });
+});

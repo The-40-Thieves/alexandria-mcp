@@ -1,6 +1,13 @@
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { requestContext } from '../utils/http.ts';
-import { createLedger, type LedgerStore, reserveQuota, utcDay } from '../utils/quotaLedger.ts';
+import { sourceMetrics } from '../utils/metrics.ts';
+import {
+  createLedger,
+  type LedgerStore,
+  QuotaExceededError,
+  reserveQuota,
+  utcDay,
+} from '../utils/quotaLedger.ts';
 import { rateLimited } from '../utils/rateLimit.ts';
 import { cacheKey, searchCache } from '../utils/resultCache.ts';
 import { stateStore } from '../utils/stateStore.ts';
@@ -78,7 +85,23 @@ const DEFAULTS = {
 
 const REGISTRY = new Map<string, RegisteredEntry>();
 const WRAPPED = new Map<string, SourceAdapter>();
-const ledger: LedgerStore = createLedger();
+
+// Deferred to the first guarded call rather than built here at module load:
+// createLedger() reads config.ALEXANDRIA_LEDGER/SUPABASE_URL/
+// SUPABASE_SERVICE_ROLE_KEY, and a single config field access runs the
+// full schema.safeParse(process.env) (see config.ts's module comment).
+// registry.ts is imported by nearly everything (gen-docs, probe,
+// eval-routing, every registry test), so building the ledger eagerly here
+// meant an unrelated malformed ambient var (a bad TRANSPORT or PORT)
+// threw at the least diagnosable point: merely importing this module,
+// before main() ever ran. See index.ts's main(), which now calls
+// loadConfig() explicitly as its first statement so that failure still
+// surfaces immediately and readably at real startup.
+let ledgerInstance: LedgerStore | undefined;
+function getLedger(): LedgerStore {
+  if (!ledgerInstance) ledgerInstance = createLedger();
+  return ledgerInstance;
+}
 
 // True when a source needs no key (auth undefined or type 'none'), or its
 // configured env var is present.
@@ -118,10 +141,16 @@ export function register(name: string, adapter: SourceAdapter): void {
 // wired to via requestContext, see withGuards()) cancels its in-flight
 // fetch and stops retrying instead of continuing after this caller has
 // already given up.
+// A distinct subclass (message text unchanged, so scripts/probe.ts's
+// /abort/i match still holds) lets withGuards() below classify a guard
+// timeout into metrics.ts's `timeouts` counter via `instanceof` rather than
+// string-matching the message a second time.
+export class GuardTimeoutError extends Error {}
+
 function withTimeout<T>(p: Promise<T>, ms: number, controller: AbortController): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      const err = new Error('This operation was aborted');
+      const err = new GuardTimeoutError('This operation was aborted');
       controller.abort(err);
       reject(err);
     }, ms);
@@ -188,26 +217,64 @@ function chainAbort(inner: AbortController): () => void {
   return () => outer.removeEventListener('abort', onOuterAbort);
 }
 
+// Runs `fn` inside a fresh signal (chained/merged with whatever's already
+// ambient, see chainAbort()/this function) while keeping the outer store's
+// reqId/tool (set by index.ts's withRequestContext() around the whole MCP
+// tool call) intact, so log.ts's requestLogger() and providers.ts's
+// llmCalls counter can still attribute to that tool from inside a guarded
+// adapter call. A plain `requestContext.run({ signal }, fn)` would instead
+// REPLACE the store for this inner scope, dropping reqId/tool.
+function runGuarded<T>(controller: AbortController, fn: () => Promise<T>): Promise<T> {
+  const outer = requestContext.getStore();
+  return requestContext.run({ ...outer, signal: controller.signal }, fn);
+}
+
+// Classifies a failed guarded call into exactly one of metrics.ts's
+// error-shaped counters (quotaRejections / timeouts / errors), mutually
+// exclusive so `calls` decomposes cleanly into "succeeded" plus these three.
+function recordFailure(metrics: ReturnType<typeof sourceMetrics>, err: unknown): void {
+  if (err instanceof QuotaExceededError) metrics.quotaRejections++;
+  else if (err instanceof GuardTimeoutError) metrics.timeouts++;
+  else metrics.errors++;
+}
+
 function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
   return {
     ...adapter,
     async search(query, limit) {
       const key = cacheKey(name, query, limit);
       const cached = searchCache.get(key);
-      if (cached) return cached;
+      const metrics = sourceMetrics(name);
+      if (cached) {
+        metrics.cacheHits++;
+        return cached;
+      }
       const controller = new AbortController();
       const unchain = chainAbort(controller);
+      metrics.calls++;
       try {
         const result = await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
-          await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
-          return withTimeout(
-            requestContext.run({ signal: controller.signal }, () => adapter.search(query, limit)),
-            adapter.timeoutMs,
-            controller,
-          );
+          await reserveQuota(name, adapter.pacing?.dailyCap, getLedger());
+          // Timed from here, not from the top of search(): rateLimited()'s
+          // wait for a pacing slot and reserveQuota() both happen above
+          // this line, so a paced source (ghsa at 60s, nvd at 6.5s, ...)
+          // no longer shows its queue wait as provider latency.
+          const start = Date.now();
+          try {
+            return await withTimeout(
+              runGuarded(controller, () => adapter.search(query, limit)),
+              adapter.timeoutMs,
+              controller,
+            );
+          } finally {
+            metrics.latencyMsTotal += Date.now() - start;
+          }
         });
         searchCache.set(key, result);
         return result;
+      } catch (err) {
+        recordFailure(metrics, err);
+        throw err;
       } finally {
         unchain();
       }
@@ -215,15 +282,25 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
     async read(id) {
       const controller = new AbortController();
       const unchain = chainAbort(controller);
+      const metrics = sourceMetrics(name);
+      metrics.calls++;
       try {
         return await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
-          await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
-          return withTimeout(
-            requestContext.run({ signal: controller.signal }, () => adapter.read(id)),
-            adapter.timeoutMs,
-            controller,
-          );
+          await reserveQuota(name, adapter.pacing?.dailyCap, getLedger());
+          const start = Date.now();
+          try {
+            return await withTimeout(
+              runGuarded(controller, () => adapter.read(id)),
+              adapter.timeoutMs,
+              controller,
+            );
+          } finally {
+            metrics.latencyMsTotal += Date.now() - start;
+          }
         });
+      } catch (err) {
+        recordFailure(metrics, err);
+        throw err;
       } finally {
         unchain();
       }

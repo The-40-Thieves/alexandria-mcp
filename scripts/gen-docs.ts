@@ -7,6 +7,7 @@
 // without writing, so CI can catch a registry change that docs weren't
 // regenerated for.
 import fs from 'node:fs';
+import { CONFIG_FIELDS } from '../src/config.ts';
 import '../src/sources/all.ts';
 import { type Cluster, listSources, type SourceKind } from '../src/sources/registry.ts';
 import { VERSION } from '../src/version.ts';
@@ -126,12 +127,14 @@ function buildHealthExample(sources: Source[]): string {
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of sources) byKind[s.kind]++;
   const kindStr = `{ rest: ${byKind.rest}, hub: ${byKind.hub}, rss: ${byKind.rss}, mcp: ${byKind.mcp}, scrape: ${byKind.scrape} }`;
-  // quota/cache are runtime counters (Task 4's StateStore); the doc example
-  // shows a freshly-started process (nothing reserved or cached yet) rather
-  // than today's actual date, so this line does not drift day to day.
+  // quota/cache/calls/errors are runtime counters (Task 4's StateStore,
+  // Task 5's per-source metrics); the doc example shows a freshly-started
+  // process (nothing reserved, cached, or called yet) rather than today's
+  // actual date, so this line does not drift day to day.
+  const sourcesStr = `{ total: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, calls: 0, errors: 0 }`;
   const quotaStr = '{ day: "2026-09-02", reserved: 0, sources: 0 }';
   const cacheStr = '{ entries: 0 }';
-  return `{ status: "ok", version: "${VERSION}", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
+  return `{ status: "ok", version: "${VERSION}", sources: ${sourcesStr}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
 }
 
 function applyReadmeSubstitutions(content: string, sources: Source[]): string {
@@ -158,165 +161,33 @@ interface EnvVar {
   comment: string;
 }
 
-// Feature envs not tied to a single source's `auth` field: per-role
-// provider overrides, caching, the web tier, MCP delegation, and Supabase
-// storage. Fixed list and order per the Stage 10 brief. A name that also
-// happens to be a source's declared auth.env (CONTACT_EMAIL, JINA_API_KEY,
-// TAVILY_API_KEY) is listed here only, with the gated source named in its
-// comment, instead of twice.
-const FEATURE_ENVS: EnvVar[] = [
-  {
-    name: 'ALEXANDRIA_BASE_URL',
-    comment:
-      'Shared OpenAI-compatible gateway base URL for every role (router/synth/research/embeddings/rerank).',
-  },
-  { name: 'ALEXANDRIA_API_KEY', comment: 'Shared API key paired with ALEXANDRIA_BASE_URL.' },
-  {
-    name: 'ALEXANDRIA_ROUTER_BASE_URL',
-    comment: 'Per-role override: base URL used by library_ask/library_answer routing.',
-  },
-  { name: 'ALEXANDRIA_ROUTER_API_KEY', comment: 'Per-role override: API key for the router role.' },
-  {
-    name: 'ALEXANDRIA_ROUTER_MODEL',
-    comment: 'Per-role override: chat model used for routing (default gpt-4o-mini).',
-  },
-  {
-    name: 'ALEXANDRIA_SYNTH_BASE_URL',
-    comment: 'Per-role override: base URL used by library_answer synthesis.',
-  },
-  { name: 'ALEXANDRIA_SYNTH_API_KEY', comment: 'Per-role override: API key for the synth role.' },
-  {
-    name: 'ALEXANDRIA_SYNTH_MODEL',
-    comment: 'Per-role override: chat model used for answer synthesis (default gpt-4o-mini).',
-  },
-  {
-    name: 'ALEXANDRIA_RESEARCH_BASE_URL',
-    comment: 'Per-role override: base URL used by library_research.',
-  },
-  {
-    name: 'ALEXANDRIA_RESEARCH_API_KEY',
-    comment: 'Per-role override: API key for the research role.',
-  },
-  {
-    name: 'ALEXANDRIA_RESEARCH_MODEL',
-    comment: 'Per-role override: chat model used for research (default gpt-4o).',
-  },
-  {
-    name: 'ALEXANDRIA_EMBEDDINGS_BASE_URL',
-    comment: 'Per-role override: base URL used for library_ingest embeddings.',
-  },
-  {
-    name: 'ALEXANDRIA_EMBEDDINGS_API_KEY',
-    comment: 'Per-role override: API key for the embeddings role.',
-  },
-  {
-    name: 'ALEXANDRIA_EMBEDDINGS_MODEL',
-    comment: 'Per-role override: embedding model (default text-embedding-3-small).',
-  },
-  {
-    name: 'ALEXANDRIA_RERANK_BASE_URL',
-    comment: 'Per-role override: base URL used for the LLM rerank stage.',
-  },
-  { name: 'ALEXANDRIA_RERANK_API_KEY', comment: 'Per-role override: API key for the rerank role.' },
-  {
-    name: 'ALEXANDRIA_RERANK_MODEL',
-    comment: 'Per-role override: chat model used for rerank (default gpt-4o-mini).',
-  },
-  {
-    name: 'ALEXANDRIA_RERANK',
-    comment:
-      'Set to "llm" to rerank fused results with a chat call; otherwise the fused order is kept.',
-  },
-  {
-    name: 'ALEXANDRIA_CATALOG_CACHE',
-    comment:
-      'Path to the routing catalog embedding cache. Defaults to eval/catalog-embeddings.json inside the package.',
-  },
-  {
-    name: 'ALEXANDRIA_CACHE_TTL_MS',
-    comment: 'Search result cache TTL in milliseconds. Unset uses the built-in default.',
-  },
-  {
-    name: 'ALEXANDRIA_HTTP_CACHE',
-    comment:
-      'Path to the shared undici RFC 9111 http-cache SQLite database. Defaults to data/http-cache.db inside the package; falls back to an in-memory cache if that location cannot be created.',
-  },
-  {
-    name: 'ALEXANDRIA_STATE_DB',
-    comment:
-      'Path to the node:sqlite database backing the daily quota ledger and search result cache. Defaults to data/alexandria.db inside the package; set to ":memory:" to force the in-memory store, or falls back to it automatically if the path can\'t be created.',
-  },
-  {
-    name: 'ALEXANDRIA_LEDGER',
-    comment:
-      'Set to "supabase" (with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY) to persist the daily quota ledger there instead of ALEXANDRIA_STATE_DB.',
-  },
-  {
-    name: 'SEARXNG_URL',
-    comment: 'Self-hosted SearXNG metasearch instance URL. Hides the searxng source without it.',
-  },
-  {
-    name: 'CRAWL4AI_URL',
-    comment:
-      'Self-hosted crawl4ai headless-browser render server URL (fetch tier 3). Hides that tier without it.',
-  },
-  {
-    name: 'CRAWL4AI_API_TOKEN',
-    comment: 'Bearer token for CRAWL4AI_URL, only needed if your instance requires auth.',
-  },
-  {
-    name: 'JINA_API_KEY',
-    comment:
-      'Jina AI Reader/Search key. Required to unhide the jinasearch source; also enables fetch tier 2 (jina reader) as a fallback when set.',
-  },
-  {
-    name: 'ALEXANDRIA_JINA_READER',
-    comment:
-      'Set to 1 to use the jina reader fetch tier anonymously (20 RPM shared cap) when JINA_API_KEY is unset.',
-  },
-  {
-    name: 'TAVILY_API_KEY',
-    comment: 'Tavily AI-oriented web search API key. Required to unhide the tavily source.',
-  },
-  {
-    name: 'SUPADATA_API_KEY',
-    comment:
-      'Supadata transcript service key, preferred for youtube transcripts over the unofficial fallback.',
-  },
-  {
-    name: 'KNOWLEDGE_MCP_URL',
-    comment:
-      'Optional knowledge-base MCP server URL, folded into library_answer as one more ranked list.',
-  },
-  { name: 'KNOWLEDGE_MCP_TOKEN', comment: 'Bearer token for KNOWLEDGE_MCP_URL.' },
-  {
-    name: 'SUPABASE_URL',
-    comment:
-      'Supabase project URL. Required for library_ingest and for ALEXANDRIA_LEDGER=supabase.',
-  },
-  {
-    name: 'SUPABASE_SERVICE_ROLE_KEY',
-    comment:
-      'Supabase service role key. Required for library_ingest and for ALEXANDRIA_LEDGER=supabase.',
-  },
-  {
-    name: 'SUPABASE_TABLE',
-    comment: 'Table name for library_ingest chunks. Default knowledge_chunks.',
-  },
-  {
-    name: 'CONTACT_EMAIL',
-    comment:
-      'Courtesy contact email sent to OpenAlex, Crossref, BASE, and similar polite pools; required to unhide the ecosystems source.',
-  },
+// Feature envs not tied to a single source's `auth` field: transport,
+// per-role provider overrides, caching, the web tier, MCP delegation, and
+// Supabase storage. Task 5 (review 3.6) moved this list from a
+// hand-maintained array to src/config.ts's zod schema - each field's
+// `.describe()` text is this section's comment, so the schema is now the
+// only place that needs updating when an ops env var is added, renamed, or
+// documented. A name that also happens to be a source's declared auth.env
+// (JINA_API_KEY) is still listed here only, with the gated source named in
+// the registry's own "Source-specific keys" entry for it instead of twice -
+// see buildEnvBlock()'s `FEATURE_ENV_NAMES.has(env)` skip below.
+//
+// UNDECLARED_SOURCE_ENVS covers the opposite edge: an env var an adapter
+// reads directly but never declares via `auth`/`optionalEnv` (so the
+// registry has no record of it) and that isn't ops-level config either.
+// TROVE_FULLTEXT_CAP is the one remaining case (src/sources/trove.ts, out
+// of scope for this task per the brief). Kept tiny and explicit rather than
+// silently dropping it from .env.example.
+const UNDECLARED_SOURCE_ENVS: EnvVar[] = [
   {
     name: 'TROVE_FULLTEXT_CAP',
     comment: 'Max trove full-text reads per run before falling back to metadata. Default 25.',
   },
-  {
-    name: 'ALEXANDRIA_ALLOW_LOOPBACK',
-    comment:
-      'Test-only: lets the fetch tier SSRF guard reach 127.0.0.1/localhost. Never set in production.',
-  },
+];
+
+const FEATURE_ENVS: EnvVar[] = [
+  ...CONFIG_FIELDS.map(({ name, description }) => ({ name, comment: description })),
+  ...UNDECLARED_SOURCE_ENVS,
 ];
 
 const FEATURE_ENV_NAMES = new Set(FEATURE_ENVS.map((e) => e.name));

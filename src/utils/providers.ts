@@ -12,6 +12,9 @@
 // api.openai.com for router/synth, text-embedding-3-small for embeddings.
 import OpenAI from 'openai';
 import type { z } from 'zod';
+import { config } from '../config.ts';
+import { requestContext } from './http.ts';
+import { toolMetrics } from './metrics.ts';
 
 export type Role = 'router' | 'synth' | 'research' | 'embeddings' | 'rerank';
 
@@ -51,16 +54,32 @@ function envKey(role: Role, suffix: 'BASE_URL' | 'API_KEY' | 'MODEL' | 'JSON_MOD
   return `ALEXANDRIA_${role.toUpperCase()}_${suffix}`;
 }
 
+// Attributed to whichever MCP tool is currently in flight (index.ts wraps
+// every tool handler in requestContext.run() with its name - see
+// src/utils/http.ts's RequestContextStore), or "unknown" for a call made
+// outside that context (a script, a direct unit test).
+function recordLlmCall(): void {
+  const tool = requestContext.getStore()?.tool ?? 'unknown';
+  toolMetrics(tool).llmCalls++;
+}
+
+// config's keys are literally the env var names (see config.ts's module
+// comment), so envKey()'s dynamic suffix composition still works - just
+// indexed against the validated config object instead of raw process.env.
+function configValue(key: string): string | undefined {
+  return config[key as keyof typeof config] as string | undefined;
+}
+
 // env: ALEXANDRIA_<ROLE>_BASE_URL, _API_KEY, _MODEL; then ALEXANDRIA_BASE_URL/
 // _API_KEY as shared defaults; then OPENAI_API_KEY with
 // https://api.openai.com/v1.
 export function roleConfig(role: Role): RoleConfig {
-  const roleBaseURL = process.env[envKey(role, 'BASE_URL')];
-  const roleApiKey = process.env[envKey(role, 'API_KEY')];
-  const roleModel = process.env[envKey(role, 'MODEL')];
-  const sharedBaseURL = process.env.ALEXANDRIA_BASE_URL;
-  const sharedApiKey = process.env.ALEXANDRIA_API_KEY;
-  const openaiApiKey = process.env.OPENAI_API_KEY;
+  const roleBaseURL = configValue(envKey(role, 'BASE_URL'));
+  const roleApiKey = configValue(envKey(role, 'API_KEY'));
+  const roleModel = configValue(envKey(role, 'MODEL'));
+  const sharedBaseURL = config.ALEXANDRIA_BASE_URL;
+  const sharedApiKey = config.ALEXANDRIA_API_KEY;
+  const openaiApiKey = config.OPENAI_API_KEY;
 
   const directBaseURL = openaiBaseUrlOverride.value;
   const usingGateway = Boolean(roleBaseURL || sharedBaseURL);
@@ -68,7 +87,7 @@ export function roleConfig(role: Role): RoleConfig {
   const apiKey = roleApiKey || sharedApiKey || openaiApiKey || '';
   const model = roleModel || defaultModel(role);
 
-  const config: RoleConfig = { baseURL, apiKey, model };
+  const resolved: RoleConfig = { baseURL, apiKey, model };
 
   // When the primary points at a gateway rather than OpenAI directly, and a
   // direct OpenAI key is also available, wire it up as a one-shot fallback
@@ -85,10 +104,10 @@ export function roleConfig(role: Role): RoleConfig {
     // origin (same base URL, different key) the model name is still valid,
     // so it is kept.
     const fallbackModel = baseURL === directBaseURL ? model : defaultModel(role);
-    config.fallback = { baseURL: directBaseURL, apiKey: openaiApiKey, model: fallbackModel };
+    resolved.fallback = { baseURL: directBaseURL, apiKey: openaiApiKey, model: fallbackModel };
   }
 
-  return config;
+  return resolved;
 }
 
 function requireApiKey(role: Role, config: RoleConfig): void {
@@ -138,10 +157,10 @@ export function getClient(role: Role): OpenAI {
 // backend is api.openai.com, or the deployer has confirmed (via
 // ALEXANDRIA_<ROLE>_JSON_MODE=1) that their gateway/model supports it;
 // otherwise fall back to asking for JSON in the prompt.
-function supportsJsonMode(role: Role, config: RoleConfig): boolean {
-  if (process.env[envKey(role, 'JSON_MODE')] === '1') return true;
+function supportsJsonMode(role: Role, roleCfg: RoleConfig): boolean {
+  if (configValue(envKey(role, 'JSON_MODE')) === '1') return true;
   try {
-    return new URL(config.baseURL).hostname === 'api.openai.com';
+    return new URL(roleCfg.baseURL).hostname === 'api.openai.com';
   } catch {
     return false;
   }
@@ -172,6 +191,7 @@ async function callChat(
   jsonMode: boolean,
 ): Promise<string> {
   const client = clientFor(config);
+  recordLlmCall();
   const response = await client.chat.completions.create({
     model: config.model,
     messages,
@@ -297,6 +317,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
   const results: number[][] = [];
   for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
     const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
+    recordLlmCall();
     const response = await client.embeddings.create({ model: config.model, input: batch });
     for (const item of response.data) {
       if (cachedEmbeddingDimensions === undefined) {
