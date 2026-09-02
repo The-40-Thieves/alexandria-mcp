@@ -1,0 +1,16 @@
+{
+  "response": {
+    "id": "",
+    "name": "",
+    "description": "",
+    "routes": [
+      { "id": "coal", "name": "Coal", "description": "EIA coal energy data" },
+      { "id": "electricity", "name": "Electricity", "description": "EIA electricity survey data" },
+      {
+        "id": "petroleum",
+        "name": "Petroleum",
+        "description": "EIA petroleum energy data"
+      }
+    ]
+  }
+}

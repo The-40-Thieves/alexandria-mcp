@@ -1,0 +1,35 @@
+{
+  "response": {
+    "total": 2,
+    "dateFormat": "YYYY-MM",
+    "frequency": "monthly",
+    "data": [
+      {
+        "period": "2026-06",
+        "duoarea": "NUS",
+        "area-name": "U.S.",
+        "product": "EPC0",
+        "product-name": "Crude Oil",
+        "process": "FPF",
+        "process-name": "Field Production",
+        "series": "MCRFPUS2",
+        "series-description": "U.S. Field Production of Crude Oil (Thousand Barrels per Day)",
+        "value": 13792,
+        "units": "MBBL/D"
+      },
+      {
+        "period": "2026-05",
+        "duoarea": "NUS",
+        "area-name": "U.S.",
+        "product": "EPC0",
+        "product-name": "Crude Oil",
+        "process": "FPF",
+        "process-name": "Field Production",
+        "series": "MCRFPUS2",
+        "series-description": "U.S. Field Production of Crude Oil (Thousand Barrels per Day)",
+        "value": 13755,
+        "units": "MBBL/D"
+      }
+    ]
+  }
+}

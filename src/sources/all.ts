@@ -90,3 +90,4 @@ import './attack.js';
 import './twelvedata.js';
 import './coingecko.js';
 import './frankfurter.js';
+import './eia.js';
