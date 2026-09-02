@@ -1,8 +1,8 @@
 // ReliefWeb: humanitarian reports and situation updates, run by UN OCHA.
 // Requires a registered RELIEFWEB_APPNAME.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://api.reliefweb.int/v2';
 

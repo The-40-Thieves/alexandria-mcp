@@ -4,10 +4,10 @@
 // (embed=true, the server's own page-size ceiling) once per process and
 // filters client-side by title token match, the same lazy-cache
 // convention as kev.ts/attack.ts/peps.ts/tc39.ts/swiftevolution.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { stripHtml } from '../utils/text-clean.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { stripHtml } from '../utils/text-clean.ts';
+import { register } from './registry.ts';
 
 const URL = 'https://api.w3.org/specifications?items=1000&embed=true';
 const TIMEOUT_MS = 30000;

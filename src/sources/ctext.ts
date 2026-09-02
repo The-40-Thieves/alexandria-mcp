@@ -1,8 +1,8 @@
 import pLimit from 'p-limit';
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { normaliseWhitespace } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { normaliseWhitespace } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 // Migrated off the legacy ctext.org/api.pl CGI endpoint (retired) to the
 // current api.ctext.org REST API. Ids are now ctp: URNs (e.g. "ctp:analects")

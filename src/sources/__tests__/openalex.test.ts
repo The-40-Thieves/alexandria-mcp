@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeOpenAlex, openalexSearch } from '../openalex.js';
+import { normalizeOpenAlex, openalexSearch } from '../openalex.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/openalex-search.json'), 'utf8'),

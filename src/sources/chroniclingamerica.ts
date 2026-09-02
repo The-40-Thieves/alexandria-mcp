@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 // Migrated off the retired chroniclingamerica.loc.gov API (2026) to the
 // unified loc.gov search/item JSON API. Chronicling America is now one

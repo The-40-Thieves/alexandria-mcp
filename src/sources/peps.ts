@@ -4,10 +4,10 @@
 // swiftevolution.ts. read() returns metadata only; extracting the PEP body
 // HTML awaits the fetchTier web-fetch tier (Stage 6), the same TODO
 // convention used by nhk.ts and kinds/rss.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 const URL = 'https://peps.python.org/api/peps.json';
 const TIMEOUT_MS = 20000;

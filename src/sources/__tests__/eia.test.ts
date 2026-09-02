@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeEiaRoute, normalizeEiaSeries } from '../eia.js';
-import { getAdapter } from '../registry.js';
+import { normalizeEiaRoute, normalizeEiaSeries } from '../eia.ts';
+import { getAdapter } from '../registry.ts';
 
 const routes = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/eia-routes.json'), 'utf8'),

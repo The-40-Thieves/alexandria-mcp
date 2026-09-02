@@ -7,13 +7,13 @@
 // claims and trimmed.
 import pLimit from 'p-limit';
 import { z } from 'zod';
-import { chatJSON, requireRoleForTool } from '../utils/providers.js';
+import { chatJSON, requireRoleForTool } from '../utils/providers.ts';
 import {
   type Citation,
   type LibraryAnswerOptions,
   type LibraryAnswerResult,
   libraryAnswer,
-} from './libraryAnswer.js';
+} from './libraryAnswer.ts';
 
 const RESEARCH_CONCURRENCY = 3;
 

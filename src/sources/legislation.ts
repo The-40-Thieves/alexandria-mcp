@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchText } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://www.legislation.gov.uk';
 

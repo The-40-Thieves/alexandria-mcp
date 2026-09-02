@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { getAdapter } from '../registry.js';
-import { defineRssSource, parseFeedItems } from './rss.js';
+import { getAdapter } from '../registry.ts';
+import { defineRssSource, parseFeedItems } from './rss.ts';
 
 function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/rss', name), 'utf8');
@@ -176,7 +176,7 @@ test('defineRssSource', async (t) => {
       region: 'Testland',
       homepage: 'https://example.org',
     });
-    const { listSources } = await import('../registry.js');
+    const { listSources } = await import('../registry.ts');
     const meta = listSources().find((s) => s.name === 'test-rss-region');
     assert.ok(meta);
     assert.equal(meta?.kind, 'rss');

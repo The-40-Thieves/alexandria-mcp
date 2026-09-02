@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import test from 'node:test';
-import { register } from '../sources/registry.js';
-import { resetCatalogCacheForTests } from '../utils/catalogIndex.js';
+import { register } from '../sources/registry.ts';
+import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
 import {
   dropDanglingCitations,
   escapeSourceText,
   extractCitationNumbers,
   libraryAnswer,
-} from './libraryAnswer.js';
+} from './libraryAnswer.ts';
 
 interface FakeServer {
   url: string;

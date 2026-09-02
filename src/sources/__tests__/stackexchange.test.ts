@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeStackExchange } from '../stackexchange.js';
+import { normalizeStackExchange } from '../stackexchange.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/stackexchange-search.json'), 'utf8'),

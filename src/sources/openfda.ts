@@ -1,9 +1,9 @@
 // openFDA drug enforcement (recalls) search. Works keyless (rate limited);
 // OPENFDA_API_KEY, if present, is sent as the api_key query param for a
 // higher rate limit, the same optional-key convention as nvd.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.fda.gov/drug/enforcement.json';
 

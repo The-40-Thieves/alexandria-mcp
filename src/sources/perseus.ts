@@ -1,7 +1,7 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { normaliseWhitespace } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { normaliseWhitespace } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 // Perseus's old CTS API (perseus.tufts.edu/hopper/CTS) is dead (connection
 // refused, confirmed 2026-09). Scaife (scaife.perseus.org) is Perseus's

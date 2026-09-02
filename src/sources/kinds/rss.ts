@@ -3,12 +3,12 @@
 // (RSS 2.0, Atom, RDF, JSON Feed) into one flat item shape the rest of this
 // file (and googlenews.ts) can share.
 import { parseFeed } from 'feedsmith';
-import type { LibraryResult, ReadResult } from '../../types.js';
-import { fetchText } from '../../utils/http.js';
-import { stripHtml } from '../../utils/text-clean.js';
-import { fetchAsText } from '../../web/fetchTier.js';
-import type { Cluster, Freshness } from '../registry.js';
-import { register, truncateText } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import { fetchText } from '../../utils/http.ts';
+import { stripHtml } from '../../utils/text-clean.ts';
+import { fetchAsText } from '../../web/fetchTier.ts';
+import type { Cluster, Freshness } from '../registry.ts';
+import { register, truncateText } from '../registry.ts';
 
 export interface FeedConfig {
   name: string;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeGdelt } from '../gdelt.js';
+import { normalizeGdelt } from '../gdelt.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/gdelt-doc.json'), 'utf8'),

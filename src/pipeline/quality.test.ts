@@ -1,14 +1,14 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import type { Chunk } from '../types.js';
-import { ocrQualityScore } from '../utils/text-clean.js';
+import type { Chunk } from '../types.ts';
+import { ocrQualityScore } from '../utils/text-clean.ts';
 import {
   avgQuality,
   DEFAULT_QUALITY_THRESHOLD,
   filterChunks,
   MIN_CHUNK_LENGTH,
   scoreChunk,
-} from './quality.js';
+} from './quality.ts';
 
 test('DEFAULT_QUALITY_THRESHOLD is 0.75', () => {
   assert.strictEqual(DEFAULT_QUALITY_THRESHOLD, 0.75);

@@ -7,9 +7,9 @@
 // cached module-scope for a short TTL rather than downloaded once per
 // process (like kev.ts/attack.ts), since the content changes daily.
 import { parse as parseHtml } from 'node-html-parser';
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const URL =
   'https://en.wikipedia.org/w/api.php?action=parse&page=Portal:Current_events&prop=text&format=json&formatversion=2';

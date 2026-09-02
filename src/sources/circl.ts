@@ -1,8 +1,8 @@
 // CIRCL Vulnerability Lookup: full-text search across CVE, GHSA and other
 // vulnerability feeds ingested by CIRCL. No API key required.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://vulnerability.circl.lu';
 

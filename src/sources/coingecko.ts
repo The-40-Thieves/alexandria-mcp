@@ -2,9 +2,9 @@
 // keyless (rate limited); COINGECKO_API_KEY, if present, is sent as the
 // x-cg-demo-api-key header for a higher rate limit, the same optional-key
 // convention as nvd.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.coingecko.com/api/v3';
 

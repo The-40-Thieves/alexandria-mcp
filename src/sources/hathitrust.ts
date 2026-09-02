@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 // HathiTrust's Data API (the old /api/v2/volumes/search) was retired.
 // There is no public keyword-search API left; catalog.hathitrust.org/api

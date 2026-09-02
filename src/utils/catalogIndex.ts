@@ -8,8 +8,8 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Cluster, catalog, type Freshness } from '../sources/registry.js';
-import { embed, hasEmbeddingsConfigured } from './providers.js';
+import { type Cluster, catalog, type Freshness } from '../sources/registry.ts';
+import { embed, hasEmbeddingsConfigured } from './providers.ts';
 
 export interface CatalogEntry {
   name: string;

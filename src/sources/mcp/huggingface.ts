@@ -4,10 +4,10 @@
 // grammar). No API key required. read() delegates straight to the
 // existing arxiv source rather than calling back out to hf_fs, since
 // every hit's `path` is a bare arXiv id.
-import type { LibraryResult } from '../../types.js';
-import type { RemoteServerConfig } from '../../utils/mcpClientPool.js';
-import { defineMcpSourceWithDelegatedRead } from '../kinds/mcp.js';
-import { getAdapter } from '../registry.js';
+import type { LibraryResult } from '../../types.ts';
+import type { RemoteServerConfig } from '../../utils/mcpClientPool.ts';
+import { defineMcpSourceWithDelegatedRead } from '../kinds/mcp.ts';
+import { getAdapter } from '../registry.ts';
 
 const SERVER: RemoteServerConfig = {
   name: 'huggingface',

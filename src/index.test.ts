@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
-import { createHttpApp, createServer } from './index.js';
+import { createHttpApp, createServer } from './index.ts';
 
 /**
  * Regression test for the shared-McpServer bug: a module-level McpServer that

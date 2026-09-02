@@ -1,9 +1,9 @@
 // Swift Evolution proposals: a single JSON document, downloaded once per
 // process and filtered client-side by token match, the static-download
 // convention shared with kev.ts, attack.ts, peps.ts and tc39.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const URL = 'https://download.swift.org/swift-evolution/v1/evolution.json';
 const TIMEOUT_MS = 20000;

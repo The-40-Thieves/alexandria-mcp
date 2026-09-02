@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeMdnMcp, normalizeMdnMcpRead, parseMdnSearch } from './mdnmcp.js';
+import { normalizeMdnMcp, normalizeMdnMcpRead, parseMdnSearch } from './mdnmcp.ts';
 
 // A trimmed version of the real text `search` returned for {query:
 // "Array.prototype.map"} against https://mcp.mdn.mozilla.net/, captured

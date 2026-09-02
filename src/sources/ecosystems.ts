@@ -9,9 +9,9 @@
 // (packages.ecosyste.ms/docs/api/v1/openapi.yaml) has no /packages/search
 // path at all, only /packages/lookup?name=..., an exact (not full-text)
 // name match across every registry. Use that instead.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const BASE = 'https://packages.ecosyste.ms/api/v1';
 

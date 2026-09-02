@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cacheKey, parseTtlMs, ResultCache } from './resultCache.js';
+import { cacheKey, parseTtlMs, ResultCache } from './resultCache.ts';
 
 test('resultCache', async (t) => {
   await t.test('returns undefined on miss', () => {

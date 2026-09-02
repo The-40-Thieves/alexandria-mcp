@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { googleBooksSearch, normalizeGoogleBooks } from '../googlebooks.js';
+import { googleBooksSearch, normalizeGoogleBooks } from '../googlebooks.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/googlebooks-search.json'), 'utf8'),

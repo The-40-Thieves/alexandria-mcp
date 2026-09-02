@@ -9,7 +9,7 @@ import {
   type DnsLookupAll,
   dnsResolver,
   fetchAsText,
-} from './fetchTier.js';
+} from './fetchTier.ts';
 
 function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/web', name), 'utf8');

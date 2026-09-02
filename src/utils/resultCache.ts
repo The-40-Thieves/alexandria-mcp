@@ -1,6 +1,6 @@
 // THE-166: a short TTL cache for search results, keyed by source+query+limit.
 
-import type { LibraryResult } from '../types.js';
+import type { LibraryResult } from '../types.ts';
 
 interface Entry<T> {
   value: T;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { perseusRead, perseusSearch } from '../perseus.js';
+import { perseusRead, perseusSearch } from '../perseus.ts';
 
 function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}`), 'utf8');

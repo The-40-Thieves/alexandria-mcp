@@ -1,5 +1,5 @@
-import type { LibraryResult } from '../types.js';
-import { register } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { register } from './registry.ts';
 
 const BASE = 'https://sacred-texts.com';
 

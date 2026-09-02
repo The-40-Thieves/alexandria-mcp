@@ -1,8 +1,8 @@
 import { XMLParser } from 'fast-xml-parser';
-import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
-import { normaliseWhitespace, stripHtml } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchText } from '../utils/http.ts';
+import { normaliseWhitespace, stripHtml } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 const SRU = 'https://gallica.bnf.fr/services/engine/search/sru';
 const FULLTEXT = 'https://gallica.bnf.fr/services/engine/fulltext';

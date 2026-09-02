@@ -1,7 +1,7 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { normaliseWhitespace } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { normaliseWhitespace } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 const API = 'https://en.wikisource.org/w/api.php';
 

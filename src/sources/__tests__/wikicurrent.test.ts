@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeWikicurrent, parseSections } from '../wikicurrent.js';
+import { normalizeWikicurrent, parseSections } from '../wikicurrent.ts';
 
 const fixture = readFileSync(
   path.resolve(process.cwd(), 'eval/fixtures/wikicurrent-portal.html'),

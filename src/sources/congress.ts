@@ -13,9 +13,9 @@
 // names the primary (DATA_GOV_API_KEY) for documentation/probe purposes,
 // and `hidden` is set explicitly here to reflect the two-env fallback
 // registry.register()'s default single-env hidden check can't express.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.congress.gov/v3';
 

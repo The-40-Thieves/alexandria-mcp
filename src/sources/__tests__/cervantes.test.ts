@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { cervantesRead, normalizeCervantesSparql } from '../cervantes.js';
+import { cervantesRead, normalizeCervantesSparql } from '../cervantes.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/cervantes-sparql.json'), 'utf8'),

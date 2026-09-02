@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeFrankfurterCurrency, normalizeFrankfurterRates } from '../frankfurter.js';
+import { normalizeFrankfurterCurrency, normalizeFrankfurterRates } from '../frankfurter.ts';
 
 const latest = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/frankfurter-latest.json'), 'utf8'),

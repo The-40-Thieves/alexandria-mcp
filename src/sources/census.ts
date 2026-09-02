@@ -2,9 +2,9 @@
 // search API), downloaded once per process and filtered client-side by
 // token match, the same static-download convention as kev.ts and attack.ts.
 // CENSUS_API_KEY is optional and not needed for this catalog metadata.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const URL = 'https://api.census.gov/data.json';
 const TIMEOUT_MS = 30000;

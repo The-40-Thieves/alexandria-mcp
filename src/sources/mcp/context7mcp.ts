@@ -7,10 +7,10 @@
 // original search query; it falls back to a broad, generic query (see
 // DEFAULT_READ_QUERY) rather than nothing, and a caller who wants a
 // specific topic should search() with that topic instead.
-import type { LibraryResult, ReadResult } from '../../types.js';
-import type { RemoteServerConfig } from '../../utils/mcpClientPool.js';
-import { defineMcpSource } from '../kinds/mcp.js';
-import { truncateText } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import type { RemoteServerConfig } from '../../utils/mcpClientPool.ts';
+import { defineMcpSource } from '../kinds/mcp.ts';
+import { truncateText } from '../registry.ts';
 
 const DEFAULT_READ_QUERY = 'overview and getting started';
 

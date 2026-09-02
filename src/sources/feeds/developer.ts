@@ -1,5 +1,5 @@
 // Developer community RSS/Atom feeds.
-import { defineRssSource } from '../kinds/rss.js';
+import { defineRssSource } from '../kinds/rss.ts';
 
 defineRssSource({
   name: 'lobsters',

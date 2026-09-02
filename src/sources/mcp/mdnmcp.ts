@@ -3,10 +3,10 @@
 // src/sources/mdn.ts, which uses MDN's public search API instead; this
 // one is the official MCP surface and, unlike the REST source, can
 // return full document text for read().
-import type { LibraryResult, ReadResult } from '../../types.js';
-import type { RemoteServerConfig } from '../../utils/mcpClientPool.js';
-import { defineMcpSource } from '../kinds/mcp.js';
-import { truncateText } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import type { RemoteServerConfig } from '../../utils/mcpClientPool.ts';
+import { defineMcpSource } from '../kinds/mcp.ts';
+import { truncateText } from '../registry.ts';
 
 const SERVER: RemoteServerConfig = {
   name: 'mdnmcp',

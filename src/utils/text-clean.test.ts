@@ -8,7 +8,7 @@ import {
   ocrQualityScore,
   stripGutenbergWrapper,
   stripHtml,
-} from './text-clean.js';
+} from './text-clean.ts';
 
 describe('text-clean utilities', () => {
   describe('stripGutenbergWrapper', () => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MemoryLedgerStore, QuotaExceededError, reserveQuota, utcDay } from './quotaLedger.js';
+import { MemoryLedgerStore, QuotaExceededError, reserveQuota, utcDay } from './quotaLedger.ts';
 
 test('quotaLedger', async (t) => {
   await t.test('utcDay formats as YYYY-MM-DD', () => {

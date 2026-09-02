@@ -1,8 +1,8 @@
 // Twelve Data: stock, ETF, and forex symbol search plus a daily time series
 // read. Requires TWELVEDATA_API_KEY (query param apikey).
-import type { LibraryResult, ReadResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://api.twelvedata.com';
 

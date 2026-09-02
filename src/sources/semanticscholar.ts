@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchWithRetry, retryAfterMs } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchWithRetry, retryAfterMs } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const GRAPH = 'https://api.semanticscholar.org/graph/v1';
 const REC = 'https://api.semanticscholar.org/recommendations/v1';

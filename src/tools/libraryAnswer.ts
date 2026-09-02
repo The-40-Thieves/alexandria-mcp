@@ -3,12 +3,12 @@
 // reranks them with an LLM, reads the top full-text results, and asks the
 // `synth` role for a cited answer. Every LLM call goes through
 // src/utils/providers.ts; nothing here imports openai directly.
-import { getAdapter } from '../sources/registry.js';
-import type { LibraryResult } from '../types.js';
-import { llmRerank, rrf } from '../utils/fuse.js';
-import { pool, type RemoteServerConfig } from '../utils/mcpClientPool.js';
-import { chatText, requireRoleForTool } from '../utils/providers.js';
-import { type RouteItem, runAsk } from './libraryAsk.js';
+import { getAdapter } from '../sources/registry.ts';
+import type { LibraryResult } from '../types.ts';
+import { llmRerank, rrf } from '../utils/fuse.ts';
+import { pool, type RemoteServerConfig } from '../utils/mcpClientPool.ts';
+import { chatText, requireRoleForTool } from '../utils/providers.ts';
+import { type RouteItem, runAsk } from './libraryAsk.ts';
 
 const READ_CHAR_LIMIT = 6000;
 const RERANK_POOL_CAP = 40;

@@ -1,5 +1,5 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
 
 const OL_BASE = 'https://openlibrary.org';
 
@@ -103,7 +103,7 @@ export async function openLibraryMeta(workId: string): Promise<{
   };
 }
 
-import { register } from './registry.js';
+import { register } from './registry.ts';
 
 register('openlibrary', {
   description:

@@ -5,10 +5,10 @@
 // JINA_API_KEY, matching the reasoning in the task brief: the anonymous tier
 // is capped at 20 RPM shared across every caller of s.jina.ai, so this stays
 // hidden without a key rather than silently drawing on that shared budget.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://s.jina.ai';
 

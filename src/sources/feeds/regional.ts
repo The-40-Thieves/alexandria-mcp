@@ -1,6 +1,6 @@
 // Regional news RSS/Atom/RDF feeds, spanning Africa, the Middle East, South
 // Asia, Australia, Latin America, Europe, East Asia and the Asia-Pacific.
-import { defineRssSource } from '../kinds/rss.js';
+import { defineRssSource } from '../kinds/rss.ts';
 
 defineRssSource({
   name: 'allafrica',

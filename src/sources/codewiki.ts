@@ -1,8 +1,8 @@
 // Google Code Wiki — batchexecute protocol client + Alexandria adapter
 // Reverse-engineered from https://github.com/izzzzzi/codewiki-mcp
 
-import type { LibraryResult } from '../types.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { register, truncateText } from './registry.ts';
 
 const BATCH_URL = 'https://codewiki.google/_/BoqAngularSdlcAgentsUi/data/batchexecute';
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeNdl } from '../ndl.js';
+import { normalizeNdl } from '../ndl.ts';
 
 const xml = readFileSync(path.resolve(process.cwd(), 'eval/fixtures/ndl-search-raw.xml'), 'utf8');
 

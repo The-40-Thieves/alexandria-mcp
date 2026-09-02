@@ -3,16 +3,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { z } from 'zod';
-import { indexText, ingestText } from './pipeline/index.js';
-import { getAdapter, healthSummary, listSources } from './sources/registry.js';
-import { s2Recommend } from './sources/semanticscholar.js';
-import { libraryAnswer } from './tools/libraryAnswer.js';
-import { libraryAsk } from './tools/libraryAsk.js';
-import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.js';
-import type { LibrarySource } from './types.js';
-import { VERSION } from './version.js';
+import { indexText, ingestText } from './pipeline/index.ts';
+import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
+import { s2Recommend } from './sources/semanticscholar.ts';
+import { libraryAnswer } from './tools/libraryAnswer.ts';
+import { libraryAsk } from './tools/libraryAsk.ts';
+import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
+import type { LibrarySource } from './types.ts';
+import { VERSION } from './version.ts';
 
-import './sources/all.js';
+import './sources/all.ts';
 
 // The nine public tools registered below (library_list_sources, library_ask,
 // library_search, library_read, library_index, library_ingest,

@@ -29,7 +29,7 @@
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
 import { parseHTML } from 'linkedom';
-import { fetchWithRetry } from '../utils/http.js';
+import { fetchWithRetry } from '../utils/http.ts';
 
 // defuddle/node only declares an ESM "import" condition (no "require"), and
 // this package compiles to CommonJS (no "type": "module" in package.json,

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import test, { describe, it } from 'node:test';
-import { fetchJSON } from '../utils/http.js';
+import { fetchJSON } from '../utils/http.ts';
 import {
   catalog,
   getAdapter,
@@ -9,7 +9,7 @@ import {
   READ_MAX_CHARS,
   register,
   truncateText,
-} from './registry.js';
+} from './registry.ts';
 
 describe('truncateText', () => {
   it('returns exact string if below max limit', () => {

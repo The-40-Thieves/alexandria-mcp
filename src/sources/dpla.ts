@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 // DPLA's previously-available keyless allowance (500 req/day) is gone;
 // unauthenticated calls now return 403 invalid_api_key (confirmed 2026-09).

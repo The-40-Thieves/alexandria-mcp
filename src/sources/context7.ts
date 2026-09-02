@@ -5,9 +5,9 @@
 // JSON-only read() doesn't fit. Kept alongside the `mcp`-kind variant of
 // this source (context7mcp), which supersedes it for routing; this REST
 // source stays registered and callable by name.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://context7.com/api/v2';
 

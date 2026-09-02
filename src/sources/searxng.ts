@@ -4,10 +4,10 @@
 // `hidden` is set explicitly here since there's no key to gate on, just a
 // URL, which registry.register()'s default auth-based hidden check doesn't
 // cover (the same pattern congress.ts and regulations.ts use).
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 interface SearxngResult {
   url?: string;

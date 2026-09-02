@@ -1,8 +1,8 @@
 // GitHub Security Advisories. Works keyless (60 req/h against the shared
 // GitHub API pool); GITHUB_TOKEN, if present, buys a much higher rate.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://api.github.com';
 

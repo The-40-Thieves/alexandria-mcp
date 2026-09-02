@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.reporter.nih.gov/v2';
 

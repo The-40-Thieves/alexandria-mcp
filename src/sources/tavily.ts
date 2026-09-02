@@ -3,10 +3,10 @@
 // hidden without it. Custom register() rather than defineRest() because
 // read() goes through the web fetch tier (fetchAsText), not a second JSON
 // API call.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 const SEARCH_URL = 'https://api.tavily.com/search';
 

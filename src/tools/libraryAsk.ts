@@ -12,10 +12,10 @@
  */
 
 import { z } from 'zod';
-import { getAdapter } from '../sources/registry.js';
-import type { LibraryResult } from '../types.js';
-import { type CatalogEntry, candidates } from '../utils/catalogIndex.js';
-import { chatJSON } from '../utils/providers.js';
+import { getAdapter } from '../sources/registry.ts';
+import type { LibraryResult } from '../types.ts';
+import { type CatalogEntry, candidates } from '../utils/catalogIndex.ts';
+import { chatJSON } from '../utils/providers.ts';
 
 export interface RouteItem {
   source: string;

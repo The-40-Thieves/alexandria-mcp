@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { getAdapter } from '../registry.js';
-import { normalizeTwelveData } from '../twelvedata.js';
+import { getAdapter } from '../registry.ts';
+import { normalizeTwelveData } from '../twelvedata.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/twelvedata-search.json'), 'utf8'),

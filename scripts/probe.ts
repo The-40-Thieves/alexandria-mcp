@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import '../src/sources/all.js';
-import { mcpProbeEntries } from '../src/sources/kinds/mcp.js';
-import { getAdapter, listSources } from '../src/sources/registry.js';
-import { pool } from '../src/utils/mcpClientPool.js';
+import '../src/sources/all.ts';
+import { mcpProbeEntries } from '../src/sources/kinds/mcp.ts';
+import { getAdapter, listSources } from '../src/sources/registry.ts';
+import { pool } from '../src/utils/mcpClientPool.ts';
 
 export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT' | 'KEY_MISSING';
 export interface ProbeResult {

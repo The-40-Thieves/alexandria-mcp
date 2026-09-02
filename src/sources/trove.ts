@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 // Full-text retrieval from Trove is governed by a data agreement with the
 // National Library of Australia (enquiry RSref185776): live calls only, no

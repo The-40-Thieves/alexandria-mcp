@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeChroniclingAmerica } from '../chroniclingamerica.js';
+import { normalizeChroniclingAmerica } from '../chroniclingamerica.ts';
 
 // Tests always run from the repo root (npm test / npx tsx --test), so a
 // cwd-relative path avoids import.meta (invalid once tsc emits CommonJS,

@@ -10,7 +10,7 @@ import {
   getClient,
   openaiBaseUrlOverride,
   roleConfig,
-} from './providers.js';
+} from './providers.ts';
 
 interface FakeServer {
   url: string;

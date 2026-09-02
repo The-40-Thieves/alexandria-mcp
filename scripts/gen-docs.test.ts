@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { listSources } from '../src/sources/registry.js';
+import type { listSources } from '../src/sources/registry.ts';
 import {
   buildEnvBlock,
   buildHealthExample,
   buildReadmeSourcesBlock,
   buildSourcesDoc,
   spliceMarked,
-} from './gen-docs.js';
+} from './gen-docs.ts';
 
 type Source = ReturnType<typeof listSources>[number];
 

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeGithubSearch } from '../githubsearch.js';
-import { getAdapter } from '../registry.js';
+import { normalizeGithubSearch } from '../githubsearch.ts';
+import { getAdapter } from '../registry.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/githubsearch-code.json'), 'utf8'),

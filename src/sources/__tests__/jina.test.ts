@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import '../mcp/jina.js';
-import { pool } from '../../utils/mcpClientPool.js';
-import { getAdapter } from '../registry.js';
+import '../mcp/jina.ts';
+import { pool } from '../../utils/mcpClientPool.ts';
+import { getAdapter } from '../registry.ts';
 
 // jina's read() delegates to the remote server's read_url tool, which fetches
 // whatever URL it is handed. Without a guard that made the source an SSRF

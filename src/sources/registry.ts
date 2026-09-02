@@ -1,8 +1,8 @@
-import type { LibraryResult, ReadResult } from '../types.js';
-import { requestContext } from '../utils/http.js';
-import { createLedger, type LedgerStore, reserveQuota } from '../utils/quotaLedger.js';
-import { rateLimited } from '../utils/rateLimit.js';
-import { cacheKey, searchCache } from '../utils/resultCache.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { requestContext } from '../utils/http.ts';
+import { createLedger, type LedgerStore, reserveQuota } from '../utils/quotaLedger.ts';
+import { rateLimited } from '../utils/rateLimit.ts';
+import { cacheKey, searchCache } from '../utils/resultCache.ts';
 
 export type SourceKind = 'rest' | 'hub' | 'rss' | 'mcp' | 'scrape';
 export type Freshness = 'realtime' | 'daily' | 'static';

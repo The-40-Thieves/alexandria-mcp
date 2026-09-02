@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getAdapter } from '../registry.js';
-import { defineRest } from './rest.js';
+import { getAdapter } from '../registry.ts';
+import { defineRest } from './rest.ts';
 
 interface FakeRaw {
   items: Array<{ id: string; name: string }>;
@@ -198,7 +198,7 @@ test('defineRest', async (t) => {
         }),
       },
     });
-    const { listSources } = await import('../registry.js');
+    const { listSources } = await import('../registry.ts');
     const meta = listSources().find((s) => s.name === 'test-rest-no-verified-at');
     assert.ok(meta);
     assert.equal(meta?.verifiedAt, undefined);

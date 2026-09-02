@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { extractStandardEbooksText, normalizeStandardEbooksSearch } from '../standardebooks.js';
+import { extractStandardEbooksText, normalizeStandardEbooksSearch } from '../standardebooks.ts';
 
 const searchHtml = readFileSync(
   path.resolve(process.cwd(), 'eval/fixtures/standardebooks-search.html'),

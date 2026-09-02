@@ -3,10 +3,10 @@
 // to pick the item array out of the raw JSON response, and how to normalize
 // one raw item into a LibraryResult (or null to drop it). Auth is injected
 // generically from AuthSpec so individual adapters don't hand-roll it.
-import type { LibraryResult, ReadResult } from '../../types.js';
-import { DEFAULT_TIMEOUT_MS, fetchJSON } from '../../utils/http.js';
-import type { AuthSpec, Cluster, Freshness, SourceMeta } from '../registry.js';
-import { register, requireKey } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import { DEFAULT_TIMEOUT_MS, fetchJSON } from '../../utils/http.ts';
+import type { AuthSpec, Cluster, Freshness, SourceMeta } from '../registry.ts';
+import { register, requireKey } from '../registry.ts';
 
 export interface RestSpec<TRaw> {
   name: string;

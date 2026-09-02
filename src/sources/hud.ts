@@ -2,9 +2,9 @@
 // or a 2-letter state code, per the task-4.3 brief; anything else returns
 // [] with the expected format explained in the description. Requires a
 // bearer HUD_API_TOKEN.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://www.huduser.gov/hudapi/public/fmr/data';
 const ZIP_OR_STATE = /^(\d{5}|[A-Za-z]{2})$/;

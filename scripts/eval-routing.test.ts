@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import '../src/sources/all.js';
-import { listSources } from '../src/sources/registry.js';
+import '../src/sources/all.ts';
+import { listSources } from '../src/sources/registry.ts';
 import {
   type GoldenQuery,
   loadGolden,
@@ -9,7 +9,7 @@ import {
   recallAt5,
   recallAt20,
   score,
-} from './eval-routing.js';
+} from './eval-routing.ts';
 
 test('routing-golden.yaml', async (t) => {
   await t.test('parses to a non-empty list of {query, expected}', () => {

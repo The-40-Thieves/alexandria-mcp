@@ -7,11 +7,11 @@
 // and search_arxiv both return a one-line "Unauthorized" error result
 // rather than throwing, which splitHits() below drops, leaving zero
 // hits rather than a crash).
-import type { LibraryResult, ReadResult } from '../../types.js';
-import type { RemoteServerConfig } from '../../utils/mcpClientPool.js';
-import { assertFetchableUrl } from '../../web/fetchTier.js';
-import { defineMcpSource, defineMcpSourceWithDelegatedRead } from '../kinds/mcp.js';
-import { getAdapter, truncateText } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import type { RemoteServerConfig } from '../../utils/mcpClientPool.ts';
+import { assertFetchableUrl } from '../../web/fetchTier.ts';
+import { defineMcpSource, defineMcpSourceWithDelegatedRead } from '../kinds/mcp.ts';
+import { getAdapter, truncateText } from '../registry.ts';
 
 function server(name: string): RemoteServerConfig {
   const key = process.env.JINA_API_KEY;

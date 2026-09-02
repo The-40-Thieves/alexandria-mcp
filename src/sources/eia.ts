@@ -5,9 +5,9 @@
 // alternative: EIA's own route listing (GET /v2/) filtered by name, since
 // that's the only browsable catalog v2 exposes without a series id already
 // in hand.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.eia.gov/v2';
 

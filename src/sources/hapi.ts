@@ -4,10 +4,10 @@
 // events directly; otherwise search() falls back to HAPI's location
 // metadata search. Requires HDX_APP_IDENTIFIER (a self-serve base64 string,
 // see https://hdx-hapi.readthedocs.io).
-import type { LibraryResult } from '../types.js';
-import { ISO3_COUNTRIES } from './data/iso3-countries.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { ISO3_COUNTRIES } from './data/iso3-countries.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://hapi.humdata.org/api/v2';
 

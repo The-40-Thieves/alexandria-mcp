@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeContext7Mcp, normalizeContext7McpRead, parseLibraryList } from './context7mcp.js';
+import { normalizeContext7Mcp, normalizeContext7McpRead, parseLibraryList } from './context7mcp.ts';
 
 // The real text resolve-library-id returned for {query: "react",
 // libraryName: "react"} against https://mcp.context7.com/mcp, captured

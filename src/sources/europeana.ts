@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const API = 'https://api.europeana.eu/record/v2/search.json';
 const KEY_URL = 'https://pro.europeana.eu/page/developer-keys';

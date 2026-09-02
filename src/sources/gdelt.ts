@@ -2,10 +2,10 @@
 // article search across GDELT's worldwide monitoring. No API key required.
 // GDELT asks callers to space requests at least 5s apart; timeoutMs is 45s
 // because the doc API itself can be slow to answer.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const TIMEOUT_MS = 45000;

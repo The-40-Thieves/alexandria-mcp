@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { recordFullTextRead, resetFullTextWindow, troveRead } from '../trove.js';
+import { recordFullTextRead, resetFullTextWindow, troveRead } from '../trove.ts';
 
 function fixture(name: string) {
   return readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}.json`), 'utf8');
