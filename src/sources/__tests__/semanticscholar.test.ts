@@ -57,3 +57,24 @@ test('s2Search throws with a clear HTTP message on a second consecutive 429', as
     globalThis.fetch = originalFetch;
   }
 });
+
+test('s2Search fails fast (no sleep, no retry) when Retry-After exceeds the cap', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response('{}', { status: 429, headers: { 'retry-after': '86400' } });
+  }) as typeof fetch;
+
+  const t0 = Date.now();
+  try {
+    await assert.rejects(
+      s2Search('x', 2),
+      /semanticscholar rate-limited; upstream asked to wait 86400s/,
+    );
+    assert.equal(calls, 1); // no retry attempted
+    assert.ok(Date.now() - t0 < 500); // no 24h sleep leaked
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

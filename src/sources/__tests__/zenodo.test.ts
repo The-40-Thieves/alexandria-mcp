@@ -38,3 +38,24 @@ test('zenodoSearch honors Retry-After on a 429 (single retry)', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('zenodoSearch fails fast (no sleep, no retry) when Retry-After exceeds the cap', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response('rate limited', { status: 429, headers: { 'retry-after': '86400' } });
+  }) as typeof fetch;
+
+  const t0 = Date.now();
+  try {
+    await assert.rejects(
+      zenodoSearch('plastic waste', 2),
+      /zenodo rate-limited; upstream asked to wait 86400s/,
+    );
+    assert.equal(calls, 1); // no retry attempted
+    assert.ok(Date.now() - t0 < 500); // no 24h sleep leaked
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

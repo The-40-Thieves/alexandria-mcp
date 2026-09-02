@@ -1,5 +1,5 @@
 import type { LibraryResult } from '../types.js';
-import { fetchWithRetry } from '../utils/http.js';
+import { fetchWithRetry, retryAfterMs } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
 
 const GRAPH = 'https://api.semanticscholar.org/graph/v1';
@@ -17,15 +17,22 @@ function sleep(ms: number): Promise<void> {
 
 // Semantic Scholar's shared unauthenticated pool 429s aggressively; on a
 // 429 read Retry-After and sleep once before retrying, rather than failing
-// immediately or retrying indefinitely.
+// immediately or retrying indefinitely. retryAfterMs caps the sleep so a
+// large Retry-After (e.g. a day) cannot leak a timer well past the
+// registry's own guard timeout; when it returns null, fail fast instead.
 async function s2Fetch<T>(url: string): Promise<T> {
   let res = await fetchWithRetry(url, { headers: headers() });
   if (res.status === 429) {
-    const retryAfterSec = Number(res.headers.get('retry-after'));
-    await sleep((Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec : 1) * 1000);
+    const header = res.headers.get('retry-after');
+    const waitMs = retryAfterMs(header);
+    if (waitMs === null) {
+      const suffix = /^\d+$/.test(header ?? '') ? 's' : '';
+      throw new Error(`semanticscholar rate-limited; upstream asked to wait ${header}${suffix}`);
+    }
+    await sleep(waitMs);
     res = await fetchWithRetry(url, { headers: headers() });
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}, url: ${url}`);
   return res.json() as Promise<T>;
 }
 
@@ -103,7 +110,7 @@ export async function s2Recommend(paperId: string, limit = 20): Promise<LibraryR
 
 register('semanticscholar', {
   description:
-    'Semantic Scholar — 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend. Set SEMANTIC_SCHOLAR_API_KEY for a dedicated rate pool.',
+    'Semantic Scholar: 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend. Set SEMANTIC_SCHOLAR_API_KEY for a dedicated rate pool.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'academic',
