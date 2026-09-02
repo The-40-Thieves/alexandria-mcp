@@ -104,7 +104,8 @@ const DEFAULT_QUERY = 'history of science';
 
 export function classify(x: { results: unknown[] | null; error: Error | null }): ProbeStatus {
   if (x.error) {
-    if (/requires .*(key|token|env)/i.test(x.error.message)) return 'KEY_MISSING';
+    if (/requires .*(key|token|env|email|identifier|appname)/i.test(x.error.message))
+      return 'KEY_MISSING';
     return /abort/i.test(x.error.message) ? 'TIMEOUT' : 'ERROR';
   }
   return (x.results?.length ?? 0) > 0 ? 'OK' : 'EMPTY';
