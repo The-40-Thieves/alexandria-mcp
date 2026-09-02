@@ -99,3 +99,5 @@ import './openfda.js';
 import './epatri.js';
 import './hud.js';
 import './rentcast.js';
+import './gdelt.js';
+import './newsdata.js';

@@ -96,6 +96,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // openFDA returns HTTP 404 (not an empty array) for a zero-result query.
   openfda: 'tylenol',
   epatri: 'BASF',
+  gdelt: 'ukraine',
 };
 const DEFAULT_QUERY = 'history of science';
 
