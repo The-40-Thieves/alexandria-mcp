@@ -92,6 +92,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // comtrade's search() only accepts an HS commodity code; the default
   // free-text query isn't one and would return [] by design.
   comtrade: '0101',
+  census: 'population',
 };
 const DEFAULT_QUERY = 'history of science';
 
