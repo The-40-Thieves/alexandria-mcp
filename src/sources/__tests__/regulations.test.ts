@@ -20,20 +20,24 @@ test('normalizeRegulations', async (t) => {
   });
 });
 
-test('regulations requires DATA_GOV_API_KEY', async (t) => {
-  const originalEnv = process.env.DATA_GOV_API_KEY;
+test('regulations requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)', async (t) => {
+  const savedDataGov = process.env.DATA_GOV_API_KEY;
+  const savedGovinfo = process.env.GOVINFO_API_KEY;
   t.after(() => {
-    if (originalEnv === undefined) delete process.env.DATA_GOV_API_KEY;
-    else process.env.DATA_GOV_API_KEY = originalEnv;
+    if (savedDataGov === undefined) delete process.env.DATA_GOV_API_KEY;
+    else process.env.DATA_GOV_API_KEY = savedDataGov;
+    if (savedGovinfo === undefined) delete process.env.GOVINFO_API_KEY;
+    else process.env.GOVINFO_API_KEY = savedGovinfo;
   });
 
   await t.test(
-    'throws "regulations requires DATA_GOV_API_KEY" when the env is absent',
+    'throws "regulations requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)" when both envs are absent',
     async () => {
       delete process.env.DATA_GOV_API_KEY;
+      delete process.env.GOVINFO_API_KEY;
       await assert.rejects(
         () => getAdapter('regulations').search('climate', 5),
-        /^Error: regulations requires DATA_GOV_API_KEY$/,
+        /^Error: regulations requires DATA_GOV_API_KEY \(or GOVINFO_API_KEY\)$/,
       );
     },
   );

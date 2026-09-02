@@ -37,13 +37,13 @@ test('congress requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)', async (t) => {
   });
 
   await t.test(
-    'throws "congress requires DATA_GOV_API_KEY" when both envs are absent',
+    'throws "congress requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)" when both envs are absent',
     async () => {
       delete process.env.DATA_GOV_API_KEY;
       delete process.env.GOVINFO_API_KEY;
       await assert.rejects(
         () => getAdapter('congress').search('privacy', 5),
-        /^Error: congress requires DATA_GOV_API_KEY$/,
+        /^Error: congress requires DATA_GOV_API_KEY \(or GOVINFO_API_KEY\)$/,
       );
     },
   );

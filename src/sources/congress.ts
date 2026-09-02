@@ -21,7 +21,7 @@ const BASE = 'https://api.congress.gov/v3';
 
 function key(): string {
   const k = process.env.DATA_GOV_API_KEY || process.env.GOVINFO_API_KEY;
-  if (!k) throw new Error('congress requires DATA_GOV_API_KEY');
+  if (!k) throw new Error('congress requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)');
   return k;
 }
 
