@@ -10,6 +10,7 @@ import { libraryAnswer } from './tools/libraryAnswer.ts';
 import { libraryAsk } from './tools/libraryAsk.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
 import type { LibrarySource } from './types.ts';
+import { installDispatcher } from './utils/dispatcher.ts';
 import { VERSION } from './version.ts';
 
 import './sources/all.ts';
@@ -575,6 +576,11 @@ async function runStdio(): Promise<void> {
 }
 
 function main(): void {
+  // Before the transport starts: every source's fetchWithRetry() call picks
+  // up the composed dispatcher (connection pooling, dns cache, RFC 9111
+  // http cache) with no per-call change, since it's installed as undici's
+  // global dispatcher. See src/utils/dispatcher.ts.
+  installDispatcher();
   const transportMode = process.env.TRANSPORT ?? 'stdio';
   const run = transportMode === 'http' ? runHTTP : runStdio;
   run().catch((err) => {

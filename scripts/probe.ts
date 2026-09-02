@@ -3,6 +3,7 @@ import path from 'node:path';
 import '../src/sources/all.ts';
 import { mcpProbeEntries } from '../src/sources/kinds/mcp.ts';
 import { getAdapter, listSources } from '../src/sources/registry.ts';
+import { installDispatcher } from '../src/utils/dispatcher.ts';
 import { pool } from '../src/utils/mcpClientPool.ts';
 
 export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT' | 'KEY_MISSING';
@@ -205,6 +206,10 @@ export async function mcpToolsSnapshotOrDrift(
 }
 
 async function main() {
+  // Same dispatcher production installs at startup (src/index.ts): the probe
+  // is meant to measure this server's real request path, connection
+  // pooling and http caching included, not a bare fetch.
+  installDispatcher();
   const args = process.argv.slice(2);
   const only = args.find((a) => a.startsWith('--source='))?.slice(9);
   const writeBaseline = args.includes('--baseline');

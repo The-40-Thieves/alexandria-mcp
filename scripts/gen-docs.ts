@@ -232,6 +232,11 @@ const FEATURE_ENVS: EnvVar[] = [
     comment: 'Search result cache TTL in milliseconds. Unset uses the built-in default.',
   },
   {
+    name: 'ALEXANDRIA_HTTP_CACHE',
+    comment:
+      'Path to the shared undici RFC 9111 http-cache SQLite database. Defaults to data/http-cache.db inside the package; falls back to an in-memory cache if that location cannot be created.',
+  },
+  {
     name: 'ALEXANDRIA_LEDGER',
     comment:
       'Set to "supabase" (with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY) to persist the daily quota ledger; otherwise it is in-memory only.',

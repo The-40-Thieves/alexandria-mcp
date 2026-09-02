@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
+import { guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
+import { fetchWithRetry } from '../utils/http.ts';
 import {
   assertConfiguredServiceUrl,
   assertFetchableUrl,
@@ -558,4 +560,151 @@ test('fetchAsText', async (t) => {
 
     delete process.env.CRAWL4AI_URL;
   });
+});
+
+// A local http.Server bound to one specific address:port, tracking how many
+// requests it received. Used by the address-pinning test below, which needs
+// two servers sharing one port across two different loopback addresses -
+// startFixtureServer() above always binds an OS-assigned ephemeral port, so
+// it can't produce that pairing.
+interface PinnedServer {
+  port: number;
+  hits: number;
+  close(): Promise<void>;
+}
+function startServerOn(address: string, port: number, body: string): Promise<PinnedServer> {
+  const state = { hits: 0 };
+  return new Promise((resolve, reject) => {
+    const server = createServer((_req: IncomingMessage, res: ServerResponse) => {
+      state.hits += 1;
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(body);
+    });
+    server.once('error', reject);
+    server.listen(port, address, () => {
+      const bound = server.address();
+      const boundPort = typeof bound === 'object' && bound ? bound.port : port;
+      resolve({
+        port: boundPort,
+        get hits() {
+          return state.hits;
+        },
+        close: () => new Promise((res) => server.close(() => res())),
+      });
+    });
+  });
+}
+
+test('guardedDispatcher pins the connection to the address the guard validated', async (t) => {
+  const originalEnv = { ...process.env };
+  const originalLookup = dnsResolver.lookup;
+  t.after(() => {
+    process.env = originalEnv;
+    dnsResolver.lookup = originalLookup;
+  });
+  process.env.ALEXANDRIA_ALLOW_LOOPBACK = '1';
+  delete process.env.JINA_API_KEY;
+  delete process.env.ALEXANDRIA_JINA_READER;
+  delete process.env.CRAWL4AI_URL;
+
+  await t.test(
+    'a hostname whose DNS answer could change between validation and connect never reaches a later, different address',
+    async () => {
+      const article = fixture('article.html');
+      // "first" is the address assertFetchableUrl/resolveFetchTarget
+      // validates (dnsResolver.lookup's 1st call, below) and pins the
+      // connection to; "second" stands in for what an independent,
+      // un-pinned DNS lookup at connect time would answer with instead
+      // (attacker-controlled DNS / rebinding) - every dnsResolver.lookup
+      // call after the first returns it. Same port, two different loopback
+      // addresses, so the request URL never changes; only which address the
+      // connection actually reaches distinguishes the two.
+      const first = await startServerOn('127.0.0.1', 0, article);
+      t.after(() => first.close());
+      const second = await startServerOn('127.0.0.2', first.port, 'should never be reached');
+      t.after(() => second.close());
+
+      let lookupCalls = 0;
+      dnsResolver.lookup = (async () => {
+        lookupCalls += 1;
+        return lookupCalls === 1
+          ? [{ address: '127.0.0.1', family: 4 }]
+          : [{ address: '127.0.0.2', family: 4 }];
+      }) satisfies DnsLookupAll;
+
+      const page = await fetchAsText(`http://pin-test.invalid:${first.port}/`);
+
+      assert.equal(page.title, 'A Long Enough Article About Testing');
+      assert.equal(lookupCalls, 1, 'no second, independent DNS lookup was ever triggered');
+      assert.equal(first.hits, 1, 'the connection reached the address the guard validated');
+      assert.equal(second.hits, 0, 'the connection never reached the later, different address');
+    },
+  );
+
+  await t.test('a guarded fetch with no pinned address in scope fails closed', async () => {
+    // guardedDispatcher's connect.lookup refuses to connect at all when no
+    // pin is in scope for the hostname, rather than silently falling back
+    // to an unvalidated system DNS lookup. fetchAsText() always establishes
+    // a pin before this path runs (see above), so this exercises the
+    // dispatcher's own fail-closed behavior directly.
+    const pin = {
+      hostname: 'no-pin-for-this-host.invalid',
+      addresses: [{ address: '127.0.0.1', family: 4 }],
+    };
+    await assert.rejects(
+      () =>
+        withPinnedAddress(pin, () =>
+          fetchWithRetry(
+            'http://a-different-host.invalid/',
+            { dispatcher: guardedDispatcher },
+            1000,
+            0,
+          ),
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(String(err.cause), /no pinned address/);
+        return true;
+      },
+    );
+  });
+
+  await t.test(
+    'a dead first address does not sink the connection: guardedDispatcher falls through to a later, live, validated address',
+    async () => {
+      // Both addresses were validated by the guard (this is the multi-
+      // address happy-eyeballs case, not the TOCTOU case above): the first
+      // is a loopback address nothing listens on (a fast, local
+      // ECONNREFUSED rather than a slow timeout), the second is a real
+      // server. Pre-change, the plain default connector raced/fell through
+      // the full dns.lookup(all:true) set; pinning to only the first
+      // address regressed that - this proves the pin carries the whole
+      // set and Node's own connect failover still works within it.
+      const article = fixture('article.html');
+      const live = await startServerOn('127.0.0.2', 0, article);
+      t.after(() => live.close());
+
+      dnsResolver.lookup = (async () => [
+        { address: '127.0.0.3', family: 4 }, // dead: nothing listens here
+        { address: '127.0.0.2', family: 4 }, // live: the server above
+      ]) satisfies DnsLookupAll;
+
+      const page = await fetchAsText(`http://dead-first-address.invalid:${live.port}/`);
+      assert.equal(page.title, 'A Long Enough Article About Testing');
+      assert.equal(live.hits, 1);
+    },
+  );
+
+  await t.test(
+    'fetchAsText against localhost still succeeds (localhost is pinned, not left unpinned)',
+    async () => {
+      const article = fixture('article.html');
+      const server = await startServerOn('127.0.0.1', 0, article);
+      t.after(() => server.close());
+
+      const page = await fetchAsText(`http://localhost:${server.port}/`);
+      assert.equal(page.title, 'A Long Enough Article About Testing');
+      assert.equal(server.hits, 1);
+    },
+  );
 });

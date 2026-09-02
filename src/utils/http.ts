@@ -1,4 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Dispatcher } from 'undici';
+
+// The ambient global RequestInit (from @types/node) has no `dispatcher`
+// field under this project's tsconfig, so options that want one are typed
+// through this intersection rather than the bare global RequestInit.
+export type FetchOptions = RequestInit & { dispatcher?: Dispatcher };
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
@@ -17,7 +23,7 @@ function sleep(ms: number): Promise<void> {
 
 export async function fetchWithRetry(
   url: string,
-  options: RequestInit = {},
+  options: FetchOptions = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retries = DEFAULT_RETRIES,
 ): Promise<Response> {
@@ -33,6 +39,21 @@ export async function fetchWithRetry(
     const signal = ambient ? AbortSignal.any([controller.signal, ambient]) : controller.signal;
 
     try {
+      // Node's global fetch is its OWN bundled undici build. The `undici`
+      // package this repo installs for Agent/interceptors
+      // (src/utils/dispatcher.ts) is kept on the 7.x line (package.json:
+      // "^7.29.0") as conservatism - 7.x is current and maintained - but it
+      // is also a reproduced (not merely asserted) requirement for exactly
+      // this call site: an explicit `dispatcher` option, like the one
+      // fetchTier.ts's guarded fetches pass, is handed by Node's bundled
+      // fetch straight to the Agent's own dispatch(), with no version
+      // compatibility shim in between (that shim exists in undici 8.x, but
+      // only inside setGlobalDispatcher() - irrelevant to an explicit
+      // per-call option). Reproduced live on Node 24.20.0 (bundled undici
+      // 7.29.0) with the installed package temporarily bumped to 8.10.1:
+      // this exact call shape throws "invalid onRequestStart method" (code
+      // UND_ERR_INVALID_ARG). See dispatcher.ts's module comment for the
+      // full mechanism, the exact reproduction command, and the report.
       const response = await fetch(url, {
         ...options,
         signal,
