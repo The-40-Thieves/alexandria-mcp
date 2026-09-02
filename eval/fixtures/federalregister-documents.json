@@ -1,0 +1,15 @@
+{
+  "description": "Documents matching 'privacy'",
+  "count": 10000,
+  "total_pages": 50,
+  "results": [
+    {
+      "title": "Privacy Act Regulations",
+      "type": "Proposed Rule",
+      "abstract": "The Commodity Futures Trading Commission (CFTC) is establishing a new Insider Risk Program.",
+      "document_number": "2026-08979",
+      "html_url": "https://www.federalregister.gov/documents/2026/05/06/2026-08979/privacy-act-regulations",
+      "publication_date": "2026-05-06"
+    }
+  ]
+}

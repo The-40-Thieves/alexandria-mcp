@@ -106,3 +106,4 @@ import './hapi.js';
 import './reliefweb.js';
 import './ucdp.js';
 import './wikicurrent.js';
+import './federalregister.js';
