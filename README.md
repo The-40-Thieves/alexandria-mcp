@@ -105,19 +105,19 @@ Some sources require their own API key. These are free registrations. Sources wi
 |---|---|---|
 | `CORE_API_KEY` | `core` | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 | `COURTLISTENER_API_KEY` | `courtlistener` | [courtlistener.com/profile/tokens](https://www.courtlistener.com/profile/tokens/) |
-| `GOVINFO_API_KEY` | `govinfo`, `smithsonian` | [api.data.gov/signup](https://api.data.gov/signup/) — one key covers both |
+| `GOVINFO_API_KEY` | `govinfo`; also accepted by `congress` and `regulations` as a fallback for `DATA_GOV_API_KEY` | [api.data.gov/signup](https://api.data.gov/signup/). Does not cover `smithsonian`, which needs its own `SMITHSONIAN_API_KEY` from the same signup page |
 | `GOOGLE_BOOKS_API_KEY` | `googlebooks` | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Books API |
 | `BHL_API_KEY` | `bhl` | [biodiversitylibrary.org/getapikey](https://www.biodiversitylibrary.org/getapikey.aspx) |
 | `DIGITALNZ_API_KEY` | `digitalnz` | [digitalnz.org/developers](https://digitalnz.org/developers) |
 | `DPLA_API_KEY` | `dpla` | [pro.dp.la/developers/api-codex](https://pro.dp.la/developers/api-codex) |
 | `EUROPEANA_API_KEY` | `europeana` | [apis.europeana.eu](https://apis.europeana.eu/en/) — test key immediate, personal ~1 week |
-| `GITHUB_TOKEN` | `openiti` | [github.com/settings/tokens](https://github.com/settings/tokens) — public repo read scope, optional but prevents rate limiting |
+| `GITHUB_TOKEN` | required by `githubsearch` and `githubmcp`; optional for `ghsa` and `openiti` | [github.com/settings/tokens](https://github.com/settings/tokens), public repo read scope. `githubsearch` and `githubmcp` are hidden without it; `ghsa` falls back to 60s pacing and `openiti` to an unauthenticated search path |
 | `NASA_ADS_API_KEY` | `nasaads` | [ui.adsabs.harvard.edu/user/settings/token](https://ui.adsabs.harvard.edu/user/settings/token) |
 | `SPRINGER_OA_API_KEY` + `SPRINGER_META_API_KEY` | `springer` | [dev.springernature.com](https://dev.springernature.com/) — same registration, two keys |
 | `ZENODO_API_KEY` | `zenodo` | [zenodo.org/account/settings/applications/tokens/new](https://zenodo.org/account/settings/applications/tokens/new/) — optional, increases rate limits |
+| `SMITHSONIAN_API_KEY` | `smithsonian` | [api.data.gov/signup](https://api.data.gov/signup/). Its own key, separate from `GOVINFO_API_KEY` |
 | `SEMANTIC_SCHOLAR_API_KEY` | `semanticscholar` | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) — optional, increases rate limits |
 | `TROVE_API_KEY` | `trove` | [trove.nla.gov.au/about/create-something/using-api](https://trove.nla.gov.au/about/create-something/using-api) — ~1 week approval |
-| `BASE_API_KEY` | `base` | [base-search.net/about/en/contact](https://www.base-search.net/about/en/contact.php) — requires IP whitelist |
 | `YOUTUBE_API_KEY` | `youtube` | [console.cloud.google.com](https://console.cloud.google.com/) — enable YouTube Data API v3; search only, transcripts need no key |
 
 ## Setup
@@ -220,10 +220,27 @@ With `library_ask` and `library_ingest` enabled:
 
 ## Railway (HTTP)
 
-Set env vars in the Railway dashboard and deploy:
+HTTP mode is off by default. Set `TRANSPORT=http` to serve Streamable HTTP on
+`/mcp` instead of speaking stdio, and `PORT` to choose the listen port
+(default `3000`; Railway sets `PORT` for you). Every request gets its own MCP
+server and transport, so the endpoint is stateless and safe to run behind a
+load balancer.
+
+| Env Var | Values | Default |
+|---|---|---|
+| `TRANSPORT` | `stdio` or `http` | `stdio` |
+| `PORT` | any port number, HTTP mode only | `3000` |
+
+Set those (plus any source keys) in the Railway dashboard and deploy:
 
 ```bash
 railway up
+```
+
+Locally the same thing is:
+
+```bash
+TRANSPORT=http PORT=3000 npm start
 ```
 
 Register in Claude Desktop:
