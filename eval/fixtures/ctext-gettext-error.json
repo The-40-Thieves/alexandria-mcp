@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "ERR_REQUIRES_AUTHENTICATION",
+    "description": "The requested function requires authentication to continue. Please access the API from a registered IP address or supply a valid API key."
+  }
+}

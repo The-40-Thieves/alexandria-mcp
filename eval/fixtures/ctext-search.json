@@ -1,0 +1,5 @@
+{
+  "books": [
+    { "title": "論語", "urn": "ctp:analects" }
+  ]
+}

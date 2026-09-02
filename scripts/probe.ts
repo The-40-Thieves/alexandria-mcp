@@ -19,7 +19,9 @@ export const PROBE_QUERIES: Record<string, string> = {
   legislation: 'data protection',
   codewiki: 'react hooks',
   youtube: 'lecture',
-  ctext: 'analects',
+  // api.ctext.org's searchtexts does a case-sensitive prefix match against
+  // its English title index — "analects" returns zero books, "Analects" does.
+  ctext: 'Analects',
   openiti: 'hadith',
   nasa: 'mars rover',
   base: 'machine learning',
