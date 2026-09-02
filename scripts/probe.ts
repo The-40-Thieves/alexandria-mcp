@@ -97,6 +97,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   openfda: 'tylenol',
   epatri: 'BASF',
   gdelt: 'ukraine',
+  wikicurrent: '',
 };
 const DEFAULT_QUERY = 'history of science';
 
