@@ -82,6 +82,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // 2026-09-01 (see the task report); a single token exercises the
   // working tag-filtered branch instead.
   devto: 'rust',
+  peps: 'style guide',
 };
 const DEFAULT_QUERY = 'history of science';
 
