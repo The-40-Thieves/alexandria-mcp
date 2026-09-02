@@ -1,34 +1,34 @@
 {
-  "generatedAt": "2026-09-02T01:12:17.306Z",
+  "generatedAt": "2026-09-02T01:35:38.412Z",
   "results": {
     "gutenberg": {
       "status": "OK",
-      "ms": 97,
+      "ms": 96,
       "count": 30
     },
     "openlibrary": {
       "status": "OK",
-      "ms": 2471,
+      "ms": 5084,
       "count": 2
     },
     "archive": {
       "status": "OK",
-      "ms": 268,
+      "ms": 302,
       "count": 2
     },
     "sacredtexts": {
       "status": "OK",
-      "ms": 3,
+      "ms": 1,
       "count": 2
     },
     "wikisource": {
       "status": "OK",
-      "ms": 217,
+      "ms": 236,
       "count": 2
     },
     "standardebooks": {
       "status": "OK",
-      "ms": 116,
+      "ms": 78,
       "count": 1
     },
     "perseus": {
@@ -38,17 +38,17 @@
     },
     "ctext": {
       "status": "OK",
-      "ms": 173,
+      "ms": 159,
       "count": 1
     },
     "gallica": {
       "status": "EMPTY",
-      "ms": 527,
+      "ms": 381,
       "count": 0
     },
     "loc": {
       "status": "OK",
-      "ms": 131,
+      "ms": 34,
       "count": 2
     },
     "hathitrust": {
@@ -58,13 +58,13 @@
     },
     "dpla": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 1,
       "count": 0,
       "message": "DPLA requires DPLA_API_KEY. Register a free key at: https://pro.dp.la/developers/policies#getting-a-key then set DPLA_API_KEY in your environment."
     },
     "ndl": {
       "status": "OK",
-      "ms": 193,
+      "ms": 48,
       "count": 2
     },
     "europeana": {
@@ -75,7 +75,7 @@
     },
     "trove": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 0,
       "count": 0,
       "message": "Trove requires a free API key. Register at: https://trove.nla.gov.au/about/create-something/using-api then set TROVE_API_KEY in your environment."
     },
@@ -87,17 +87,17 @@
     },
     "digitalnz": {
       "status": "OK",
-      "ms": 1095,
+      "ms": 552,
       "count": 2
     },
     "internetclassics": {
       "status": "OK",
-      "ms": 1,
+      "ms": 0,
       "count": 2
     },
     "marxists": {
       "status": "OK",
-      "ms": 374,
+      "ms": 369,
       "count": 2
     },
     "projectruneberg": {
@@ -107,74 +107,74 @@
     },
     "cervantes": {
       "status": "OK",
-      "ms": 474,
+      "ms": 167,
       "count": 2
     },
     "doab": {
       "status": "OK",
-      "ms": 442,
+      "ms": 830,
       "count": 2
     },
     "googlebooks": {
       "status": "KEY_MISSING",
       "ms": 1,
       "count": 0,
-      "message": "Google Books requires GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted — confirmed live: every unauthenticated request returns 429 \"Quota exceeded\")."
+      "message": "Google Books requires GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted, confirmed live: every unauthenticated request returns 429 \"Quota exceeded\"). "
     },
     "chroniclingamerica": {
       "status": "OK",
-      "ms": 31931,
+      "ms": 33611,
       "count": 2
     },
     "ccel": {
       "status": "OK",
-      "ms": 1,
+      "ms": 0,
       "count": 2
     },
     "wdl": {
       "status": "OK",
-      "ms": 35,
+      "ms": 36,
       "count": 2
     },
     "datagov": {
       "status": "OK",
-      "ms": 27,
+      "ms": 37,
       "count": 2
     },
     "arxiv": {
       "status": "OK",
-      "ms": 28,
+      "ms": 105,
       "count": 2
     },
     "core": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 0,
       "count": 0,
       "message": "CORE requires CORE_API_KEY. Register a free key at: https://core.ac.uk/services/api then set CORE_API_KEY in your environment."
     },
     "europmc": {
       "status": "OK",
-      "ms": 742,
+      "ms": 635,
       "count": 2
     },
     "nasa": {
       "status": "OK",
-      "ms": 656,
+      "ms": 600,
       "count": 2
     },
     "osti": {
       "status": "OK",
-      "ms": 204,
+      "ms": 197,
       "count": 2
     },
     "eric": {
       "status": "OK",
-      "ms": 164,
+      "ms": 231,
       "count": 2
     },
     "nsf": {
       "status": "OK",
-      "ms": 43,
+      "ms": 90,
       "count": 2
     },
     "courtlistener": {
@@ -185,75 +185,75 @@
     },
     "biorxiv": {
       "status": "OK",
-      "ms": 1462,
+      "ms": 8458,
       "count": 2
     },
     "zenodo": {
       "status": "OK",
-      "ms": 2410,
+      "ms": 1609,
       "count": 2
     },
     "semanticscholar": {
       "status": "ERROR",
-      "ms": 1176,
+      "ms": 1204,
       "count": 0,
-      "message": "HTTP 429  — https://api.semanticscholar.org/graph/v1/paper/search?query=history%20of%20science&fields=paperId,title,authors,year,abstract,openAccessPdf,external"
+      "message": "HTTP 429 , url: https://api.semanticscholar.org/graph/v1/paper/search?query=history%20of%20science&fields=paperId,title,authors,year,abstract,openAccessPdf,exte"
     },
     "govinfo": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 1,
       "count": 0,
       "message": "GovInfo requires GOVINFO_API_KEY. Register a free key at: https://api.govinfo.gov/docs/ then set GOVINFO_API_KEY in your environment."
     },
     "nih": {
       "status": "OK",
-      "ms": 135,
+      "ms": 11608,
       "count": 2
     },
     "nbnorway": {
       "status": "OK",
-      "ms": 565,
+      "ms": 576,
       "count": 2
     },
     "legislation": {
       "status": "EMPTY",
-      "ms": 20,
+      "ms": 21,
       "count": 0
     },
     "osf": {
       "status": "OK",
-      "ms": 784,
+      "ms": 836,
       "count": 2
     },
     "earlyprint": {
       "status": "ERROR",
-      "ms": 50,
+      "ms": 53,
       "count": 0,
-      "message": "HTTP 404 Not Found — https://eplab.artsci.wustl.edu/blacklab-server/earlyprint/docs?filter=title%3Ahistory%20of%20science%20OR%20author%3Ahistory%20of%20science"
+      "message": "HTTP 404 Not Found, url: https://eplab.artsci.wustl.edu/blacklab-server/earlyprint/docs?filter=title%3Ahistory%20of%20science%20OR%20author%3Ahistory%20of%20sci"
     },
     "openiti": {
       "status": "OK",
-      "ms": 148,
+      "ms": 198,
       "count": 2
     },
     "legislationscot": {
       "status": "OK",
-      "ms": 21,
+      "ms": 9,
       "count": 2
     },
     "openalex": {
       "status": "OK",
-      "ms": 638,
+      "ms": 735,
       "count": 2
     },
     "plos": {
       "status": "OK",
-      "ms": 60,
+      "ms": 72,
       "count": 2
     },
     "nasaads": {
       "status": "ERROR",
-      "ms": 1,
+      "ms": 0,
       "count": 0,
       "message": "NASA_ADS_API_KEY is not set. Register free at https://ui.adsabs.harvard.edu/user/settings/token"
     },
@@ -265,7 +265,7 @@
     },
     "doaj": {
       "status": "OK",
-      "ms": 227,
+      "ms": 228,
       "count": 2
     },
     "nara": {
@@ -282,23 +282,23 @@
     },
     "harvardlib": {
       "status": "ERROR",
-      "ms": 39,
+      "ms": 24,
       "count": 0,
-      "message": "HTTP 429  — https://api.lib.harvard.edu/v2/items.dc.json?q=history%20of%20science&limit=2&start=1"
+      "message": "HTTP 429 , url: https://api.lib.harvard.edu/v2/items.dc.json?q=history%20of%20science&limit=2&start=1"
     },
     "apollo": {
       "status": "OK",
-      "ms": 422,
+      "ms": 400,
       "count": 2
     },
     "ora": {
       "status": "OK",
-      "ms": 805,
+      "ms": 803,
       "count": 2
     },
     "codewiki": {
       "status": "EMPTY",
-      "ms": 399,
+      "ms": 347,
       "count": 0
     },
     "youtube": {
