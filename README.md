@@ -255,7 +255,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: 138, visible: 103, hidden: 35, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, tools: 9 }`.
+Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: 138, visible: 103, hidden: 35, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0 }, cache: { entries: 0 }, tools: 9 }`.
 
 ## Adding Custom Providers
 

@@ -1,8 +1,9 @@
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { requestContext } from '../utils/http.ts';
-import { createLedger, type LedgerStore, reserveQuota } from '../utils/quotaLedger.ts';
+import { createLedger, type LedgerStore, reserveQuota, utcDay } from '../utils/quotaLedger.ts';
 import { rateLimited } from '../utils/rateLimit.ts';
 import { cacheKey, searchCache } from '../utils/resultCache.ts';
+import { stateStore } from '../utils/stateStore.ts';
 
 export type SourceKind = 'rest' | 'hub' | 'rss' | 'mcp' | 'scrape';
 export type Freshness = 'realtime' | 'daily' | 'static';
@@ -273,12 +274,36 @@ export function healthSummary(): {
   visible: number;
   hidden: number;
   byKind: Record<SourceKind, number>;
+  quota: { day: string; reserved: number; sources: number };
+  cache: { entries: number };
 } {
   const all = listSources();
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of all) byKind[s.kind]++;
   const hidden = all.filter((s) => s.hidden).length;
-  return { sources: all.length, visible: all.length - hidden, hidden, byKind };
+  // Reads the Task 4 store directly, so this reflects whatever ledger
+  // backend createLedger() actually wired up by default (sqlite or
+  // memory). When ALEXANDRIA_LEDGER=supabase is configured, reservations
+  // go to Supabase instead and never touch this store, so these numbers
+  // read as zero in that deployment mode; that mode has its own quota
+  // visibility via the quota_ledger table.
+  //
+  // One bulk read (quotaForDay), not one getQuota() round trip per
+  // registered source (~138 of them): a row only exists once something
+  // reserved against it, so the map's size is already "sources with any
+  // usage today" and its values sum to the day's total.
+  const day = utcDay();
+  const perSource = stateStore.quotaForDay(day);
+  let reserved = 0;
+  for (const n of perSource.values()) reserved += n;
+  return {
+    sources: all.length,
+    visible: all.length - hidden,
+    hidden,
+    byKind,
+    quota: { day, reserved, sources: perSource.size },
+    cache: { entries: stateStore.cacheSize() },
+  };
 }
 
 // Routing view: every non-hidden source, trimmed to what routing needs.

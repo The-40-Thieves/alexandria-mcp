@@ -6,5 +6,7 @@ dist/
 *.d.ts.map
 .superpowers/
 # Default ALEXANDRIA_HTTP_CACHE location (src/utils/dispatcher.ts): the
-# undici RFC 9111 http-cache SQLite database, created at runtime.
+# undici RFC 9111 http-cache SQLite database, created at runtime. Also the
+# default ALEXANDRIA_STATE_DB location (src/utils/stateStore.ts): the
+# quota ledger + result cache SQLite database.
 /data/

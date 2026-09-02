@@ -1,40 +1,31 @@
 // THE-166: a short TTL cache for search results, keyed by source+query+limit.
+// Task 4: backed by a StateStore rather than its own Map, so the
+// default (sqlite) deployment survives a restart. A store-less caller still
+// gets the exact prior behavior via a private MemoryStateStore.
 
 import type { LibraryResult } from '../types.ts';
-
-interface Entry<T> {
-  value: T;
-  expiresAt: number;
-}
+import {
+  stateStore as defaultStateStore,
+  MemoryStateStore,
+  type StateStore,
+} from './stateStore.ts';
 
 export class ResultCache<T> {
-  private store = new Map<string, Entry<T>>();
+  private store: StateStore;
   private ttlMs: number;
-  private max: number;
 
-  constructor(ttlMs: number, max = 500) {
+  constructor(ttlMs: number, store: StateStore = new MemoryStateStore()) {
     this.ttlMs = ttlMs;
-    this.max = max;
+    this.store = store;
   }
 
   get(key: string, now = Date.now()): T | undefined {
-    const entry = this.store.get(key);
-    if (!entry) return undefined;
-    if (entry.expiresAt <= now) {
-      this.store.delete(key);
-      return undefined;
-    }
-    return entry.value;
+    return this.store.getCache<T>(key, now);
   }
 
   set(key: string, value: T, now = Date.now()): void {
     if (this.ttlMs <= 0) return; // 0 disables caching
-    if (!this.store.has(key) && this.store.size >= this.max) {
-      // Map preserves insertion order; the first key is the oldest.
-      const oldestKey = this.store.keys().next().value;
-      if (oldestKey !== undefined) this.store.delete(oldestKey);
-    }
-    this.store.set(key, { value, expiresAt: now + this.ttlMs });
+    this.store.setCache(key, value, now + this.ttlMs);
   }
 }
 
@@ -51,7 +42,7 @@ export function parseTtlMs(raw: string | undefined, fallback = DEFAULT_CACHE_TTL
 }
 
 const CACHE_TTL_MS = parseTtlMs(process.env.ALEXANDRIA_CACHE_TTL_MS);
-export const searchCache = new ResultCache<LibraryResult[]>(CACHE_TTL_MS);
+export const searchCache = new ResultCache<LibraryResult[]>(CACHE_TTL_MS, defaultStateStore);
 
 export function cacheKey(source: string, query: string, limit: number): string {
   return `${source}|${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${limit}`;
