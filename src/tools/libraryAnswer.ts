@@ -3,6 +3,7 @@
 // reranks them with an LLM, reads the top full-text results, and asks the
 // `synth` role for a cited answer. Every LLM call goes through
 // src/utils/providers.ts; nothing here imports openai directly.
+import { config } from '../config.ts';
 import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
 import { llmRerank, rrf } from '../utils/fuse.ts';
@@ -66,10 +67,10 @@ function parseKnowledgeHits(raw: { text: string; structured?: unknown }): Knowle
 // rrf(). Skipped silently (returns []) when the URL isn't set or the call
 // fails for any reason; logged at debug (DEBUG=1) only.
 async function fetchKnowledgeResults(query: string, limit: number): Promise<LibraryResult[]> {
-  const url = process.env.KNOWLEDGE_MCP_URL;
+  const url = config.KNOWLEDGE_MCP_URL;
   if (!url) return [];
 
-  const token = process.env.KNOWLEDGE_MCP_TOKEN;
+  const token = config.KNOWLEDGE_MCP_TOKEN;
   const server: RemoteServerConfig = {
     name: 'knowledge',
     url,

@@ -3,6 +3,7 @@
 // default (sqlite) deployment survives a restart. A store-less caller still
 // gets the exact prior behavior via a private MemoryStateStore.
 
+import { config } from '../config.ts';
 import type { LibraryResult } from '../types.ts';
 import {
   stateStore as defaultStateStore,
@@ -41,7 +42,7 @@ export function parseTtlMs(raw: string | undefined, fallback = DEFAULT_CACHE_TTL
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-const CACHE_TTL_MS = parseTtlMs(process.env.ALEXANDRIA_CACHE_TTL_MS);
+const CACHE_TTL_MS = parseTtlMs(config.ALEXANDRIA_CACHE_TTL_MS);
 export const searchCache = new ResultCache<LibraryResult[]>(CACHE_TTL_MS, defaultStateStore);
 
 export function cacheKey(source: string, query: string, limit: number): string {

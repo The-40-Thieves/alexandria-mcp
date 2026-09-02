@@ -77,6 +77,7 @@ import type { LookupAddress, LookupOptions } from 'node:dns';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Agent, cacheStores, type Dispatcher, interceptors, setGlobalDispatcher } from 'undici';
+import { config } from '../config.ts';
 
 const CONNECTIONS = 64;
 const KEEP_ALIVE_TIMEOUT_MS = 30_000;
@@ -94,7 +95,7 @@ const CACHE_MAX_ENTRY_SIZE_BYTES = 1 * 1024 * 1024;
 const DEFAULT_CACHE_PATH = path.resolve(import.meta.dirname, '../../data/http-cache.db');
 
 function cachePath(): string {
-  return process.env.ALEXANDRIA_HTTP_CACHE ?? DEFAULT_CACHE_PATH;
+  return config.ALEXANDRIA_HTTP_CACHE ?? DEFAULT_CACHE_PATH;
 }
 
 let warnedFallback = false;

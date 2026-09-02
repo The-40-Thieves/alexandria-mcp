@@ -4,6 +4,7 @@
 // duplicates (the same work returned under slightly different titles by two
 // sources) before anything gets read or cited.
 import { z } from 'zod';
+import { config } from '../config.ts';
 import type { LibraryResult } from '../types.ts';
 import { chatJSON } from './providers.ts';
 
@@ -84,7 +85,7 @@ export async function llmRerank(
   items: LibraryResult[],
   top = 10,
 ): Promise<LibraryResult[]> {
-  if (process.env.ALEXANDRIA_RERANK !== 'llm' || items.length === 0) {
+  if (config.ALEXANDRIA_RERANK !== 'llm' || items.length === 0) {
     return items.slice(0, top);
   }
 

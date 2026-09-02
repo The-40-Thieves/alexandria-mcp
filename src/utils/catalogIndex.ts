@@ -8,6 +8,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { config } from '../config.ts';
 import { type Cluster, catalog, type Freshness } from '../sources/registry.ts';
 import { embed, hasEmbeddingsConfigured } from './providers.ts';
 
@@ -31,7 +32,7 @@ export interface CatalogEntry {
 const DEFAULT_CACHE_PATH = path.resolve(import.meta.dirname, '../../eval/catalog-embeddings.json');
 
 function cachePath(): string {
-  return process.env.ALEXANDRIA_CATALOG_CACHE ?? DEFAULT_CACHE_PATH;
+  return config.ALEXANDRIA_CATALOG_CACHE ?? DEFAULT_CACHE_PATH;
 }
 
 function entryText(name: string, description: string, cluster: Cluster): string {

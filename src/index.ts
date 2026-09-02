@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { z } from 'zod';
+import { config } from './config.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
@@ -564,7 +565,7 @@ export function createHttpApp(): express.Express {
 
 async function runHTTP(): Promise<void> {
   const app = createHttpApp();
-  const port = parseInt(process.env.PORT ?? '3000', 10);
+  const port = config.PORT;
   app.listen(port, () =>
     console.error(`alexandria — ${listSources().length} sources — http://localhost:${port}/mcp`),
   );
@@ -583,8 +584,7 @@ function main(): void {
   // http cache) with no per-call change, since it's installed as undici's
   // global dispatcher. See src/utils/dispatcher.ts.
   installDispatcher();
-  const transportMode = process.env.TRANSPORT ?? 'stdio';
-  const run = transportMode === 'http' ? runHTTP : runStdio;
+  const run = config.TRANSPORT === 'http' ? runHTTP : runStdio;
   run().catch((err) => {
     console.error(err);
     process.exit(1);
