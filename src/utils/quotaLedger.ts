@@ -4,12 +4,15 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export class QuotaExceededError extends Error {
-  constructor(
-    public source: string,
-    public used: number,
-    public cap: number,
-  ) {
+  source: string;
+  used: number;
+  cap: number;
+
+  constructor(source: string, used: number, cap: number) {
     super(`Daily quota for ${source} reached (${used}/${cap}). Try again after 00:00 UTC.`);
+    this.source = source;
+    this.used = used;
+    this.cap = cap;
   }
 }
 

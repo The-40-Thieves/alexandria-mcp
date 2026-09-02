@@ -585,6 +585,6 @@ function main(): void {
 
 // Only start a transport when run as the entrypoint; importing this module
 // (the HTTP test does) must not open stdio or bind a port.
-if (require.main === module) {
+if (import.meta.main) {
   main();
 }
