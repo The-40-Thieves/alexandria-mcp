@@ -89,6 +89,9 @@ export const PROBE_QUERIES: Record<string, string> = {
   w3c: 'css',
   coingecko: 'bitcoin',
   frankfurter: 'USD EUR',
+  // comtrade's search() only accepts an HS commodity code; the default
+  // free-text query isn't one and would return [] by design.
+  comtrade: '0101',
 };
 const DEFAULT_QUERY = 'history of science';
 

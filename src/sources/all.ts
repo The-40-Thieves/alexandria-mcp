@@ -93,3 +93,4 @@ import './frankfurter.js';
 import './eia.js';
 import './fred.js';
 import './dbnomics.js';
+import './comtrade.js';
