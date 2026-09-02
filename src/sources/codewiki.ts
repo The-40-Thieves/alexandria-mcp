@@ -164,6 +164,11 @@ register('codewiki', {
   description:
     'Google Code Wiki — AI-generated continuously updated docs for any GitHub repo. Search indexed repos or fetch architecture overviews, API references, and class diagrams by passing "{owner}/{repo}". No auth required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'developer',
+  freshness: 'daily',
+  homepage: 'https://codewiki.google',
+  verifiedAt: '2026-09-01',
   search: codewikiSearch,
   async read(id) {
     const raw = await codewikiRead(id);

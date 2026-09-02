@@ -117,6 +117,7 @@ register('courtlistener', {
   cluster: 'law',
   freshness: 'daily',
   homepage: 'https://www.courtlistener.com',
+  verifiedAt: '2026-09-01',
   auth: { type: 'header', env: 'COURTLISTENER_API_KEY', header: 'Authorization' },
   pacing: { minIntervalMs: 12000, dailyCap: 120 },
   search: courtlistenerSearch,

@@ -106,6 +106,7 @@ register('ndl', {
   cluster: 'culture',
   freshness: 'daily',
   homepage: 'https://ndlsearch.ndl.go.jp',
+  verifiedAt: '2026-09-01',
   search: ndlSearch,
   async read(id) {
     return {

@@ -97,6 +97,11 @@ register('smithsonian', {
   description:
     'Smithsonian Institution — 14M+ records across all museums: American history, air & space, natural history, art, military artifacts. Requires SMITHSONIAN_API_KEY (free at api.data.gov).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'culture',
+  freshness: 'daily',
+  homepage: 'https://www.si.edu',
+  verifiedAt: '2026-09-01',
   search: smithsonianSearch,
   async read(id) {
     const raw = await smithsonianRead(id);

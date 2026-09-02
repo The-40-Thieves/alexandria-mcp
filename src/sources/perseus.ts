@@ -233,6 +233,7 @@ register('perseus', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://scaife.perseus.org',
+  verifiedAt: '2026-09-01',
   search: (query, limit) => Promise.resolve(perseusSearch(query, limit)),
   async read(id) {
     const raw = await perseusRead(id);

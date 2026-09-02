@@ -61,6 +61,11 @@ register('eric', {
   description:
     'ERIC — 2M+ education research documents from the US Dept of Education. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://eric.ed.gov',
+  verifiedAt: '2026-09-01',
   search: ericSearch,
   async read(id) {
     const raw = await ericRead(id);

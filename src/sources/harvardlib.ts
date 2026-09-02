@@ -102,6 +102,7 @@ register('harvardlib', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://library.harvard.edu',
+  verifiedAt: '2026-09-01',
   hidden: true,
   search: harvardlibSearch,
   async read(id) {

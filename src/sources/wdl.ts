@@ -50,6 +50,11 @@ register('wdl', {
   description:
     'World Digital Library (via LOC) — 19k+ rare and unique cultural heritage items from 200 countries, 8000 BCE–present. Maps, manuscripts, photographs, films, sound recordings.',
   supportsIngest: false,
+  kind: 'rest',
+  cluster: 'culture',
+  freshness: 'static',
+  homepage: 'https://www.loc.gov/collections/world-digital-library/',
+  verifiedAt: '2026-09-01',
   search: wdlSearch,
   async read(id) {
     return {

@@ -124,6 +124,7 @@ register('chroniclingamerica', {
   cluster: 'archives',
   freshness: 'static',
   homepage: 'https://www.loc.gov/collections/chronicling-america/',
+  verifiedAt: '2026-09-01',
   timeoutMs: 45000,
   search: chroniclingAmericaSearch,
   async read(id) {

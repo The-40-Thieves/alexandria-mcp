@@ -288,6 +288,7 @@ register('youtube', {
   cluster: 'video',
   freshness: 'realtime',
   homepage: 'https://www.youtube.com',
+  verifiedAt: '2026-09-01',
   pacing: { dailyCap: 90 },
   search: youtubeSearch,
   async read(id) {

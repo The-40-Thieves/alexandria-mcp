@@ -57,7 +57,10 @@ test('openitiSearch uses GitHub code search when GITHUB_TOKEN is set', async () 
     const out = await openitiSearch('ihya', 5);
     assert.match(capturedUrl, /search\/code/);
     assert.equal(out.length, 1);
-    assert.equal(out[0].id, '0500AH||data/0505Ghazali/0505Ghazali.IhyaCulumDin/0505Ghazali.IhyaCulumDin.Shamela0011606-ara1');
+    assert.equal(
+      out[0].id,
+      '0500AH||data/0505Ghazali/0505Ghazali.IhyaCulumDin/0505Ghazali.IhyaCulumDin.Shamela0011606-ara1',
+    );
     assert.equal(out[0].title, '0505Ghazali — IhyaCulumDin');
   } finally {
     globalThis.fetch = originalFetch;

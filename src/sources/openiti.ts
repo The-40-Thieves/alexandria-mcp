@@ -165,6 +165,7 @@ register('openiti', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://openiti.org',
+  verifiedAt: '2026-09-01',
   search: openitiSearch,
   async read(id) {
     const raw = await openitiRead(id);

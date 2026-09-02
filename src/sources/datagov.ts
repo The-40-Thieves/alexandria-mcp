@@ -57,6 +57,7 @@ register('datagov', {
   cluster: 'government',
   freshness: 'daily',
   homepage: 'https://catalog.data.gov',
+  verifiedAt: '2026-09-01',
   search: dataGovSearch,
   async read(id) {
     const landingPage = id.startsWith('http') ? id : `https://catalog.data.gov/dataset/${id}`;

@@ -105,6 +105,7 @@ register('hathitrust', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://www.hathitrust.org',
+  verifiedAt: '2026-09-01',
   search: hathitrustSearch,
   async read(id) {
     return hathitrustRead(id);

@@ -54,6 +54,11 @@ register('doab', {
   description:
     'Directory of Open Access Books — 70k+ peer-reviewed OA academic monographs across all disciplines. Metadata + external PDF links.',
   supportsIngest: false,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://www.doabooks.org',
+  verifiedAt: '2026-09-01',
   search: doabSearch,
   async read(id) {
     const previewUrl = id.startsWith('http') ? id : `https://www.doabooks.org/handle/${id}`;

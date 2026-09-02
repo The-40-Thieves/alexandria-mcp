@@ -95,6 +95,7 @@ register('apollo', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://www.repository.cam.ac.uk',
+  verifiedAt: '2026-09-01',
   search: apolloSearch,
   async read(id) {
     const raw = await apolloRead(id);

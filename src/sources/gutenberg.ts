@@ -93,6 +93,7 @@ register('gutenberg', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://www.gutenberg.org',
+  verifiedAt: '2026-09-01',
   search: gutenbergSearch,
   async read(id) {
     const raw = await gutenbergRead(id);

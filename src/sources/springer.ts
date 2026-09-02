@@ -137,6 +137,11 @@ register('springer', {
   description:
     'Springer Nature — 16M+ articles via Meta API (all content, abstracts) + OA API (open access full text). Requires SPRINGER_META_API_KEY and SPRINGER_OA_API_KEY (free at dev.springernature.com).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://www.springernature.com',
+  verifiedAt: '2026-09-01',
   search: springerSearch,
   async read(id) {
     const raw = await springerRead(id);

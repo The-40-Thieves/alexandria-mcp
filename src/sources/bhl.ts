@@ -86,6 +86,11 @@ register('bhl', {
   description:
     'Biodiversity Heritage Library — natural history, botany, zoology literature. Requires free BHL_API_KEY.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'science',
+  freshness: 'daily',
+  homepage: 'https://www.biodiversitylibrary.org',
+  verifiedAt: '2026-09-01',
   search: bhlSearch,
   async read(id) {
     const raw = await bhlRead(id);

@@ -116,6 +116,7 @@ register('gallica', {
   cluster: 'culture',
   freshness: 'daily',
   homepage: 'https://gallica.bnf.fr',
+  verifiedAt: '2026-09-01',
   search: gallicaSearch,
   async read(id) {
     const raw = await gallicaRead(id);

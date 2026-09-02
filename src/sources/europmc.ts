@@ -98,6 +98,11 @@ register('europmc', {
   description:
     'Europe PMC — 43M+ biomedical and life science literature. Full text for open access PMC articles.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://europepmc.org',
+  verifiedAt: '2026-09-01',
   search: europmcSearch,
   async read(id) {
     const raw = await europmcRead(id);

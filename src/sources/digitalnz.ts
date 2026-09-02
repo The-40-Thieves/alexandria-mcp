@@ -48,6 +48,7 @@ register('digitalnz', {
   cluster: 'culture',
   freshness: 'daily',
   homepage: 'https://digitalnz.org',
+  verifiedAt: '2026-09-01',
   search: digitalnzSearch,
   async read(id) {
     return {

@@ -106,6 +106,7 @@ register('openalex', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://openalex.org',
+  verifiedAt: '2026-09-01',
   pacing: { dailyCap: 900 },
   search: openalexSearch,
   async read(id) {

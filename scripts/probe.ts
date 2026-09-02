@@ -30,7 +30,6 @@ export const PROBE_QUERIES: Record<string, string> = {
   ctext: 'Analects',
   openiti: 'hadith',
   nasa: 'mars rover',
-  base: 'machine learning',
   // biorxiv has no free-text search API; search() scans the last 7 days of
   // postings client-side, so the probe query needs to be common enough to
   // hit within the first page or two rather than exhausting MAX_PAGES.

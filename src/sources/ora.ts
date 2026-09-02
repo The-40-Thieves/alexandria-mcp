@@ -96,6 +96,7 @@ register('ora', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://ora.ox.ac.uk',
+  verifiedAt: '2026-09-01',
   search: oraSearch,
   async read(id) {
     const raw = await oraRead(id);

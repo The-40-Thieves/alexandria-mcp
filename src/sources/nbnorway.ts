@@ -70,6 +70,11 @@ register('nbnorway', {
   description:
     'National Library of Norway — digitized books, manuscripts, and newspapers with OCR text in JSON. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'culture',
+  freshness: 'daily',
+  homepage: 'https://www.nb.no',
+  verifiedAt: '2026-09-01',
   search: nbnorwaySearch,
   async read(id) {
     const raw = await nbnorwayRead(id);

@@ -124,6 +124,7 @@ register('arxiv', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://arxiv.org',
+  verifiedAt: '2026-09-01',
   // arXiv's API terms of use ask for a single connection at a time with at
   // least a 3s gap between requests; the registry's rateLimited() wrapper
   // already serializes calls per source, so this interval both spaces

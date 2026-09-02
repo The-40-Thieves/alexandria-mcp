@@ -77,6 +77,11 @@ export async function wikisourceRead(
 register('wikisource', {
   description: 'Wikisource — multilingual library of free-content source texts in 70+ languages.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'daily',
+  homepage: 'https://wikisource.org',
+  verifiedAt: '2026-09-01',
   search: wikisourceSearch,
   async read(id) {
     const raw = await wikisourceRead(id);

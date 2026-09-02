@@ -63,6 +63,11 @@ register('plos', {
   description:
     'PLOS — Public Library of Science journals. 100% open access. Biology, medicine, genetics, computational biology. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://www.plos.org',
+  verifiedAt: '2026-09-01',
   search: plosSearch,
   async read(id) {
     const raw = await plosRead(id);

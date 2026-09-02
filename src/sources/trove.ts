@@ -120,8 +120,7 @@ function findNewspaperArticleId(record: TroveWorkRecord): string | undefined {
   for (const ident of allIdentifiers) {
     if (ident.linktype !== 'fulltext' || !ident.value) continue;
     const m =
-      ident.value.match(/newspaper\/article\/(\d+)/) ??
-      ident.value.match(/nla\.news-article(\d+)/);
+      ident.value.match(/newspaper\/article\/(\d+)/) ?? ident.value.match(/nla\.news-article(\d+)/);
     if (m) return m[1];
   }
   return undefined;
@@ -230,6 +229,7 @@ register('trove', {
   cluster: 'archives',
   freshness: 'daily',
   homepage: 'https://trove.nla.gov.au',
+  verifiedAt: '2026-09-01',
   auth: { type: 'query', env: 'TROVE_API_KEY', param: 'key' },
   search: troveSearch,
   async read(id) {

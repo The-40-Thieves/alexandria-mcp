@@ -130,6 +130,7 @@ register('googlebooks', {
   cluster: 'literature',
   freshness: 'daily',
   homepage: 'https://books.google.com',
+  verifiedAt: '2026-09-01',
   auth: { type: 'query', env: 'GOOGLE_BOOKS_API_KEY', param: 'key' },
   search: googleBooksSearch,
   async read(id) {

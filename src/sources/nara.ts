@@ -102,6 +102,7 @@ register('nara', {
   cluster: 'archives',
   freshness: 'daily',
   homepage: 'https://catalog.archives.gov',
+  verifiedAt: '2026-09-01',
   auth: { type: 'header', env: 'NARA_API_KEY', header: 'x-api-key' },
   search: naraSearch,
   async read(id) {

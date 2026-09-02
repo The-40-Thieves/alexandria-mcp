@@ -50,8 +50,7 @@ test('s2Search retries once after a 429 (sleeping on Retry-After, or 1s default)
 
 test('s2Search throws with a clear HTTP message on a second consecutive 429', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () =>
-    new Response('{}', { status: 429 })) as typeof fetch;
+  globalThis.fetch = (async () => new Response('{}', { status: 429 })) as typeof fetch;
   try {
     await assert.rejects(s2Search('x', 2), /HTTP 429/);
   } finally {

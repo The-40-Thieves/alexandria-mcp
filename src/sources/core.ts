@@ -83,6 +83,7 @@ register('core', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://core.ac.uk',
+  verifiedAt: '2026-09-01',
   auth: { type: 'header', env: 'CORE_API_KEY', header: 'Authorization' },
   pacing: { minIntervalMs: 2100 },
   search: coreSearch,

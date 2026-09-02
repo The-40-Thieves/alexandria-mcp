@@ -52,6 +52,7 @@ register('loc', {
   cluster: 'archives',
   freshness: 'daily',
   homepage: 'https://www.loc.gov',
+  verifiedAt: '2026-09-01',
   pacing: { minIntervalMs: 3100 }, // loc.gov's stated limit is ~20 req/min
   search: locSearch,
   async read(id) {

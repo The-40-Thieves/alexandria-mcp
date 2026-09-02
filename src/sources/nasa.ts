@@ -79,6 +79,7 @@ register('nasa', {
   cluster: 'science',
   freshness: 'daily',
   homepage: 'https://ntrs.nasa.gov',
+  verifiedAt: '2026-09-01',
   search: nasaSearch,
   async read(id) {
     const raw = await nasaRead(id);

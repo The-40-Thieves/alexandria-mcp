@@ -79,6 +79,7 @@ register('dpla', {
   cluster: 'culture',
   freshness: 'daily',
   homepage: 'https://dp.la',
+  verifiedAt: '2026-09-01',
   auth: { type: 'query', env: 'DPLA_API_KEY', param: 'api_key' },
   search: dplaSearch,
   async read(id) {

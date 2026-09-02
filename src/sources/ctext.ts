@@ -134,6 +134,7 @@ register('ctext', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://ctext.org',
+  verifiedAt: '2026-09-01',
   search: ctextSearch,
   async read(id) {
     const raw = await ctextRead(id);

@@ -105,6 +105,11 @@ register('nih', {
   description:
     'NIH RePORTER — National Institutes of Health funded research projects and abstracts. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'science',
+  freshness: 'daily',
+  homepage: 'https://reporter.nih.gov',
+  verifiedAt: '2026-09-01',
   search: nihSearch,
   async read(id) {
     const raw = await nihRead(id);

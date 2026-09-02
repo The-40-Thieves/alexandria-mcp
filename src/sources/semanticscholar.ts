@@ -109,6 +109,7 @@ register('semanticscholar', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://www.semanticscholar.org',
+  verifiedAt: '2026-09-01',
   pacing: { minIntervalMs: 1100 },
   search: s2Search,
   async read(id) {

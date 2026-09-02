@@ -96,6 +96,7 @@ register('standardebooks', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://standardebooks.org',
+  verifiedAt: '2026-09-01',
   search: standardEbooksSearch,
   async read(id) {
     const raw = await standardEbooksRead(id);

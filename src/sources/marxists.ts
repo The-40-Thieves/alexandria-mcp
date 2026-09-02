@@ -167,6 +167,11 @@ register('marxists', {
   description:
     'Marxists Internet Archive — socialist, anarchist, and critical theory texts. Marx, Engels, Luxemburg, Gramsci, Fanon, Benjamin, and 700+ authors.',
   supportsIngest: true,
+  kind: 'scrape',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://www.marxists.org',
+  verifiedAt: '2026-09-01',
   search: marxistsSearch,
   async read(id) {
     const raw = await marxistsRead(id);

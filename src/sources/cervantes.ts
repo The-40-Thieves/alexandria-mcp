@@ -233,6 +233,7 @@ register('cervantes', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://www.cervantesvirtual.com',
+  verifiedAt: '2026-09-01',
   search: cervantesSearch,
   async read(id) {
     const raw = await cervantesRead(id);

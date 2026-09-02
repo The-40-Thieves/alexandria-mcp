@@ -102,6 +102,7 @@ register('earlyprint', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://earlyprint.org',
+  verifiedAt: '2026-09-01',
   hidden: true,
   search: earlyprintSearch,
   async read(id) {

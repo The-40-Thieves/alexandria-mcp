@@ -55,8 +55,7 @@ export function normalizeGovInfo(data: GovInfoSearchResponse, limit: number): Li
     subjects: r.collectionCode ? [r.collectionCode] : [],
     hasFullText: Boolean(r.download?.txtLink),
     previewUrl:
-      r.resultLink ??
-      `https://www.govinfo.gov/content/pkg/${r.packageId}/html/${r.packageId}.htm`,
+      r.resultLink ?? `https://www.govinfo.gov/content/pkg/${r.packageId}/html/${r.packageId}.htm`,
   }));
 }
 
@@ -113,6 +112,7 @@ register('govinfo', {
   cluster: 'government',
   freshness: 'daily',
   homepage: 'https://www.govinfo.gov',
+  verifiedAt: '2026-09-01',
   auth: { type: 'query', env: 'GOVINFO_API_KEY', param: 'api_key' },
   search: govinfoSearch,
   async read(id) {

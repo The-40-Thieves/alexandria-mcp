@@ -101,6 +101,7 @@ register('biorxiv', {
   cluster: 'science',
   freshness: 'daily',
   homepage: 'https://www.biorxiv.org',
+  verifiedAt: '2026-09-01',
   timeoutMs: 30000, // client-side scan can page through up to MAX_PAGES requests
   search: biorxivSearch,
   async read(id) {

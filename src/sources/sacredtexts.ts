@@ -307,6 +307,7 @@ register('sacredtexts', {
   cluster: 'literature',
   freshness: 'static',
   homepage: 'https://sacred-texts.com',
+  verifiedAt: '2026-09-01',
   search: (query, limit) => Promise.resolve(sacredTextsSearch(query, limit)),
   async read(id) {
     const entry = REGISTRY.find((e) => e.id === id);

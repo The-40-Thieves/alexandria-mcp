@@ -102,6 +102,7 @@ register('zenodo', {
   cluster: 'academic',
   freshness: 'daily',
   homepage: 'https://zenodo.org',
+  verifiedAt: '2026-09-01',
   pacing: { minIntervalMs: 2100 },
   search: zenodoSearch,
   async read(id) {

@@ -65,6 +65,7 @@ register('europeana', {
   cluster: 'culture',
   freshness: 'daily',
   homepage: 'https://www.europeana.eu',
+  verifiedAt: '2026-09-01',
   auth: { type: 'query', env: 'EUROPEANA_API_KEY', param: 'wskey' },
   search: europeanaSearch,
   async read(id) {
