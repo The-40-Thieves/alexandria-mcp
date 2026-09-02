@@ -1,0 +1,18 @@
+{
+  "count": 129,
+  "next_page": 2,
+  "previous_page": null,
+  "results": [
+    {
+      "id": "109717",
+      "arxiv_id": "2608.24053",
+      "source": "arxiv",
+      "url_abs": "https://arxiv.org/abs/2608.24053",
+      "url_pdf": "https://arxiv.org/pdf/2608.24053.pdf",
+      "title": "WeMM-Embedding: WeChat Multi-Modal Embedding Technical Report",
+      "abstract": "Universal multimodal embeddings are becoming a core component of modern AI systems.",
+      "authors": ["Junjie Zhou", "Ke Mei", "Lei LI"],
+      "published": "2026-08-25"
+    }
+  ]
+}

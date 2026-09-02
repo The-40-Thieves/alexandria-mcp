@@ -111,3 +111,4 @@ import './congress.js';
 import './regulations.js';
 import './ukparliament.js';
 import './hfpapers.js';
+import './paperswithcode.js';
