@@ -17,7 +17,9 @@ export interface ProbeResult {
 // failure), e.g. hathitrust, whose only remaining public endpoint is a
 // lookup-by-identifier, not a keyword search. An OK -> EMPTY transition for
 // one of these is not a regression.
-export const EXPECTED_EMPTY = new Set<string>(['hathitrust']);
+// webfetch's search() always returns [] by design (it's a read-only door
+// into the fetch tier, not a search engine); see src/sources/webfetch.ts.
+export const EXPECTED_EMPTY = new Set<string>(['hathitrust', 'webfetch']);
 
 export const PROBE_QUERIES: Record<string, string> = {
   gallica: 'histoire des sciences',

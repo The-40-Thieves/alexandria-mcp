@@ -120,3 +120,4 @@ import './mcp/githubmcp.js';
 import './searxng.js';
 import './jinasearch.js';
 import './tavily.js';
+import './webfetch.js';
