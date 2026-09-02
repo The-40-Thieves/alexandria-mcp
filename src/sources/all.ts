@@ -66,3 +66,4 @@ import './googlenews.js';
 import './nhk.js';
 import './circl.js';
 import './osv.js';
+import './ghsa.js';
