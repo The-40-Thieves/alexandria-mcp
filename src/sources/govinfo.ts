@@ -6,7 +6,11 @@ const BASE = 'https://api.govinfo.gov';
 
 function key(): string {
   const k = process.env.GOVINFO_API_KEY;
-  if (!k) throw new Error('GOVINFO_API_KEY is not set');
+  if (!k)
+    throw new Error(
+      'GovInfo requires GOVINFO_API_KEY. Register a free key at: https://api.govinfo.gov/docs/ ' +
+        'then set GOVINFO_API_KEY in your environment.',
+    );
   return k;
 }
 
@@ -24,38 +28,50 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-interface GovInfoPackage {
-  packageId: string;
+interface GovInfoSearchResult {
   title?: string;
+  packageId: string;
+  granuleId?: string;
   dateIssued?: string;
   collectionCode?: string;
-  collectionName?: string;
-  packageLink?: string;
-  lastModified?: string;
+  governmentAuthor?: string[];
+  download?: { txtLink?: string; pdfLink?: string };
+  resultLink?: string;
 }
 
 interface GovInfoSearchResponse {
   count?: number;
-  packages?: GovInfoPackage[];
-  results?: GovInfoPackage[];
+  offsetMark?: string;
+  results?: GovInfoSearchResult[];
+}
+
+export function normalizeGovInfo(data: GovInfoSearchResponse, limit: number): LibraryResult[] {
+  return (data.results ?? []).slice(0, limit).map((r) => ({
+    id: r.granuleId ?? r.packageId,
+    source: 'govinfo' as const,
+    title: r.title || r.packageId,
+    authors: r.governmentAuthor ?? [],
+    year: r.dateIssued ? parseInt(r.dateIssued.substring(0, 4), 10) : undefined,
+    subjects: r.collectionCode ? [r.collectionCode] : [],
+    hasFullText: Boolean(r.download?.txtLink),
+    previewUrl:
+      r.resultLink ??
+      `https://www.govinfo.gov/content/pkg/${r.packageId}/html/${r.packageId}.htm`,
+  }));
 }
 
 export async function govinfoSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<GovInfoSearchResponse>(
-    `${BASE}/search?query=${encodeURIComponent(query)}&pageSize=${limit}&api_key=${key()}`,
-  );
-  const items = data.packages || data.results || [];
-  return items.map((p) => ({
-    id: p.packageId,
-    source: 'govinfo' as const,
-    title: p.title || p.packageId,
-    authors: [],
-    year: p.dateIssued ? parseInt(p.dateIssued.substring(0, 4), 10) : undefined,
-    subjects: p.collectionCode ? [p.collectionCode] : [],
-    hasFullText: true,
-    previewUrl: `https://www.govinfo.gov/content/pkg/${p.packageId}/html/${p.packageId}.htm`,
-    description: p.collectionName,
-  }));
+  const data = await fetchJSON<GovInfoSearchResponse>(`${BASE}/search?api_key=${key()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      pageSize: limit,
+      offsetMark: '*',
+      resultLevel: 'default',
+    }),
+  });
+  return normalizeGovInfo(data, limit);
 }
 
 export async function govinfoRead(id: string): Promise<{
@@ -91,8 +107,13 @@ export async function govinfoRead(id: string): Promise<{
 
 register('govinfo', {
   description:
-    'GovInfo — US Congressional Record, Federal Register, US Code, Bills, CFR, and more. GPO official archive.',
+    'GovInfo — US Congressional Record, Federal Register, US Code, Bills, CFR, and more. GPO official archive. Requires free GOVINFO_API_KEY.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'government',
+  freshness: 'daily',
+  homepage: 'https://www.govinfo.gov',
+  auth: { type: 'query', env: 'GOVINFO_API_KEY', param: 'api_key' },
   search: govinfoSearch,
   async read(id) {
     const raw = await govinfoRead(id);
