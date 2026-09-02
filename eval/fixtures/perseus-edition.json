@@ -1,0 +1,53 @@
+{
+  "url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/",
+  "json_url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/json/",
+  "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/text/",
+  "reader_url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/redirect/",
+  "first_passage": {
+    "url": "/reader/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30/",
+    "json_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30/json/",
+    "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30/text/",
+    "urn": "urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30"
+  },
+  "ancestors": [
+    {
+      "url": "/library/urn:cts:greekLit:tlg0012/",
+      "json_url": "/library/urn:cts:greekLit:tlg0012/json/",
+      "text_url": "/library/passage/urn:cts:greekLit:tlg0012/text/",
+      "urn": "urn:cts:greekLit:tlg0012",
+      "label": "Homer"
+    },
+    {
+      "url": "/library/urn:cts:greekLit:tlg0012.tlg001/",
+      "json_url": "/library/urn:cts:greekLit:tlg0012.tlg001/json/",
+      "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001/text/",
+      "urn": "urn:cts:greekLit:tlg0012.tlg001",
+      "label": "Iliad"
+    }
+  ],
+  "toc": [
+    {
+      "url": "/reader/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30/",
+      "json_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30/json/",
+      "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30/text/",
+      "urn": "urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:1.1-1.30",
+      "label": "Book",
+      "num": "1"
+    },
+    {
+      "url": "/reader/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:2.1-2.30/",
+      "json_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:2.1-2.30/json/",
+      "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:2.1-2.30/text/",
+      "urn": "urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:2.1-2.30",
+      "label": "Book",
+      "num": "2"
+    }
+  ],
+  "urn": "urn:cts:greekLit:tlg0012.tlg001.perseus-grc2",
+  "label": "Ἰλιάς",
+  "description": "Homer.  Homeri Opera, Volumes 1-2. Monro, D. B. (David Binning), editor; Allen, Thomas W. (Thomas William), editor.  Oxford: Clarendon Press, 1908-1920.",
+  "kind": "edition",
+  "lang": "grc",
+  "rtl": false,
+  "human_lang": "Greek"
+}
