@@ -179,9 +179,50 @@ test('roleConfig', async (t) => {
       assert.ok(router.fallback);
       assert.equal(router.fallback?.baseURL, 'https://api.openai.com/v1');
       assert.equal(router.fallback?.apiKey, 'sk-direct');
-      assert.equal(router.fallback?.model, router.model);
+      // Same default model on both sides here: nothing overrode it.
+      assert.equal(router.fallback?.model, 'gpt-4o-mini');
     },
   );
+
+  await t.test(
+    'the fallback does not inherit a gateway-local model name across a different base URL',
+    () => {
+      // A LiteLLM/self-hosted model name is meaningless at api.openai.com:
+      // inheriting it turned a recoverable gateway blip into a 404
+      // model_not_found on the fallback attempt.
+      clearAlexandriaEnv();
+      process.env.ALEXANDRIA_BASE_URL = 'http://gateway.example/v1';
+      process.env.ALEXANDRIA_API_KEY = 'gateway-key';
+      process.env.ALEXANDRIA_ROUTER_MODEL = 'litellm/llama-3.1-70b';
+      process.env.OPENAI_API_KEY = 'sk-direct';
+
+      const router = roleConfig('router');
+      assert.equal(router.model, 'litellm/llama-3.1-70b', 'the primary keeps the gateway model');
+      assert.ok(router.fallback);
+      assert.equal(router.fallback?.baseURL, 'https://api.openai.com/v1');
+      assert.notEqual(router.fallback?.model, router.model);
+      assert.equal(router.fallback?.model, 'gpt-4o-mini', 'the role default');
+
+      // Per-role defaults, not the router's, for the other roles.
+      process.env.ALEXANDRIA_RESEARCH_MODEL = 'litellm/llama-3.1-70b';
+      assert.equal(roleConfig('research').fallback?.model, 'gpt-4o');
+      process.env.ALEXANDRIA_EMBEDDINGS_MODEL = 'bge-m3';
+      assert.equal(roleConfig('embeddings').fallback?.model, 'text-embedding-3-small');
+    },
+  );
+
+  await t.test('a fallback on the SAME base URL keeps the configured model', () => {
+    // Only the key differs, so the model name is still valid there.
+    clearAlexandriaEnv();
+    process.env.ALEXANDRIA_BASE_URL = 'https://api.openai.com/v1';
+    process.env.ALEXANDRIA_API_KEY = 'sk-project-scoped';
+    process.env.ALEXANDRIA_ROUTER_MODEL = 'gpt-4o';
+    process.env.OPENAI_API_KEY = 'sk-direct';
+
+    const router = roleConfig('router');
+    assert.ok(router.fallback);
+    assert.equal(router.fallback?.model, 'gpt-4o');
+  });
 
   await t.test('no fallback is attached when there is no gateway configured', () => {
     clearAlexandriaEnv();

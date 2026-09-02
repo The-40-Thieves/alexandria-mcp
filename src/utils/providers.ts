@@ -76,7 +76,16 @@ export function roleConfig(role: Role): RoleConfig {
   // gateway. With only OPENAI_API_KEY set, usingGateway is false, so no
   // fallback is attached and behavior matches today exactly.
   if (usingGateway && openaiApiKey && (baseURL !== directBaseURL || apiKey !== openaiApiKey)) {
-    config.fallback = { baseURL: directBaseURL, apiKey: openaiApiKey, model };
+    // The fallback targets OpenAI directly. When that is a DIFFERENT origin
+    // from the primary, the primary's model name is a gateway-local alias
+    // (a LiteLLM route name, a Cloudflare AI Gateway model id, a
+    // self-hosted model) that OpenAI answers with 404 model_not_found,
+    // turning a recoverable gateway blip into a hard failure. Use the
+    // role's own default there. When the fallback shares the primary's
+    // origin (same base URL, different key) the model name is still valid,
+    // so it is kept.
+    const fallbackModel = baseURL === directBaseURL ? model : defaultModel(role);
+    config.fallback = { baseURL: directBaseURL, apiKey: openaiApiKey, model: fallbackModel };
   }
 
   return config;
