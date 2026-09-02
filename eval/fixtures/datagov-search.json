@@ -12,9 +12,7 @@
         "climate budgeting",
         "executive budget"
       ],
-      "theme": [
-        "City Government"
-      ],
+      "theme": ["City Government"],
       "dcat": {
         "landingPage": "https://data.cityofnewyork.us/d/c99a-c5ux",
         "issued": "2025-07-28",
@@ -65,9 +63,7 @@
         "DOC/NOAA/NESDIS/NCDC > National Climatic Data Center, NESDIS, NOAA, U.S. Department of Commerce",
         "DOC/NOAA/NESDIS/NCEI > National Centers for Environmental Information, NESDIS, NOAA, U.S. Department of Commerce"
       ],
-      "theme": [
-        "geospatial"
-      ],
+      "theme": ["geospatial"],
       "dcat": {
         "landingPage": "https://www.ncdc.noaa.gov/climate-monitoring/index.php",
         "issued": "1998-01-01T00:00:00.000+00:00",
@@ -116,9 +112,7 @@
         "DOC/NOAA/NESDIS/NCDC > National Climatic Data Center, NESDIS, NOAA, U.S. Department of Commerce",
         "DOC/NOAA/NESDIS/NCEI > National Centers for Environmental Information, NESDIS, NOAA, U.S. Department of Commerce"
       ],
-      "theme": [
-        "geospatial"
-      ],
+      "theme": ["geospatial"],
       "dcat": {
         "landingPage": "https://www.ncdc.noaa.gov/climate-monitoring/index.php",
         "issued": "1998-01-01T00:00:00.000+00:00",

@@ -1,5 +1,3 @@
 {
-  "books": [
-    { "title": "論語", "urn": "ctp:analects" }
-  ]
+  "books": [{ "title": "論語", "urn": "ctp:analects" }]
 }

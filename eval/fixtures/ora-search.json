@@ -8,9 +8,7 @@
           "id": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52#index_authors",
           "type": "document_value",
           "attributes": {
-            "value": [
-              "Milarski, MR"
-            ],
+            "value": ["Milarski, MR"],
             "label": "Author"
           }
         },
@@ -18,9 +16,7 @@
           "id": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52#rights_copyright_date",
           "type": "document_value",
           "attributes": {
-            "value": [
-              2021
-            ],
+            "value": [2021],
             "label": "Copyright date"
           }
         }
@@ -34,9 +30,7 @@
           "id": "https://ora.ox.ac.uk/objects/uuid:0d641544-4873-46ba-b33a-77c273f994ea#index_authors",
           "type": "document_value",
           "attributes": {
-            "value": [
-              "Park, W, Song, J"
-            ],
+            "value": ["Park, W, Song, J"],
             "label": "Author"
           }
         },

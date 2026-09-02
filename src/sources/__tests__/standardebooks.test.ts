@@ -20,7 +20,10 @@ test('normalizeStandardEbooksSearch', async (t) => {
     assert.equal(out[0].id, 'joseph-jacobs/indian-fairy-tales');
     assert.equal(out[0].title, 'Indian Fairy Tales');
     assert.deepEqual(out[0].authors, ['Joseph Jacobs']);
-    assert.equal(out[0].previewUrl, 'https://standardebooks.org/ebooks/joseph-jacobs/indian-fairy-tales');
+    assert.equal(
+      out[0].previewUrl,
+      'https://standardebooks.org/ebooks/joseph-jacobs/indian-fairy-tales',
+    );
     assert.equal(out[0].hasFullText, true);
   });
 
@@ -49,4 +52,3 @@ test('extractStandardEbooksText', async (t) => {
     assert.doesNotMatch(text, /font-family|text-indent|@media/);
   });
 });
-

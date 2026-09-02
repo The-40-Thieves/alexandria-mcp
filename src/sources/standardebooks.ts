@@ -51,7 +51,10 @@ export async function standardEbooksSearch(query: string, limit: number): Promis
   return normalizeStandardEbooksSearch(html, limit);
 }
 
-export function extractStandardEbooksText(html: string, bookId: string): { text: string; title: string } {
+export function extractStandardEbooksText(
+  html: string,
+  bookId: string,
+): { text: string; title: string } {
   const root = parse(html);
   const title = root.querySelector('title')?.text?.trim() ?? bookId;
 

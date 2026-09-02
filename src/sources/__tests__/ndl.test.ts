@@ -4,10 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { normalizeNdl } from '../ndl.js';
 
-const xml = readFileSync(
-  path.resolve(process.cwd(), 'eval/fixtures/ndl-search-raw.xml'),
-  'utf8',
-);
+const xml = readFileSync(path.resolve(process.cwd(), 'eval/fixtures/ndl-search-raw.xml'), 'utf8');
 
 test('normalizeNdl', async (t) => {
   await t.test('maps a dcndl (recordPacking=xml) SRU response', () => {
@@ -29,7 +26,10 @@ test('normalizeNdl', async (t) => {
 
   await t.test('handles a response with no records', () => {
     assert.deepEqual(
-      normalizeNdl('<searchRetrieveResponse xmlns="http://www.loc.gov/zing/srw/"></searchRetrieveResponse>', 10),
+      normalizeNdl(
+        '<searchRetrieveResponse xmlns="http://www.loc.gov/zing/srw/"></searchRetrieveResponse>',
+        10,
+      ),
       [],
     );
   });

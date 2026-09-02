@@ -29,10 +29,7 @@ interface HTBriefResponse {
   items?: HTBriefItem[];
 }
 
-export async function hathitrustSearch(
-  _query: string,
-  _limit: number,
-): Promise<LibraryResult[]> {
+export async function hathitrustSearch(_query: string, _limit: number): Promise<LibraryResult[]> {
   return Promise.resolve([]);
 }
 

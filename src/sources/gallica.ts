@@ -43,9 +43,7 @@ export function normalizeGallica(xml: string, limit: number): LibraryResult[] {
 
   return records.slice(0, limit).flatMap((r) => {
     const rec = r as Record<string, unknown>;
-    const dc = (rec.recordData as Record<string, unknown> | undefined)?.dc as
-      | GallicaDc
-      | undefined;
+    const dc = (rec.recordData as Record<string, unknown> | undefined)?.dc as GallicaDc | undefined;
     if (!dc) return [];
 
     const identifiers = toArray(dc.identifier).map(String);

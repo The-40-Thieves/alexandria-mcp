@@ -24,15 +24,24 @@ test('probe classification', async (t) => {
       'ERROR', // "is not set" doesn't match "requires .* (key|token|env)" — see next cases
     );
     assert.equal(
-      classify({ results: null, error: new Error('Trove requires a free API key. Register at: ...') }),
+      classify({
+        results: null,
+        error: new Error('Trove requires a free API key. Register at: ...'),
+      }),
       'KEY_MISSING',
     );
     assert.equal(
-      classify({ results: null, error: new Error('YOUTUBE_API_KEY is required for the youtube source') }),
+      classify({
+        results: null,
+        error: new Error('YOUTUBE_API_KEY is required for the youtube source'),
+      }),
       'ERROR', // "is required" doesn't match "requires" either — see openiti-style wording below
     );
     assert.equal(
-      classify({ results: null, error: new Error('openiti requires a GITHUB_TOKEN environment variable') }),
+      classify({
+        results: null,
+        error: new Error('openiti requires a GITHUB_TOKEN environment variable'),
+      }),
       'KEY_MISSING',
     );
   });
@@ -49,14 +58,17 @@ test('probe classification', async (t) => {
     const now = { a: { status: 'OK' } } as any;
     assert.deepEqual(regressions(base, now), []);
   });
-  await t.test('regressions does not flag OK -> KEY_MISSING for a source that declares auth', () => {
-    const base = { keyed: { status: 'OK' } } as any;
-    const now = { keyed: { status: 'KEY_MISSING' } } as any;
-    assert.deepEqual(
-      regressions(base, now, (s) => s === 'keyed'),
-      [],
-    );
-  });
+  await t.test(
+    'regressions does not flag OK -> KEY_MISSING for a source that declares auth',
+    () => {
+      const base = { keyed: { status: 'OK' } } as any;
+      const now = { keyed: { status: 'KEY_MISSING' } } as any;
+      assert.deepEqual(
+        regressions(base, now, (s) => s === 'keyed'),
+        [],
+      );
+    },
+  );
   await t.test('regressions DOES flag OK -> KEY_MISSING for a source with no auth declared', () => {
     const base = { keyless: { status: 'OK' } } as any;
     const now = { keyless: { status: 'KEY_MISSING' } } as any;

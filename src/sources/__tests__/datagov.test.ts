@@ -12,7 +12,10 @@ test('normalizeDataGov', async (t) => {
   await t.test('maps catalog.data.gov results', () => {
     const out = normalizeDataGov(fixture, 10);
     assert.equal(out.length, 3);
-    assert.equal(out[0].id, 'nyc-climate-budgeting-report-climate-alignment-assessment-and-capital-climate-investments');
+    assert.equal(
+      out[0].id,
+      'nyc-climate-budgeting-report-climate-alignment-assessment-and-capital-climate-investments',
+    );
     assert.equal(out[0].hasFullText, false);
     assert.equal(out[0].year, 2025);
     assert.equal(out[0].previewUrl, 'https://data.cityofnewyork.us/d/c99a-c5ux');

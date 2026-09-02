@@ -94,21 +94,19 @@ export async function chroniclingAmericaRead(id: string): Promise<{
   // Fall back to the LoC text-services overlay when the item JSON itself
   // did not carry a full_text field (common for newspaper page records,
   // which serve OCR through a separate ALTO/word-coordinates service).
-  const fallback = await fetchJSON<CAReadResponse>(
-    withParam(id, 'st', 'text'),
-    {},
-    40000,
-    1,
-  ).catch(() => undefined);
+  const fallback = await fetchJSON<CAReadResponse>(withParam(id, 'st', 'text'), {}, 40000, 1).catch(
+    () => undefined,
+  );
   const fallbackText = fallback?.item?.full_text ?? fallback?.results?.[0]?.full_text;
   if (fallbackText) {
     return {
       text: fallbackText,
       title: fallback?.item?.title ?? item?.title ?? id,
       authors: [],
-      year: (fallback?.item?.date ?? item?.date)
-        ? parseInt((fallback?.item?.date ?? item?.date ?? '').slice(0, 4), 10)
-        : undefined,
+      year:
+        (fallback?.item?.date ?? item?.date)
+          ? parseInt((fallback?.item?.date ?? item?.date ?? '').slice(0, 4), 10)
+          : undefined,
     };
   }
 

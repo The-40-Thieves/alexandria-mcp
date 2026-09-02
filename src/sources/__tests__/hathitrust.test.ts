@@ -9,9 +9,12 @@ const fixture = JSON.parse(
 );
 
 test('hathitrust', async (t) => {
-  await t.test('search always returns [] (the Data API keyword-search endpoint was retired)', async () => {
-    assert.deepEqual(await hathitrustSearch('anything', 10), []);
-  });
+  await t.test(
+    'search always returns [] (the Data API keyword-search endpoint was retired)',
+    async () => {
+      assert.deepEqual(await hathitrustSearch('anything', 10), []);
+    },
+  );
 
   await t.test('normalizes a brief-volumes response by OCLC lookup', () => {
     const out = normalizeHathiTrustBrief(fixture, 'oclc:424023');

@@ -5,7 +5,9 @@ import test from 'node:test';
 import { normalizeOra, oraRead } from '../ora.js';
 
 function fixture(name: string) {
-  return JSON.parse(readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}.json`), 'utf8'));
+  return JSON.parse(
+    readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}.json`), 'utf8'),
+  );
 }
 
 test('normalizeOra', async (t) => {
@@ -18,7 +20,10 @@ test('normalizeOra', async (t) => {
     assert.equal(out[0].title, 'Exploring science capital with primary-school-aged children');
     assert.deepEqual(out[0].authors, ['Milarski, MR']);
     assert.equal(out[0].year, 2021);
-    assert.equal(out[0].previewUrl, 'https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52');
+    assert.equal(
+      out[0].previewUrl,
+      'https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52',
+    );
   });
 
   await t.test('handles a null document_value (missing rights_copyright_date)', () => {

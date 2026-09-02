@@ -15,22 +15,16 @@
         "additional_description": [
           "Archived by the National Library of New Zealand in PDF (64 pages).\nAt head of title: NEMP, National Education Monitoring Project New Zealand.\nIncorrect ISSN printed on item.\nHypertext links contained in the archived instances of this title are non-functional.\nIncludes bibliographical references."
         ],
-        "content_partner": [
-          "National Library of New Zealand"
-        ],
+        "content_partner": ["National Library of New Zealand"],
         "display_content_partner": "National Library of New Zealand",
         "collection_title": [
           "National Library of New Zealand Catalogue",
           "Publications New Zealand"
         ],
         "display_collection": "National Library of New Zealand Catalogue",
-        "primary_collection": [
-          "National Library of New Zealand Catalogue"
-        ],
+        "primary_collection": ["National Library of New Zealand Catalogue"],
         "contributing_partner": [],
-        "category": [
-          "Books"
-        ],
+        "category": ["Books"],
         "creator": [
           "Crooks, Terry",
           "Flockton, Lester",
@@ -39,62 +33,38 @@
           "New Zealand. Ministry of Education"
         ],
         "contributor": [],
-        "copyright": [
-          "All rights reserved"
-        ],
+        "copyright": ["All rights reserved"],
         "citation": [],
         "credit_creator": null,
-        "language": [
-          "eng"
-        ],
+        "language": ["eng"],
         "provenance": null,
         "publisher": [
           "Dunedin, New Zealand : Prepared and published by the Educational Assessment Research Unit, University of Otago, New Zealand, under contract to the Ministry of Education, [2004]"
         ],
         "rights": null,
-        "usage": [
-          "All rights reserved"
-        ],
-        "source": [
-          "http://nemp.otago.ac.nz/PDFs/collated_PDFs/NEMP_29_Science_2003.pdf"
-        ],
-        "tag": [
-          "natlib:online_item"
-        ],
+        "usage": ["All rights reserved"],
+        "source": ["http://nemp.otago.ac.nz/PDFs/collated_PDFs/NEMP_29_Science_2003.pdf"],
+        "tag": ["natlib:online_item"],
         "thesis_level": null,
-        "holding": [
-          "ATL.DA Turnbull Digital Archive"
-        ],
-        "library_collection": [
-          "Publications New Zealand"
-        ],
+        "holding": ["ATL.DA Turnbull Digital Archive"],
+        "library_collection": ["Publications New Zealand"],
         "shelf_location": null,
         "eprints_type": [],
         "fulltext": null,
         "text": null,
-        "has_version": [
-          "Print version: Science"
-        ],
+        "has_version": ["Print version: Science"],
         "license": null,
-        "relation": [
-          "Digital Collection = Kohinga Matihiko 81268192800002836 Alma Collection"
-        ],
-        "is_part_of": [
-          "National education monitoring report ; 29."
-        ],
+        "relation": ["Digital Collection = Kohinga Matihiko 81268192800002836 Alma Collection"],
+        "is_part_of": ["National education monitoring report ; 29."],
         "is_replaced_by": "Unknown",
         "replaces": "Unknown",
         "is_required_by": null,
         "is_version_of": "http://tepuna.on.worldcat.org/oclc/896696982",
         "table_of_contents": null,
-        "dc_type": [
-          "Books"
-        ],
+        "dc_type": ["Books"],
         "dnz_type": "Unknown",
         "display_date": "[2004]",
-        "format": [
-          "1 online resource : illustrations (some colour)"
-        ],
+        "format": ["1 online resource : illustrations (some colour)"],
         "dc_identifier": [
           "primo:NLNZ_ALMA21204216440002836",
           "ndha:IE22800196",
@@ -103,9 +73,7 @@
           "oclc:896696982"
         ],
         "is_commercial_use": null,
-        "date": [
-          "2004-01-01T00:00:00.000Z"
-        ],
+        "date": ["2004-01-01T00:00:00.000Z"],
         "syndication_date": null,
         "published_date": [],
         "landing_url": "http://natlib.govt.nz/records/35199013",
@@ -127,29 +95,21 @@
         "created_at": "2014-05-19T22:48:18.278+12:00",
         "updated_at": "2026-06-28T18:44:12.560+12:00",
         "title": "Science : assessment results 1995 / Terry Crooks, Lester Flockton, with extensive assistance from other members of the EARU team: Lee Baker, Nicole Brown, Robyn Caygill, Linda Doubleday, Liz Eley, Janice McDrury, Miriam Richardson.",
-        "alternate_title": [
-          "Science assessment results 1995"
-        ],
+        "alternate_title": ["Science assessment results 1995"],
         "description": null,
         "additional_description": [
           "Archived by the National Library of New Zealand in PDF (60 pages).\nHypertext links contained in the archived instances of this title are non-functional.\nAt head of title: NEMP National Education Monitoring Project New Zealand."
         ],
-        "content_partner": [
-          "National Library of New Zealand"
-        ],
+        "content_partner": ["National Library of New Zealand"],
         "display_content_partner": "National Library of New Zealand",
         "collection_title": [
           "National Library of New Zealand Catalogue",
           "Publications New Zealand"
         ],
         "display_collection": "National Library of New Zealand Catalogue",
-        "primary_collection": [
-          "National Library of New Zealand Catalogue"
-        ],
+        "primary_collection": ["National Library of New Zealand Catalogue"],
         "contributing_partner": [],
-        "category": [
-          "Books"
-        ],
+        "category": ["Books"],
         "creator": [
           "Crooks, Terry",
           "Flockton, Lester",
@@ -157,62 +117,38 @@
           "National Education Monitoring Project (N.Z.)"
         ],
         "contributor": [],
-        "copyright": [
-          "All rights reserved"
-        ],
+        "copyright": ["All rights reserved"],
         "citation": [],
         "credit_creator": null,
-        "language": [
-          "eng"
-        ],
+        "language": ["eng"],
         "provenance": null,
         "publisher": [
           "Dunedin, New Zealand : Educational Assessment Research Unit, University of Otago, [1996]"
         ],
         "rights": null,
-        "usage": [
-          "All rights reserved"
-        ],
-        "source": [
-          "http://nemp.otago.ac.nz/PDFs/collated_PDFs/NEMP_01_Science_1995.pdf"
-        ],
-        "tag": [
-          "natlib:online_item"
-        ],
+        "usage": ["All rights reserved"],
+        "source": ["http://nemp.otago.ac.nz/PDFs/collated_PDFs/NEMP_01_Science_1995.pdf"],
+        "tag": ["natlib:online_item"],
         "thesis_level": null,
-        "holding": [
-          "ATL.DA Turnbull Digital Archive"
-        ],
-        "library_collection": [
-          "Publications New Zealand"
-        ],
+        "holding": ["ATL.DA Turnbull Digital Archive"],
+        "library_collection": ["Publications New Zealand"],
         "shelf_location": null,
         "eprints_type": [],
         "fulltext": null,
         "text": null,
-        "has_version": [
-          "Print version: Science"
-        ],
+        "has_version": ["Print version: Science"],
         "license": null,
-        "relation": [
-          "Digital Collection = Kohinga Matihiko 81268192800002836 Alma Collection"
-        ],
-        "is_part_of": [
-          "National education monitoring report ; 1."
-        ],
+        "relation": ["Digital Collection = Kohinga Matihiko 81268192800002836 Alma Collection"],
+        "is_part_of": ["National education monitoring report ; 1."],
         "is_replaced_by": "Unknown",
         "replaces": "Unknown",
         "is_required_by": null,
         "is_version_of": "http://tepuna.on.worldcat.org/oclc/880891473",
         "table_of_contents": null,
-        "dc_type": [
-          "Books"
-        ],
+        "dc_type": ["Books"],
         "dnz_type": "Book",
         "display_date": "[1996]",
-        "format": [
-          "1 online resource : illustrations (some colour)"
-        ],
+        "format": ["1 online resource : illustrations (some colour)"],
         "dc_identifier": [
           "primo:NLNZ_ALMA21245815740002836",
           "ndha:IE20402865",
@@ -221,9 +157,7 @@
           "oclc:880891473"
         ],
         "is_commercial_use": null,
-        "date": [
-          "1996-01-01T00:00:00.000Z"
-        ],
+        "date": ["1996-01-01T00:00:00.000Z"],
         "syndication_date": "2014-05-19T22:48:18.278+12:00",
         "published_date": [],
         "landing_url": "http://natlib.govt.nz/records/33810789",

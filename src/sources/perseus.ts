@@ -192,7 +192,9 @@ export async function perseusRead(id: string): Promise<{
   const toc = (edition.toc ?? []).slice(0, MAX_PASSAGES);
 
   if (toc.length === 0) {
-    const text = await fetchText(`${SCAIFE}${edition.text_url ?? `/library/passage/${editionUrn}/text/`}`);
+    const text = await fetchText(
+      `${SCAIFE}${edition.text_url ?? `/library/passage/${editionUrn}/text/`}`,
+    );
     return {
       text: normaliseWhitespace(text),
       title: entry.title,

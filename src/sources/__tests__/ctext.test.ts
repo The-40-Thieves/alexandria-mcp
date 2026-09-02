@@ -5,7 +5,9 @@ import test from 'node:test';
 import { normalizeCtextSearch } from '../ctext.js';
 
 function fixture(name: string) {
-  return JSON.parse(readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}.json`), 'utf8'));
+  return JSON.parse(
+    readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}.json`), 'utf8'),
+  );
 }
 
 test('normalizeCtextSearch', async (t) => {

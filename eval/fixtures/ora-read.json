@@ -10,9 +10,7 @@
         "id": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52#type_of_work",
         "type": "document_value",
         "attributes": {
-          "value": [
-            "Thesis"
-          ],
+          "value": ["Thesis"],
           "label": "Type"
         }
       },

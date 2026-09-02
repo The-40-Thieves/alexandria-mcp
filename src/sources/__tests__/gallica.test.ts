@@ -33,7 +33,10 @@ test('normalizeGallica', async (t) => {
 
   await t.test('handles a response with no records', () => {
     assert.deepEqual(
-      normalizeGallica('<srw:searchRetrieveResponse xmlns:srw="http://www.loc.gov/zing/srw/"></srw:searchRetrieveResponse>', 10),
+      normalizeGallica(
+        '<srw:searchRetrieveResponse xmlns:srw="http://www.loc.gov/zing/srw/"></srw:searchRetrieveResponse>',
+        10,
+      ),
       [],
     );
   });

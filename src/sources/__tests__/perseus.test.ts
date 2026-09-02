@@ -25,37 +25,40 @@ test('perseusSearch', async (t) => {
 });
 
 test('perseusRead against scaife.perseus.org (recorded fixtures)', async (t) => {
-  await t.test('resolves a work urn to an edition, walks toc, concatenates passage text', async () => {
-    const work = JSON.parse(fixture('perseus-work.json'));
-    const edition = JSON.parse(fixture('perseus-edition.json'));
-    const passageText = fixture('perseus-passage.txt');
+  await t.test(
+    'resolves a work urn to an edition, walks toc, concatenates passage text',
+    async () => {
+      const work = JSON.parse(fixture('perseus-work.json'));
+      const edition = JSON.parse(fixture('perseus-edition.json'));
+      const passageText = fixture('perseus-passage.txt');
 
-    const originalFetch = globalThis.fetch;
-    let call = 0;
-    globalThis.fetch = (async (url: string | URL | Request) => {
-      call += 1;
-      const u = String(url);
-      if (u.includes('tlg0012.tlg001/json')) {
-        return new Response(JSON.stringify(work), { status: 200 });
-      }
-      if (u.includes('tlg0012.tlg001.perseus-grc2/json')) {
-        return new Response(JSON.stringify(edition), { status: 200 });
-      }
-      if (u.includes('/text/')) {
-        return new Response(passageText, { status: 200 });
-      }
-      throw new Error(`unexpected fetch: ${u}`);
-    }) as typeof fetch;
+      const originalFetch = globalThis.fetch;
+      let call = 0;
+      globalThis.fetch = (async (url: string | URL | Request) => {
+        call += 1;
+        const u = String(url);
+        if (u.includes('tlg0012.tlg001/json')) {
+          return new Response(JSON.stringify(work), { status: 200 });
+        }
+        if (u.includes('tlg0012.tlg001.perseus-grc2/json')) {
+          return new Response(JSON.stringify(edition), { status: 200 });
+        }
+        if (u.includes('/text/')) {
+          return new Response(passageText, { status: 200 });
+        }
+        throw new Error(`unexpected fetch: ${u}`);
+      }) as typeof fetch;
 
-    try {
-      const out = await perseusRead('iliad');
-      assert.equal(out.title, 'Iliad');
-      assert.match(out.text, /μῆνιν ἄειδε/);
-      assert.ok(call >= 3); // work json + edition json + at least one passage
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
+      try {
+        const out = await perseusRead('iliad');
+        assert.equal(out.title, 'Iliad');
+        assert.match(out.text, /μῆνιν ἄειδε/);
+        assert.ok(call >= 3); // work json + edition json + at least one passage
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  );
 
   await t.test('throws a clear error for an unknown id', async () => {
     await assert.rejects(perseusRead('not-a-real-work'), /Unknown Perseus ID/);

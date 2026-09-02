@@ -2,23 +2,12 @@
   "records": {
     "000578050": {
       "recordURL": "https://catalog.hathitrust.org/Record/000578050",
-      "titles": [
-        "Infinite series"
-      ],
-      "isbns": [
-        "9780030110405",
-        "9780030110405"
-      ],
+      "titles": ["Infinite series"],
+      "isbns": ["9780030110405", "9780030110405"],
       "issns": [],
-      "oclcs": [
-        "424023"
-      ],
-      "lccns": [
-        "62009520"
-      ],
-      "publishDates": [
-        "1962"
-      ]
+      "oclcs": ["424023"],
+      "lccns": ["62009520"],
+      "publishDates": ["1962"]
     }
   },
   "items": [
