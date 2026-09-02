@@ -26,8 +26,10 @@ interface ComtradeResponse {
   data?: ComtradeRow[];
 }
 
-const subscriptionKey = process.env.UN_COMTRADE_KEY;
-const headers = subscriptionKey ? { 'Ocp-Apim-Subscription-Key': subscriptionKey } : undefined;
+export function comtradeHeaders(): Record<string, string> | undefined {
+  const subscriptionKey = process.env.UN_COMTRADE_KEY;
+  return subscriptionKey ? { 'Ocp-Apim-Subscription-Key': subscriptionKey } : undefined;
+}
 
 function previousYear(): number {
   return new Date().getUTCFullYear() - 1;
@@ -52,7 +54,7 @@ export async function comtradeSearch(query: string, limit: number): Promise<Libr
   const period = previousYear();
   const data = await fetchJSON<ComtradeResponse>(
     `${BASE}?reporterCode=&cmdCode=${encodeURIComponent(cmdCode)}&period=${period}`,
-    { headers },
+    { headers: comtradeHeaders() },
   );
   const rows: LibraryResult[] = [];
   for (const row of data.data ?? []) {
@@ -67,7 +69,7 @@ export async function comtradeRead(id: string): Promise<ReadResult> {
   const [reporterCode, partnerCode, cmdCode, period] = id.split('-');
   const data = await fetchJSON<ComtradeResponse>(
     `${BASE}?reporterCode=&cmdCode=${encodeURIComponent(cmdCode)}&period=${period}`,
-    { headers },
+    { headers: comtradeHeaders() },
   );
   const row = (data.data ?? []).find(
     (r) =>
