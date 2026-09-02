@@ -1,0 +1,11 @@
+{
+  "id": "75001",
+  "zipCode": "75001",
+  "rentalData": {
+    "averageRent": 1875,
+    "medianRent": 1800,
+    "minRent": 1100,
+    "maxRent": 3200,
+    "totalListings": 42
+  }
+}
