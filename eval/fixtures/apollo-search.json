@@ -1,0 +1,141 @@
+{
+  "_embedded": {
+    "searchResult": {
+      "_embedded": {
+        "objects": [
+          {
+            "_embedded": {
+              "indexableObject": {
+                "id": "371d02a7-cc06-40e0-bac7-c7cc5a026391",
+                "name": "Problems and Solutions in Scientific Text",
+                "metadata": {
+                  "dc.contributor.author": [
+                    {
+                      "value": "Heffernan, K",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    },
+                    {
+                      "value": "Teufel, Simone",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 1
+                    }
+                  ],
+                  "dc.title": [
+                    {
+                      "value": "Problems and Solutions in Scientific Text",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ],
+                  "dc.date.available": [
+                    {
+                      "value": "2018-04-20T10:34:35Z",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ],
+                  "dc.subject": [
+                    {
+                      "value": "data",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ],
+                  "dc.identifier.uri": [
+                    {
+                      "value": "https://www.repository.cam.ac.uk/handle/1810/275065",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "_embedded": {
+              "indexableObject": {
+                "id": "ecfdaa7b-3244-4671-8a56-98b06065b048",
+                "name": "SciXML-ARC",
+                "metadata": {
+                  "dc.contributor.author": [
+                    {
+                      "value": "Heffernan, Kevin",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    },
+                    {
+                      "value": "Teufel, Simone",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 1
+                    }
+                  ],
+                  "dc.title": [
+                    {
+                      "value": "SciXML-ARC",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ],
+                  "dc.date.available": [
+                    {
+                      "value": "2019-11-29T10:29:27Z",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ],
+                  "dc.subject": [
+                    {
+                      "value": "NLP",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    },
+                    {
+                      "value": "Scientific Text",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 1
+                    }
+                  ],
+                  "dc.identifier.uri": [
+                    {
+                      "value": "https://www.repository.cam.ac.uk/handle/1810/299445",
+                      "language": null,
+                      "authority": null,
+                      "confidence": -1,
+                      "place": 0
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -34,10 +34,7 @@ function firstMeta(meta: DSMeta | undefined, key: string): string {
   return getMeta(meta, key)[0] || '';
 }
 
-export async function apolloSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<DSSearchResponse>(
-    `${BASE_URL}/discover/search/objects?query=${encodeURIComponent(query)}&size=${limit}&embed=indexableObject&dsoType=item`,
-  );
+export function normalizeApollo(data: DSSearchResponse): LibraryResult[] {
   const objects = data._embedded?.searchResult?._embedded?.objects || [];
   return objects.flatMap((o) => {
     const item = o._embedded?.indexableObject;
@@ -60,6 +57,13 @@ export async function apolloSearch(query: string, limit = 10): Promise<LibraryRe
     };
     return [result];
   });
+}
+
+export async function apolloSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const data = await fetchJSON<DSSearchResponse>(
+    `${BASE_URL}/discover/search/objects?query=${encodeURIComponent(query)}&size=${limit}&embed=indexableObject&dsoType=item`,
+  );
+  return normalizeApollo(data);
 }
 
 export async function apolloRead(id: string): Promise<{
@@ -87,6 +91,10 @@ register('apollo', {
   description:
     'Cambridge Apollo — Cambridge University institutional repository. Theses, working papers, preprints, and faculty research. DSpace REST API v7, no auth required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://www.repository.cam.ac.uk',
   search: apolloSearch,
   async read(id) {
     const raw = await apolloRead(id);
