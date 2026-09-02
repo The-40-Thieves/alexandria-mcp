@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Sample Atom Feed</title>
+  <id>https://example.org/atom</id>
+  <updated>2026-09-01T09:00:00Z</updated>
+  <entry>
+    <title>Older regional dispatch on trade talks</title>
+    <id>https://example.org/atom/1</id>
+    <link href="https://example.org/atom/1" rel="alternate" />
+    <summary>Coverage of trade negotiations from earlier in the year.</summary>
+    <published>2026-03-01T09:00:00Z</published>
+    <updated>2026-03-01T09:00:00Z</updated>
+    <author><name>Older Reporter</name></author>
+  </entry>
+  <entry>
+    <title>New dispatch on election results</title>
+    <id>https://example.org/atom/2</id>
+    <link href="https://example.org/atom/2" rel="alternate" />
+    <summary>Fresh coverage of the election results just announced.</summary>
+    <published>2026-09-01T09:00:00Z</published>
+    <updated>2026-09-01T09:00:00Z</updated>
+    <author><name>New Reporter</name></author>
+  </entry>
+</feed>

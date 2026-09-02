@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample HTML-Description Feed</title>
+    <link>https://example.org/</link>
+    <description>Fixture feed for rss.test.ts</description>
+    <item>
+      <title>Wrapped headline</title>
+      <link>https://example.org/html/1</link>
+      <description>&lt;a href="https://example.org/html/1" target="_blank"&gt;New breakthrough in quantum computing announced&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Example Wire&lt;/font&gt;</description>
+      <guid isPermaLink="true">https://example.org/html/1</guid>
+      <pubDate>Wed, 02 Sep 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
