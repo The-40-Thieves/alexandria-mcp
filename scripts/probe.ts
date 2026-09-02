@@ -87,6 +87,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   swiftevolution: '',
   ietf: 'tls',
   w3c: 'css',
+  coingecko: 'bitcoin',
 };
 const DEFAULT_QUERY = 'history of science';
 

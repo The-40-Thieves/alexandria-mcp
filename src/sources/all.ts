@@ -88,3 +88,4 @@ import './nvd.js';
 import './cwe.js';
 import './attack.js';
 import './twelvedata.js';
+import './coingecko.js';
