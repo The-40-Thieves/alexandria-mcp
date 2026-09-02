@@ -4,6 +4,7 @@ import { fetchJSON } from '../utils/http.js';
 import {
   catalog,
   getAdapter,
+  healthSummary,
   listSources,
   READ_MAX_CHARS,
   register,
@@ -293,4 +294,47 @@ test('registry v2', async (t) => {
       }
     },
   );
+});
+
+describe('healthSummary', () => {
+  it('counts a newly registered visible source into sources/visible/byKind', () => {
+    const before = healthSummary();
+    register('t_health_visible', {
+      description: 'x',
+      supportsIngest: false,
+      kind: 'rss',
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
+    });
+    const after = healthSummary();
+    assert.equal(after.sources, before.sources + 1);
+    assert.equal(after.visible, before.visible + 1);
+    assert.equal(after.hidden, before.hidden);
+    assert.equal(after.byKind.rss, before.byKind.rss + 1);
+  });
+
+  it('counts a hidden source into sources/hidden but not visible', () => {
+    const before = healthSummary();
+    register('t_health_hidden', {
+      description: 'x',
+      supportsIngest: false,
+      kind: 'mcp',
+      hidden: true,
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
+    });
+    const after = healthSummary();
+    assert.equal(after.sources, before.sources + 1);
+    assert.equal(after.visible, before.visible);
+    assert.equal(after.hidden, before.hidden + 1);
+    assert.equal(after.byKind.mcp, before.byKind.mcp + 1);
+  });
 });

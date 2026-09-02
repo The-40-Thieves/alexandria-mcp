@@ -230,6 +230,22 @@ export function listSources(): Array<
   }));
 }
 
+// /health summary: total sources, how many are visible vs hidden (needs a
+// key or config not present in this deployment), and a count per kind
+// across every registered source (visible and hidden alike).
+export function healthSummary(): {
+  sources: number;
+  visible: number;
+  hidden: number;
+  byKind: Record<SourceKind, number>;
+} {
+  const all = listSources();
+  const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
+  for (const s of all) byKind[s.kind]++;
+  const hidden = all.filter((s) => s.hidden).length;
+  return { sources: all.length, visible: all.length - hidden, hidden, byKind };
+}
+
 // Routing view: every non-hidden source, trimmed to what routing needs.
 export function catalog(): Array<{
   name: string;
