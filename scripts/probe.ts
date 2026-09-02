@@ -84,6 +84,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   devto: 'rust',
   peps: 'style guide',
   tc39: '',
+  swiftevolution: '',
 };
 const DEFAULT_QUERY = 'history of science';
 

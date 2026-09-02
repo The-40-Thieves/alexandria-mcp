@@ -71,6 +71,7 @@ import './devto.js';
 import './githubsearch.js';
 import './peps.js';
 import './tc39.js';
+import './swiftevolution.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';

@@ -1,0 +1,36 @@
+{
+  "proposals": [
+    {
+      "id": "SE-0001",
+      "title": "Allow (most) keywords as argument labels",
+      "authors": [
+        {
+          "link": "https://github.com/DougGregor",
+          "name": "Doug Gregor"
+        }
+      ],
+      "status": {
+        "state": "implemented",
+        "version": "2.2"
+      },
+      "link": "0001-keywords-as-argument-labels.md",
+      "summary": "Argument labels are an important part of the interface of a Swift function, describing what particular arguments to the function do and improving readability. Sometimes, the most natural label for an argument coincides with a language keyword, such as `in`, `repeat`, or `defer`. Such keywords should be allowed as argument labels, allowing better expression of these interfaces."
+    },
+    {
+      "id": "SE-0002",
+      "title": "Removing currying `func` declaration syntax",
+      "authors": [
+        {
+          "link": "https://github.com/jckarter",
+          "name": "Joe Groff"
+        }
+      ],
+      "status": {
+        "state": "implemented",
+        "version": "3.0"
+      },
+      "link": "0002-remove-currying.md",
+      "summary": "Curried function declaration syntax `func foo(x: Int)(y: Int)` is of limited usefulness and creates a lot of language and implementation complexity. We should remove it."
+    }
+  ]
+}
