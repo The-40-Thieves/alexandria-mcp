@@ -1,0 +1,36 @@
+[
+  {
+    "id": 4549831,
+    "title": "The day `format!` ate half our CPU: hunting allocations in a Rust hot path",
+    "description": "Our market-data pipeline runs on a single mid-sized VPS: a fleet of small Rust daemons that ingest...",
+    "user": {
+      "name": "Vitalii Buhaiov",
+      "username": "vitaliibuhaiovmarkettrace",
+      "twitter_username": "MTraceNotify",
+      "github_username": null,
+      "user_id": 3931543,
+      "website_url": "https://markettrace.ai/",
+      "profile_image": "https://media2.dev.to/dynamic/image/width=640,height=640,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Fuser%2Fprofile_image%2F3931543%2F525cf842-5da8-4942-aa2c-5887778df3cd.jpg",
+      "profile_image_90": "https://media2.dev.to/dynamic/image/width=90,height=90,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Fuser%2Fprofile_image%2F3931543%2F525cf842-5da8-4942-aa2c-5887778df3cd.jpg"
+    },
+    "published_at": "2026-09-01T21:08:01Z",
+    "url": "https://dev.to/markettrace/the-day-format-ate-half-our-cpu-hunting-allocations-in-a-rust-hot-path-2a0l"
+  },
+  {
+    "id": 4550421,
+    "title": "I built a parametric CAD alone, here's where AI actually helps and where it doesn't",
+    "description": "I was tired of the lack of a lightweight, simple, free CAD on Linux. In practice there's really only...",
+    "user": {
+      "name": "Denis Kazachenkov",
+      "username": "qymistech",
+      "twitter_username": null,
+      "github_username": "basson",
+      "user_id": 4105184,
+      "website_url": "https://qymis.tech/?lang=en",
+      "profile_image": "https://media2.dev.to/dynamic/image/width=640,height=640,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Fuser%2Fprofile_image%2F4105184%2F4821b91c-d896-4e00-a13d-22eda72401f7.jpg",
+      "profile_image_90": "https://media2.dev.to/dynamic/image/width=90,height=90,fit=cover,gravity=auto,format=auto/https%3A%2F%2Fdev-to-uploads.s3.us-east-2.amazonaws.com%2Fuploads%2Fuser%2Fprofile_image%2F4105184%2F4821b91c-d896-4e00-a13d-22eda72401f7.jpg"
+    },
+    "published_at": "2026-09-01T23:35:59Z",
+    "url": "https://dev.to/qymistech/i-built-a-parametric-cad-alone-heres-where-ai-actually-helps-and-where-it-doesnt-f9g"
+  }
+]

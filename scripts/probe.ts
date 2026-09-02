@@ -78,6 +78,10 @@ export const PROBE_QUERIES: Record<string, string> = {
   cwe: 'CWE-79',
   attack: 'injection',
   depsdev: 'npm:lodash',
+  // devto's multi-token search feed returns [] for every query as of
+  // 2026-09-01 (see the task report); a single token exercises the
+  // working tag-filtered branch instead.
+  devto: 'rust',
 };
 const DEFAULT_QUERY = 'history of science';
 
