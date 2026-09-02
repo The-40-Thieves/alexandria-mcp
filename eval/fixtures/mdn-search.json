@@ -1,0 +1,14 @@
+{
+  "documents": [
+    {
+      "mdn_url": "/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array",
+      "title": "Array",
+      "summary": "The Array object, as with arrays in other programming languages, enables storing a collection of multiple items under a single variable name, and has members for performing common array operations."
+    },
+    {
+      "mdn_url": "/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/isArray",
+      "title": "Array.isArray()",
+      "summary": "The Array.isArray() static method determines whether the passed value is an Array."
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "_embedded": {
+    "specifications": [
+      {
+        "title": "SMIL 2.0 Extension for Professional Multimedia Authoring - Preliminary Investigation",
+        "shortname": "SMIL2-AuthExt",
+        "description": "<p>This submission is a proposal for resuming SYMM Working Group to improve SMIL 2.0 Specification. This proposal intends to seek out the possiblity of SMIL for professional multimedia authoring. Introducing SMIL-based content authoring into professional multimedia production is also expected to enhance the possibility of SMIL-based contents on the Web.</p>",
+        "_links": {
+          "self": {
+            "href": "https://api.w3.org/specifications/SMIL2-AuthExt"
+          },
+          "version-history": {
+            "href": "https://api.w3.org/specifications/SMIL2-AuthExt/versions"
+          },
+          "first-version": {
+            "href": "https://api.w3.org/specifications/SMIL2-AuthExt/versions/20030512",
+            "title": "Note"
+          },
+          "latest-version": {
+            "href": "https://api.w3.org/specifications/SMIL2-AuthExt/versions/20030512",
+            "title": "Note"
+          },
+          "series": {
+            "href": "https://api.w3.org/specification-series/SMIL-AuthExt"
+          }
+        }
+      },
+      {
+        "title": "CSS Namespaces Module Level 3",
+        "shortname": "css-namespaces-3",
+        "description": "<p>This CSS Namespaces module defines the syntax for using namespaces in CSS. It defines the <code>@namespace</code> rule for declaring the default namespace and binding namespaces to namespace prefixes, and it also defines a syntax that other specifications can adopt for using those prefixes in namespace-qualified names.</p>",
+        "_links": {
+          "self": {
+            "href": "https://api.w3.org/specifications/css-namespaces-3"
+          },
+          "version-history": {
+            "href": "https://api.w3.org/specifications/css-namespaces-3/versions"
+          },
+          "first-version": {
+            "href": "https://api.w3.org/specifications/css-namespaces-3/versions/19990625",
+            "title": "Working Draft"
+          },
+          "latest-version": {
+            "href": "https://api.w3.org/specifications/css-namespaces-3/versions/20140320",
+            "title": "Recommendation"
+          },
+          "series": {
+            "href": "https://api.w3.org/specification-series/css-namespaces"
+          }
+        }
+      }
+    ]
+  }
+}

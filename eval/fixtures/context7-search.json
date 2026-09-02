@@ -1,0 +1,14 @@
+{
+  "results": [
+    {
+      "id": "/reactjs/react.dev",
+      "title": "React",
+      "description": "React.dev is the official documentation website for React, a JavaScript library for building user interfaces, providing guides, API references, and tutorials."
+    },
+    {
+      "id": "/react/react",
+      "title": "React",
+      "description": "React is a JavaScript library for building user interfaces."
+    }
+  ]
+}

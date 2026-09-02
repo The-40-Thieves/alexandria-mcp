@@ -1,0 +1,16 @@
+[
+  {
+    "ghsa_id": "GHSA-5hrf-vhf5-vjmc",
+    "summary": "Information leak in Skia in Google Chrome prior to 152.0.7977.75 allowed a remote attacker who...",
+    "description": "Information leak in Skia in Google Chrome prior to 152.0.7977.75 allowed a remote attacker who had compromised the renderer process to leak cross-origin data via a crafted HTML page. (Chromium security severity: High)",
+    "published_at": "2026-09-02T00:31:33Z",
+    "html_url": "https://github.com/advisories/GHSA-5hrf-vhf5-vjmc"
+  },
+  {
+    "ghsa_id": "GHSA-2cvv-4hfg-3c48",
+    "summary": "Improper privilege management in Downloads in Google Chrome prior to 152.0.7977.75 allowed a...",
+    "description": "Improper privilege management in Downloads in Google Chrome prior to 152.0.7977.75 allowed a remote attacker who had compromised the renderer process to spoof address bar via a crafted HTML page. (Chromium security severity: Medium)",
+    "published_at": "2026-09-02T00:31:33Z",
+    "html_url": "https://github.com/advisories/GHSA-2cvv-4hfg-3c48"
+  }
+]

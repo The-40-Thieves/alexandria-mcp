@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-09-02T02:03:04.164Z",
+  "generatedAt": "2026-09-02T03:02:07.712Z",
   "results": {
     "gutenberg": {
       "status": "OK",
-      "ms": 99,
+      "ms": 148,
       "count": 30
     },
     "openlibrary": {
       "status": "OK",
-      "ms": 2809,
+      "ms": 2700,
       "count": 2
     },
     "archive": {
       "status": "OK",
-      "ms": 267,
+      "ms": 322,
       "count": 2
     },
     "sacredtexts": {
@@ -23,32 +23,32 @@
     },
     "wikisource": {
       "status": "OK",
-      "ms": 241,
+      "ms": 198,
       "count": 2
     },
     "standardebooks": {
       "status": "OK",
-      "ms": 81,
+      "ms": 58,
       "count": 1
     },
     "perseus": {
       "status": "OK",
-      "ms": 0,
+      "ms": 1,
       "count": 2
     },
     "ctext": {
       "status": "OK",
-      "ms": 161,
+      "ms": 160,
       "count": 1
     },
     "gallica": {
       "status": "EMPTY",
-      "ms": 375,
+      "ms": 546,
       "count": 0
     },
     "loc": {
       "status": "OK",
-      "ms": 37,
+      "ms": 67,
       "count": 2
     },
     "hathitrust": {
@@ -64,7 +64,7 @@
     },
     "ndl": {
       "status": "OK",
-      "ms": 445,
+      "ms": 100,
       "count": 2
     },
     "europeana": {
@@ -75,7 +75,7 @@
     },
     "trove": {
       "status": "KEY_MISSING",
-      "ms": 2,
+      "ms": 0,
       "count": 0,
       "message": "Trove requires a free API key. Register at: https://trove.nla.gov.au/about/create-something/using-api then set TROVE_API_KEY in your environment."
     },
@@ -87,7 +87,7 @@
     },
     "digitalnz": {
       "status": "OK",
-      "ms": 831,
+      "ms": 1039,
       "count": 2
     },
     "internetclassics": {
@@ -97,22 +97,22 @@
     },
     "marxists": {
       "status": "OK",
-      "ms": 366,
+      "ms": 389,
       "count": 2
     },
     "projectruneberg": {
       "status": "OK",
-      "ms": 0,
+      "ms": 1,
       "count": 2
     },
     "cervantes": {
       "status": "OK",
-      "ms": 482,
+      "ms": 481,
       "count": 2
     },
     "doab": {
       "status": "OK",
-      "ms": 672,
+      "ms": 611,
       "count": 2
     },
     "googlebooks": {
@@ -123,7 +123,7 @@
     },
     "chroniclingamerica": {
       "status": "OK",
-      "ms": 35508,
+      "ms": 31209,
       "count": 2
     },
     "ccel": {
@@ -133,18 +133,19 @@
     },
     "wdl": {
       "status": "OK",
-      "ms": 34,
+      "ms": 52,
       "count": 2
     },
     "datagov": {
       "status": "OK",
-      "ms": 26,
+      "ms": 226,
       "count": 2
     },
     "arxiv": {
-      "status": "OK",
-      "ms": 69,
-      "count": 2
+      "status": "ERROR",
+      "ms": 130,
+      "count": 0,
+      "message": "HTTP 429 , url: https://export.arxiv.org/api/query?search_query=all:history%20of%20science&max_results=2&sortBy=relevance"
     },
     "core": {
       "status": "KEY_MISSING",
@@ -154,27 +155,27 @@
     },
     "europmc": {
       "status": "OK",
-      "ms": 660,
+      "ms": 654,
       "count": 2
     },
     "nasa": {
       "status": "OK",
-      "ms": 596,
+      "ms": 656,
       "count": 2
     },
     "osti": {
       "status": "OK",
-      "ms": 199,
+      "ms": 203,
       "count": 2
     },
     "eric": {
       "status": "OK",
-      "ms": 96,
+      "ms": 169,
       "count": 2
     },
     "nsf": {
       "status": "OK",
-      "ms": 91,
+      "ms": 69,
       "count": 2
     },
     "courtlistener": {
@@ -185,18 +186,19 @@
     },
     "biorxiv": {
       "status": "OK",
-      "ms": 1881,
+      "ms": 1540,
       "count": 2
     },
     "zenodo": {
       "status": "OK",
-      "ms": 2353,
+      "ms": 1523,
       "count": 2
     },
     "semanticscholar": {
-      "status": "OK",
-      "ms": 5757,
-      "count": 2
+      "status": "ERROR",
+      "ms": 1177,
+      "count": 0,
+      "message": "HTTP 429 , url: https://api.semanticscholar.org/graph/v1/paper/search?query=history%20of%20science&fields=paperId,title,authors,year,abstract,openAccessPdf,exte"
     },
     "govinfo": {
       "status": "KEY_MISSING",
@@ -206,48 +208,48 @@
     },
     "nih": {
       "status": "OK",
-      "ms": 124,
+      "ms": 250,
       "count": 2
     },
     "nbnorway": {
       "status": "OK",
-      "ms": 558,
+      "ms": 552,
       "count": 2
     },
     "legislation": {
       "status": "EMPTY",
-      "ms": 22,
+      "ms": 99,
       "count": 0
     },
     "osf": {
       "status": "OK",
-      "ms": 803,
+      "ms": 972,
       "count": 2
     },
     "earlyprint": {
       "status": "ERROR",
-      "ms": 48,
+      "ms": 53,
       "count": 0,
       "message": "HTTP 404 Not Found, url: https://eplab.artsci.wustl.edu/blacklab-server/earlyprint/docs?filter=title%3Ahistory%20of%20science%20OR%20author%3Ahistory%20of%20sci"
     },
     "openiti": {
       "status": "OK",
-      "ms": 288,
+      "ms": 117,
       "count": 2
     },
     "legislationscot": {
       "status": "OK",
-      "ms": 9,
+      "ms": 11,
       "count": 2
     },
     "openalex": {
       "status": "OK",
-      "ms": 647,
+      "ms": 801,
       "count": 2
     },
     "plos": {
       "status": "OK",
-      "ms": 62,
+      "ms": 137,
       "count": 2
     },
     "nasaads": {
@@ -264,7 +266,7 @@
     },
     "doaj": {
       "status": "OK",
-      "ms": 215,
+      "ms": 181,
       "count": 2
     },
     "nara": {
@@ -281,23 +283,23 @@
     },
     "harvardlib": {
       "status": "ERROR",
-      "ms": 80,
+      "ms": 81,
       "count": 0,
       "message": "HTTP 429 , url: https://api.lib.harvard.edu/v2/items.dc.json?q=history%20of%20science&limit=2&start=1"
     },
     "apollo": {
       "status": "OK",
-      "ms": 406,
+      "ms": 418,
       "count": 2
     },
     "ora": {
       "status": "OK",
-      "ms": 772,
+      "ms": 773,
       "count": 2
     },
     "codewiki": {
       "status": "EMPTY",
-      "ms": 397,
+      "ms": 384,
       "count": 0
     },
     "youtube": {
@@ -308,113 +310,229 @@
     },
     "exploitdb": {
       "status": "OK",
-      "ms": 27,
+      "ms": 29,
       "count": 2
     },
     "msrc": {
       "status": "OK",
-      "ms": 1139,
+      "ms": 1844,
       "count": 2
     },
     "projectzero": {
       "status": "OK",
-      "ms": 411,
+      "ms": 484,
       "count": 2
     },
     "cisco-psirt": {
       "status": "OK",
-      "ms": 448,
+      "ms": 423,
       "count": 2
     },
     "bleepingcomputer": {
       "status": "OK",
-      "ms": 58,
+      "ms": 56,
       "count": 2
     },
     "allafrica": {
       "status": "OK",
-      "ms": 112,
+      "ms": 117,
       "count": 2
     },
     "arabnews": {
       "status": "OK",
-      "ms": 115,
+      "ms": 103,
       "count": 2
     },
     "thehindu-intl": {
       "status": "OK",
-      "ms": 76,
+      "ms": 51,
       "count": 2
     },
     "abc-world": {
       "status": "OK",
-      "ms": 401,
+      "ms": 40,
       "count": 2
     },
     "folha-en": {
       "status": "OK",
-      "ms": 1070,
+      "ms": 1073,
       "count": 2
     },
     "dw": {
       "status": "OK",
-      "ms": 39,
+      "ms": 63,
       "count": 2
     },
     "france24": {
       "status": "OK",
-      "ms": 41,
+      "ms": 48,
       "count": 2
     },
     "aljazeera": {
       "status": "OK",
-      "ms": 93,
+      "ms": 27,
       "count": 2
     },
     "almonitor": {
       "status": "OK",
-      "ms": 161,
+      "ms": 106,
       "count": 2
     },
     "thediplomat": {
       "status": "OK",
-      "ms": 46,
+      "ms": 77,
       "count": 2
     },
     "nikkeiasia": {
       "status": "OK",
-      "ms": 24,
+      "ms": 31,
       "count": 2
     },
     "dailymaverick": {
       "status": "OK",
-      "ms": 65,
+      "ms": 864,
       "count": 2
     },
     "restofworld": {
       "status": "OK",
-      "ms": 16,
+      "ms": 22,
       "count": 2
     },
     "scmp": {
       "status": "OK",
-      "ms": 753,
+      "ms": 507,
       "count": 2
     },
     "nist-csrc": {
+      "status": "OK",
+      "ms": 106,
+      "count": 2
+    },
+    "lobsters": {
+      "status": "OK",
+      "ms": 39,
+      "count": 2
+    },
+    "ecosystems": {
       "status": "ERROR",
-      "ms": 82,
+      "ms": 0,
       "count": 0,
-      "message": "HTTP 404 , url: https://csrc.nist.gov/CSRC/media/feeds/publications/all.xml"
+      "message": "ecosystems requires CONTACT_EMAIL"
+    },
+    "depsdev": {
+      "status": "OK",
+      "ms": 135,
+      "count": 2
+    },
+    "stackexchange": {
+      "status": "OK",
+      "ms": 257,
+      "count": 2
+    },
+    "hn": {
+      "status": "OK",
+      "ms": 278,
+      "count": 2
+    },
+    "devto": {
+      "status": "OK",
+      "ms": 50,
+      "count": 2
+    },
+    "githubsearch": {
+      "status": "KEY_MISSING",
+      "ms": 0,
+      "count": 0,
+      "message": "githubsearch requires GITHUB_TOKEN"
+    },
+    "peps": {
+      "status": "OK",
+      "ms": 176,
+      "count": 2
+    },
+    "tc39": {
+      "status": "OK",
+      "ms": 79,
+      "count": 2
+    },
+    "swiftevolution": {
+      "status": "OK",
+      "ms": 584,
+      "count": 2
+    },
+    "mdn": {
+      "status": "OK",
+      "ms": 27,
+      "count": 10
+    },
+    "context7": {
+      "status": "OK",
+      "ms": 1264,
+      "count": 2
+    },
+    "ietf": {
+      "status": "OK",
+      "ms": 102,
+      "count": 2
+    },
+    "w3c": {
+      "status": "OK",
+      "ms": 49,
+      "count": 2
     },
     "googlenews": {
       "status": "OK",
-      "ms": 635,
+      "ms": 1178,
       "count": 2
     },
     "nhk": {
       "status": "OK",
-      "ms": 231,
+      "ms": 583,
+      "count": 2
+    },
+    "circl": {
+      "status": "OK",
+      "ms": 276,
+      "count": 2
+    },
+    "osv": {
+      "status": "OK",
+      "ms": 1112,
+      "count": 1
+    },
+    "ghsa": {
+      "status": "OK",
+      "ms": 164,
+      "count": 2
+    },
+    "kev": {
+      "status": "OK",
+      "ms": 61,
+      "count": 2
+    },
+    "euvd": {
+      "status": "OK",
+      "ms": 631,
+      "count": 2
+    },
+    "epss": {
+      "status": "OK",
+      "ms": 17,
+      "count": 1
+    },
+    "nvd": {
+      "status": "OK",
+      "ms": 317,
+      "count": 2
+    },
+    "cwe": {
+      "status": "OK",
+      "ms": 40,
+      "count": 1
+    },
+    "attack": {
+      "status": "OK",
+      "ms": 645,
       "count": 2
     }
   }

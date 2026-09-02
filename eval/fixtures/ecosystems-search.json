@@ -1,0 +1,18 @@
+[
+  {
+    "name": "express",
+    "ecosystem": "bower",
+    "description": null,
+    "homepage": "",
+    "registry_url": null,
+    "latest_release_published_at": "2025-03-28T18:29:22.000Z"
+  },
+  {
+    "name": "express",
+    "ecosystem": "cargo",
+    "description": "Compatible node express API web Framework for Rust",
+    "homepage": null,
+    "registry_url": "https://crates.io/crates/express/",
+    "latest_release_published_at": "2016-09-08T08:36:49.049Z"
+  }
+]

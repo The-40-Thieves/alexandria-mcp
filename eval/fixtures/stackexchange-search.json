@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "question_id": 10175812,
+      "title": "How can I generate a self-signed SSL certificate using OpenSSL?",
+      "creation_date": 1334585682,
+      "link": "https://stackoverflow.com/questions/10175812/how-can-i-generate-a-self-signed-ssl-certificate-using-openssl",
+      "body": "<p>I'm adding HTTPS support to an embedded Linux device. I have tried to generate a self-signed certificate with these steps:</p>\n<pre class=\"lang-none prettyprint-override\"><code>openssl req -new &gt; cert.csr\nopenssl rsa -in privkey.pem -out key.pem\nopenssl x509 -in cert.csr -out cert.pem -req -signkey key.pem -days 1001\ncat key.pem &gt;&gt; cert.pem\n</code></pre>\n<p>This works, but I get some errors with, for example, Google Chrome:</p>\n<blockquote>\n<p>This is probably not the site you are looking for!<br>\nThe site's security certificate is not trusted!</p>\n</blockquote>\n<p>Am I missing something? Is this the correct way to build a self-signed certificate?</p>\n"
+    }
+  ]
+}

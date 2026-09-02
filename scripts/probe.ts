@@ -59,8 +59,34 @@ export const PROBE_QUERIES: Record<string, string> = {
   restofworld: '',
   scmp: '',
   'nist-csrc': '',
+  lobsters: '',
   nhk: '',
   googlenews: 'technology',
+  // osv.dev's package query needs an ecosystem:name pair and rejects a bare
+  // keyword; a direct advisory id exercises the GET lookup branch instead.
+  osv: 'CVE-2021-44228',
+  // kev filters its whole-catalog download client-side by exact token
+  // match; an empty query skips the filter and returns the first entries,
+  // a reliable live probe (like the RSS-kind sources above).
+  kev: '',
+  euvd: 'openssl',
+  // epss only accepts a single CVE id; the default query isn't one.
+  epss: 'CVE-2021-44228',
+  nvd: 'openssl',
+  // cwe is a single-id lookup with no keyword search; the default query
+  // isn't a CWE number.
+  cwe: 'CWE-79',
+  attack: 'injection',
+  depsdev: 'npm:lodash',
+  // devto's multi-token search feed returns [] for every query as of
+  // 2026-09-01 (see the task report); a single token exercises the
+  // working tag-filtered branch instead.
+  devto: 'rust',
+  peps: 'style guide',
+  tc39: '',
+  swiftevolution: '',
+  ietf: 'tls',
+  w3c: 'css',
 };
 const DEFAULT_QUERY = 'history of science';
 

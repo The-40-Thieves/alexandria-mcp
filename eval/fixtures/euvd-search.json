@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "EUVD-2026-46255",
+      "description": "A flaw was found in libssh. Incorrect AES-GCM finalization checks in builds using the OpenSSL backend can effectively remove integrity protection, allowing an in-path attacker to modify plaintext on the wire without detection.",
+      "datePublished": "Jul 21, 2026, 1:18:18 PM"
+    },
+    {
+      "id": "EUVD-2026-69428",
+      "description": "Konga before 2.1.0 contains a privilege escalation vulnerability that allows low-privileged local attackers to execute arbitrary code by planting attacker-controlled OpenSSL configuration or library files in a hardcoded filesystem path absent from default installations. On Windows, the missing directory resides in a location writable by any authenticated local user, enabling attackers to create the directory and place malicious files that execute at the privilege level of the user or service account that launches Konga, facilitating privilege escalation.",
+      "datePublished": "Sep 1, 2026, 7:39:46 PM"
+    }
+  ]
+}
