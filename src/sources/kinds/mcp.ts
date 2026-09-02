@@ -45,6 +45,29 @@ function isToolLevelError(err: unknown): boolean {
   return err instanceof Error && err.message.startsWith(TOOL_ERROR_PREFIX);
 }
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+// Runs the fallback adapter's call. If IT also throws, the original
+// failure (why the MCP call itself needed a fallback) would otherwise be
+// discarded in favor of whatever the fallback threw - wraps both
+// messages into one Error instead, so a caller/log sees both causes.
+async function callFallback<T>(
+  name: string,
+  fallbackName: string,
+  originalErr: unknown,
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (fallbackErr) {
+    throw new Error(
+      `${name}: MCP call failed (${errorMessage(originalErr)}); fallback ${fallbackName} also failed (${errorMessage(fallbackErr)})`,
+    );
+  }
+}
+
 // probe.ts's --mcp-snapshot flag and its live-drift warning both need
 // each registered mcp source's server config and expected tool names.
 // registry.ts's SourceAdapter has no room for either (it only knows
@@ -80,8 +103,14 @@ function buildSearch(
   return async (query, limit) => {
     const server = resolveServer(spec as McpSourceSpec);
     if (!server) {
-      if (spec.fallback) return getAdapter(spec.fallback).search(query, limit);
-      throw notConfiguredError(spec.name);
+      const notConfigured = notConfiguredError(spec.name);
+      if (spec.fallback) {
+        const fallback = spec.fallback;
+        return callFallback(spec.name, fallback, notConfigured, () =>
+          getAdapter(fallback).search(query, limit),
+        );
+      }
+      throw notConfigured;
     }
     try {
       const { text, structured } = await pool.call(
@@ -91,8 +120,12 @@ function buildSearch(
       );
       return spec.search.normalize(text, structured, query).slice(0, limit);
     } catch (err) {
-      if (spec.fallback && !isToolLevelError(err))
-        return getAdapter(spec.fallback).search(query, limit);
+      if (spec.fallback && !isToolLevelError(err)) {
+        const fallback = spec.fallback;
+        return callFallback(spec.name, fallback, err, () =>
+          getAdapter(fallback).search(query, limit),
+        );
+      }
       throw err;
     }
   };
@@ -106,8 +139,14 @@ export function defineMcpSource(spec: McpSourceSpec): void {
     if (!spec.read) throw new Error(`${spec.name} does not support read()`);
     const server = resolveServer(spec);
     if (!server) {
-      if (spec.fallback) return getAdapter(spec.fallback).read(id);
-      throw notConfiguredError(spec.name);
+      const notConfigured = notConfiguredError(spec.name);
+      if (spec.fallback) {
+        const fallback = spec.fallback;
+        return callFallback(spec.name, fallback, notConfigured, () =>
+          getAdapter(fallback).read(id),
+        );
+      }
+      throw notConfigured;
     }
     try {
       const { text, structured } = await pool.call(
@@ -117,7 +156,10 @@ export function defineMcpSource(spec: McpSourceSpec): void {
       );
       return spec.read.normalize(text, structured, id);
     } catch (err) {
-      if (spec.fallback && !isToolLevelError(err)) return getAdapter(spec.fallback).read(id);
+      if (spec.fallback && !isToolLevelError(err)) {
+        const fallback = spec.fallback;
+        return callFallback(spec.name, fallback, err, () => getAdapter(fallback).read(id));
+      }
       throw err;
     }
   }

@@ -295,4 +295,89 @@ test('defineMcpSource', async (t) => {
     );
     assert.equal(fallbackCalls, 0, 'a tool-level error must not trigger the fallback');
   });
+
+  await t.test(
+    'search(): when the fallback adapter itself throws, the combined error names both failures',
+    async () => {
+      register('mcp_test_fallback_search_throws', {
+        description: 'a fallback that is itself broken',
+        supportsIngest: false,
+        async search() {
+          throw new Error('fallback backend is down');
+        },
+        async read(id) {
+          return { title: id, authors: [] };
+        },
+      });
+
+      const handle = await startTestMcpServer({
+        search: () => ({ content: [{ type: 'text', text: 'ignored' }] }),
+      });
+      // Stopped before the source ever connects, so search()'s
+      // pool.call() fails with a real transport-class error.
+      await handle.close();
+
+      defineMcpSource({
+        ...baseSpec(handle, 'mcp_test_fallback_search_double_failure'),
+        search: { tool: 'search', args: (q) => ({ query: q }), normalize: () => [] },
+        fallback: 'mcp_test_fallback_search_throws',
+      });
+
+      await assert.rejects(
+        getAdapter('mcp_test_fallback_search_double_failure').search('x', 3),
+        (err: unknown) => {
+          assert.ok(err instanceof Error);
+          assert.match(err.message, /MCP call failed/);
+          assert.match(err.message, /ECONNREFUSED|fetch failed/);
+          assert.match(err.message, /fallback mcp_test_fallback_search_throws also failed/);
+          assert.match(err.message, /fallback backend is down/);
+          return true;
+        },
+      );
+    },
+  );
+
+  await t.test(
+    'read(): when the fallback adapter itself throws, the combined error names both failures',
+    async () => {
+      register('mcp_test_fallback_read_throws', {
+        description: 'a fallback that is itself broken',
+        supportsIngest: false,
+        async search() {
+          return [];
+        },
+        async read() {
+          throw new Error('fallback read backend is down');
+        },
+      });
+
+      const handle = await startTestMcpServer({
+        read: () => ({ content: [{ type: 'text', text: 'ignored' }] }),
+      });
+      await handle.close();
+
+      defineMcpSource({
+        ...baseSpec(handle, 'mcp_test_fallback_read_double_failure'),
+        search: { tool: 'search', args: (q) => ({ query: q }), normalize: () => [] },
+        read: {
+          tool: 'read',
+          args: (id) => ({ id }),
+          normalize: () => ({ title: '', authors: [] }),
+        },
+        fallback: 'mcp_test_fallback_read_throws',
+      });
+
+      await assert.rejects(
+        getAdapter('mcp_test_fallback_read_double_failure').read('doc-1'),
+        (err: unknown) => {
+          assert.ok(err instanceof Error);
+          assert.match(err.message, /MCP call failed/);
+          assert.match(err.message, /ECONNREFUSED|fetch failed/);
+          assert.match(err.message, /fallback mcp_test_fallback_read_throws also failed/);
+          assert.match(err.message, /fallback read backend is down/);
+          return true;
+        },
+      );
+    },
+  );
 });
