@@ -69,6 +69,8 @@ export const PROBE_QUERIES: Record<string, string> = {
   // a reliable live probe (like the RSS-kind sources above).
   kev: '',
   euvd: 'openssl',
+  // epss only accepts a single CVE id; the default query isn't one.
+  epss: 'CVE-2021-44228',
 };
 const DEFAULT_QUERY = 'history of science';
 

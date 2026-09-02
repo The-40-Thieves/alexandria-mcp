@@ -69,3 +69,4 @@ import './osv.js';
 import './ghsa.js';
 import './kev.js';
 import './euvd.js';
+import './epss.js';
