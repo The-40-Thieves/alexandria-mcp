@@ -1,0 +1,83 @@
+name: Weekly probe
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run probe
+        run: npm run probe
+      - name: Upload probe results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-latest
+          path: eval/probe-latest.json
+      - name: File or update a regression issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const baseline = JSON.parse(fs.readFileSync('eval/probe-baseline.json', 'utf8')).results;
+            const latest = JSON.parse(fs.readFileSync('eval/probe-latest.json', 'utf8')).results;
+            const regressed = Object.keys(baseline)
+              .filter((name) => baseline[name].status === 'OK')
+              .filter((name) => latest[name] && latest[name].status !== 'OK')
+              .sort();
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = regressed.length
+              ? [
+                  `${regressed.length} source(s) regressed from OK in the baseline probe:`,
+                  '',
+                  ...regressed.map((name) => {
+                    const now = latest[name];
+                    const suffix = now.message ? ` (${now.message})` : '';
+                    return `- \`${name}\`: OK -> ${now.status}${suffix}`;
+                  }),
+                  '',
+                  `Run: ${runUrl}`,
+                ].join('\n')
+              : [
+                  'The probe run exited non-zero, but no source dropped from OK against the',
+                  `baseline (see the run log for details). Run: ${runUrl}`,
+                ].join('\n');
+
+            const title = 'Weekly probe regressions';
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'probe-regression',
+            });
+            const existing = issues.find((issue) => issue.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['probe-regression'],
+              });
+            }
