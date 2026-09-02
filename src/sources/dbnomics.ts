@@ -61,7 +61,7 @@ defineRest<DbnomicsSearchResponse>({
     },
     normalize: (raw: DbnomicsSeriesResponse, id: string) => {
       const series = raw.series?.docs?.[0];
-      if (!series || !series.period?.length) {
+      if (!series?.period?.length) {
         return { title: id, authors: [], ...truncateText(`No series data found for ${id}.`) };
       }
       const rows = series.period.map((p, i) => `${p}: ${series.value?.[i]}`);

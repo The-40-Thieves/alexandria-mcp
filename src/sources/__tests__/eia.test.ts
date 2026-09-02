@@ -42,6 +42,9 @@ test('eia requires EIA_API_KEY', async (t) => {
 
   await t.test('throws "eia requires EIA_API_KEY" when the env is absent', async () => {
     delete process.env.EIA_API_KEY;
-    await assert.rejects(() => getAdapter('eia').search('coal', 5), /^Error: eia requires EIA_API_KEY$/);
+    await assert.rejects(
+      () => getAdapter('eia').search('coal', 5),
+      /^Error: eia requires EIA_API_KEY$/,
+    );
   });
 });

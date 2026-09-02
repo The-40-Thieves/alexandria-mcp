@@ -44,8 +44,7 @@ defineRest<UkBillListResponse>({
   homepage: 'https://bills.parliament.uk',
   supportsIngest: false,
   search: {
-    url: (q, limit) =>
-      `${BASE}/Bills?SearchTerm=${encodeURIComponent(q)}&Take=${limit}`,
+    url: (q, limit) => `${BASE}/Bills?SearchTerm=${encodeURIComponent(q)}&Take=${limit}`,
     pick: (raw) => raw.items ?? [],
     normalize: normalizeUkParliament,
   },

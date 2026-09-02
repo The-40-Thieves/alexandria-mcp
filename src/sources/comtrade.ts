@@ -70,7 +70,8 @@ export async function comtradeRead(id: string): Promise<ReadResult> {
     { headers },
   );
   const row = (data.data ?? []).find(
-    (r) => String(r.reporterCode ?? 0) === reporterCode && String(r.partnerCode ?? 0) === partnerCode,
+    (r) =>
+      String(r.reporterCode ?? 0) === reporterCode && String(r.partnerCode ?? 0) === partnerCode,
   );
   if (!row) {
     return { title: id, authors: [], ...truncateText(`No Comtrade row found for ${id}.`) };

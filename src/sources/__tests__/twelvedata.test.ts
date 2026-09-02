@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeTwelveData } from '../twelvedata.js';
 import { getAdapter } from '../registry.js';
+import { normalizeTwelveData } from '../twelvedata.js';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/twelvedata-search.json'), 'utf8'),
@@ -32,11 +32,14 @@ test('twelvedata requires TWELVEDATA_API_KEY', async (t) => {
     else process.env.TWELVEDATA_API_KEY = originalEnv;
   });
 
-  await t.test('throws "twelvedata requires TWELVEDATA_API_KEY" when the env is absent', async () => {
-    delete process.env.TWELVEDATA_API_KEY;
-    await assert.rejects(
-      () => getAdapter('twelvedata').search('AAPL', 5),
-      /^Error: twelvedata requires TWELVEDATA_API_KEY$/,
-    );
-  });
+  await t.test(
+    'throws "twelvedata requires TWELVEDATA_API_KEY" when the env is absent',
+    async () => {
+      delete process.env.TWELVEDATA_API_KEY;
+      await assert.rejects(
+        () => getAdapter('twelvedata').search('AAPL', 5),
+        /^Error: twelvedata requires TWELVEDATA_API_KEY$/,
+      );
+    },
+  );
 });

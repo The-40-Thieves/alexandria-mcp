@@ -48,9 +48,7 @@ function url(search: string, limit: number): string {
 }
 
 export async function openfdaSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const data = await fetchJSON<OpenFdaResponse>(
-    url(`product_description:"${query}"`, limit),
-  );
+  const data = await fetchJSON<OpenFdaResponse>(url(`product_description:"${query}"`, limit));
   const results: LibraryResult[] = [];
   for (const item of data.results ?? []) {
     const normalized = normalizeOpenFda(item);

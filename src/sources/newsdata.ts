@@ -72,8 +72,7 @@ export async function newsdataRead(id: string): Promise<ReadResult> {
 }
 
 register('newsdata', {
-  description:
-    'newsdata.io: real-time global news article search. Requires free NEWSDATA_API_KEY.',
+  description: 'newsdata.io: real-time global news article search. Requires free NEWSDATA_API_KEY.',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'news_global',

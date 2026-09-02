@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeReliefweb } from '../reliefweb.js';
 import { getAdapter } from '../registry.js';
+import { normalizeReliefweb } from '../reliefweb.js';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/reliefweb-reports.json'), 'utf8'),

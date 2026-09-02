@@ -98,11 +98,15 @@ export async function eiaRead(id: string): Promise<ReadResult> {
     const data = await fetchJSON<EiaRouteListResponse>(`${BASE}/${id}/?api_key=${apiKey}`);
     const routes = data.response?.routes ?? [];
     const text = routes.length
-      ? routes.map((r) => `${r.id}: ${r.name}${r.description ? ` - ${r.description}` : ''}`).join('\n')
+      ? routes
+          .map((r) => `${r.id}: ${r.name}${r.description ? ` - ${r.description}` : ''}`)
+          .join('\n')
       : `No sub-routes found under ${id}.`;
     return { title: id, authors: [], ...truncateText(text) };
   }
-  const data = await fetchJSON<EiaSeriesResponse>(`${BASE}/seriesid/${encodeURIComponent(id)}?api_key=${apiKey}`);
+  const data = await fetchJSON<EiaSeriesResponse>(
+    `${BASE}/seriesid/${encodeURIComponent(id)}?api_key=${apiKey}`,
+  );
   const points = (data.response?.data ?? []).slice(0, 30);
   if (points.length === 0) {
     return { title: id, authors: [], ...truncateText(`No data found for series ${id}.`) };

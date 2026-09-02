@@ -126,7 +126,7 @@ export async function congressRead(id: string): Promise<ReadResult> {
 
 register('congress', {
   description:
-    'congress.gov API v3: US federal bill search and full text. There is no /v3/search endpoint and /v3/bill\'s q= parameter is ignored, so search() filters the most recently updated bills by title token. Shares the api.data.gov key family: reads DATA_GOV_API_KEY first, GOVINFO_API_KEY second.',
+    "congress.gov API v3: US federal bill search and full text. There is no /v3/search endpoint and /v3/bill's q= parameter is ignored, so search() filters the most recently updated bills by title token. Shares the api.data.gov key family: reads DATA_GOV_API_KEY first, GOVINFO_API_KEY second.",
   supportsIngest: true,
   kind: 'rest',
   cluster: 'government',
