@@ -117,3 +117,4 @@ import './mcp/context7mcp.js';
 import './mcp/jina.js';
 import './mcp/mdnmcp.js';
 import './mcp/githubmcp.js';
+import './searxng.js';
