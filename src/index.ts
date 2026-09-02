@@ -6,7 +6,9 @@ import { z } from 'zod';
 import { indexText, ingestText } from './pipeline/index.js';
 import { getAdapter, listSources } from './sources/registry.js';
 import { s2Recommend } from './sources/semanticscholar.js';
+import { libraryAnswer } from './tools/libraryAnswer.js';
 import { libraryAsk } from './tools/libraryAsk.js';
+import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.js';
 import type { LibrarySource } from './types.js';
 
 import './sources/all.js';
@@ -312,6 +314,134 @@ server.registerTool(
           ? `No recommendations for paper ${id}.`
           : JSON.stringify(results, null, 2);
       return { content: [{ type: 'text', text }], structuredContent: { results } };
+    } catch (err) {
+      return {
+        content: [
+          { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ── library_answer ────────────────────────────────────────────────────────────
+server.registerTool(
+  'library_answer',
+  {
+    title: 'Answer With Cited Sources',
+    description: `Ask a question in plain English and get a synthesized answer with inline [n] citations. Routes and searches like library_ask, fuses the per-source results with reciprocal rank fusion, reads the top full-text results, and asks an LLM to answer using only those sources. Every factual sentence is cited or marked "not found in the sources"; sentences with a dangling citation are dropped. If the answer had no citation markers at all, or every sentence was dropped as uncited, a message is added to warnings[] (and, in the all-dropped case, answer falls back to a plain listing of the source titles).
+
+Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY).
+Returns: { answer, citations[], results[], routing[], warnings[] }`,
+    inputSchema: {
+      query: z.string().min(1).max(1000).describe('Natural language question'),
+      max_sources: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(6)
+        .describe('Max number of sources to search (default 6)'),
+      results_per_source: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(5)
+        .describe('Results to fetch per source (default 5)'),
+      read_top: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(4)
+        .describe('How many top full-text results to read and cite (default 4)'),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ query, max_sources, results_per_source, read_top }) => {
+    try {
+      const result = await libraryAnswer(query, {
+        maxSources: max_sources,
+        resultsPerSource: results_per_source,
+        readTop: read_top,
+      });
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        structuredContent: toStructured(result),
+      };
+    } catch (err) {
+      return {
+        content: [
+          { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ── library_research ──────────────────────────────────────────────────────────
+server.registerTool(
+  'library_research',
+  {
+    title: 'Recursive Cited Research',
+    description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Writes a final cited report over the union of every round's sources, then removes any unsupported claims.
+
+Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY).
+Returns: { report, citations[], rounds[], elapsedMs }`,
+    inputSchema: {
+      query: z.string().min(1).max(1000).describe('Research topic or question'),
+      depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),
+      breadth: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(4)
+        .describe('Queries generated in the first round; halves each round (default 4)'),
+      max_minutes: z
+        .number()
+        .positive()
+        .max(30)
+        .default(6)
+        .describe('Wall-clock time budget in minutes (default 6)'),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ query, depth, breadth, max_minutes }, extra) => {
+    try {
+      const progressToken = extra._meta?.progressToken;
+      const onProgress: ProgressCallback = async (info) => {
+        if (progressToken !== undefined) {
+          await extra.sendNotification({
+            method: 'notifications/progress',
+            params: { progressToken, progress: info.round, message: info.message },
+          });
+        } else {
+          await server.sendLoggingMessage({ level: 'info', data: info.message });
+        }
+      };
+      const result = await libraryResearch(
+        query,
+        { depth, breadth, maxMinutes: max_minutes },
+        onProgress,
+      );
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        structuredContent: toStructured(result),
+      };
     } catch (err) {
       return {
         content: [

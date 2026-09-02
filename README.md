@@ -13,8 +13,10 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 | `library_index(id, source)` | Dry run: chunk and score text quality without writing anything |
 | `library_ingest(id, source)` | Chunk → embed → store in your vector database. Idempotent. |
 | `library_recommend(id, limit?)` | Get similar papers via Semantic Scholar's recommendation engine (up to 500) |
+| `library_answer(query, max_sources?, results_per_source?, read_top?)` | Ask a question and get a synthesized answer with inline `[n]` citations, fused across sources with reciprocal rank fusion; `warnings[]` flags an uncited or all-dropped answer |
+| `library_research(query, depth?, breadth?, max_minutes?)` | Recursive multi-round research: generates queries, answers each, extracts learnings, and writes a final cited report over every source found |
 
-`library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts.
+`library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results.
 
 ## Sources (60)
 

@@ -88,6 +88,19 @@ function requireApiKey(role: Role, config: RoleConfig): void {
   }
 }
 
+// A tool-level "no key configured" check, distinct from requireApiKey()
+// above (which names the plain role and backs chatJSON/chatText/getClient).
+// library_answer and library_research call this before doing any other
+// work, so a missing key surfaces as a clean, tool-named error instead of
+// failing partway through a routing/search/read pipeline.
+export function requireRoleForTool(tool: string, role: Role): void {
+  if (!roleConfig(role).apiKey) {
+    throw new Error(
+      `${tool} requires a ${role} model: set OPENAI_API_KEY or ${envKey(role, 'API_KEY')}`,
+    );
+  }
+}
+
 const clientCache = new Map<string, OpenAI>();
 
 function clientFor(config: RoleConfig): OpenAI {
