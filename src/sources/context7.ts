@@ -65,6 +65,11 @@ register('context7', {
   cluster: 'developer',
   freshness: 'daily',
   homepage: 'https://context7.com',
+  // Superseded for routing by the context7mcp source, which talks to the
+  // upstream MCP server directly. Hidden rather than removed: it stays
+  // registered and callable by name. Unlike mdnmcp, context7mcp declares no
+  // fallback to this source, so it is reachable only by explicit name.
+  hidden: true,
   verifiedAt: '2026-09-01',
   // Raises the anonymous rate limit; the source works without one.
   optionalEnv: ['CONTEXT7_API_KEY'],

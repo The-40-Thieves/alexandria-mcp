@@ -71,6 +71,10 @@ register('mdn', {
   cluster: 'developer',
   freshness: 'daily',
   homepage: 'https://developer.mozilla.org',
+  // Superseded for routing by the mdnmcp source, which talks to the
+  // upstream MCP server directly. Hidden rather than removed: it stays
+  // registered and callable by name, and mdnmcp falls back to it.
+  hidden: true,
   verifiedAt: '2026-09-01',
   search: mdnSearch,
   read: mdnRead,
