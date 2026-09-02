@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "symbol": "AAPL",
+      "instrument_name": "Apple Inc.",
+      "exchange": "NASDAQ",
+      "mic_code": "XNGS",
+      "exchange_timezone": "America/New_York",
+      "instrument_type": "Common Stock",
+      "country": "United States",
+      "currency": "USD"
+    },
+    {
+      "symbol": "AAPL",
+      "instrument_name": "Apple Inc. CEDEAR",
+      "exchange": "BCBA",
+      "mic_code": "XBUE",
+      "exchange_timezone": "America/Argentina/Buenos_Aires",
+      "instrument_type": "Depositary Receipt",
+      "country": "Argentina",
+      "currency": "ARS"
+    }
+  ],
+  "status": "ok"
+}
