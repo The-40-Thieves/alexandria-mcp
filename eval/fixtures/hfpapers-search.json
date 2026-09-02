@@ -1,0 +1,17 @@
+[
+  {
+    "paper": {
+      "id": "2408.04619",
+      "title": "Transformer Explainer: Interactive Learning of Text-Generative Models",
+      "authors": [
+        { "name": "Aeree Cho" },
+        { "name": "Grace C. Kim" },
+        { "name": "Alexander Karpekov" }
+      ],
+      "publishedAt": "2024-08-08T17:49:07.000Z"
+    },
+    "title": "Transformer Explainer: Interactive Learning of Text-Generative Models",
+    "publishedAt": "2024-08-08T17:49:07.000Z",
+    "summary": "Interactive visualization tool for understanding transformer models."
+  }
+]

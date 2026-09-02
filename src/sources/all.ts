@@ -110,3 +110,4 @@ import './federalregister.js';
 import './congress.js';
 import './regulations.js';
 import './ukparliament.js';
+import './hfpapers.js';
