@@ -58,11 +58,15 @@ function notConfiguredError(name: string): Error {
   return new Error(`${name} requires an API token or credential that is not configured`);
 }
 
-export function defineMcpSource(spec: McpSourceSpec): void {
-  const timeoutMs = spec.timeoutMs ?? 25000;
-
-  async function search(query: string, limit: number): Promise<LibraryResult[]> {
-    const server = resolveServer(spec);
+// Shared by defineMcpSource() and defineMcpSourceWithDelegatedRead():
+// builds the search() closure that resolves the server, calls the
+// configured tool through the pool, and normalizes the result.
+function buildSearch(
+  spec: Pick<McpSourceSpec, 'name' | 'server' | 'search'>,
+  timeoutMs: number,
+): (query: string, limit: number) => Promise<LibraryResult[]> {
+  return async (query, limit) => {
+    const server = resolveServer(spec as McpSourceSpec);
     if (!server) throw notConfiguredError(spec.name);
     const { text, structured } = await pool.call(
       { ...server, timeoutMs: server.timeoutMs ?? timeoutMs },
@@ -70,7 +74,12 @@ export function defineMcpSource(spec: McpSourceSpec): void {
       spec.search.args(query, limit),
     );
     return spec.search.normalize(text, structured, query).slice(0, limit);
-  }
+  };
+}
+
+export function defineMcpSource(spec: McpSourceSpec): void {
+  const timeoutMs = spec.timeoutMs ?? 25000;
+  const search = buildSearch(spec, timeoutMs);
 
   async function read(id: string): Promise<ReadResult> {
     if (!spec.read) throw new Error(`${spec.name} does not support read()`);
@@ -101,6 +110,42 @@ export function defineMcpSource(spec: McpSourceSpec): void {
   mcpProbeEntries.push({
     name: spec.name,
     resolveServer: () => resolveServer(spec),
+    expectTools: spec.expectTools,
+  });
+}
+
+// For a source whose read() should bypass the MCP server entirely and
+// delegate straight to a different, already-registered adapter (e.g.
+// huggingface and jinaarxiv delegate to the arxiv source, since every
+// result id from either is a bare arXiv id) rather than issue a
+// tools/call of its own. defineMcpSource()'s own `read` spec always
+// calls the pool, which doesn't fit a pure delegation, so this builds
+// the same pooled, mcp-kind search() defineMcpSource() would (from a
+// spec with no `read`) and registers it with the given `read` in place
+// of one built from a tool spec.
+export function defineMcpSourceWithDelegatedRead(
+  spec: Omit<McpSourceSpec, 'read'>,
+  read: (id: string) => Promise<ReadResult>,
+): void {
+  const timeoutMs = spec.timeoutMs ?? 25000;
+
+  register(spec.name, {
+    description: spec.description,
+    supportsIngest: spec.supportsIngest,
+    kind: 'mcp',
+    cluster: spec.cluster,
+    freshness: spec.freshness,
+    homepage: spec.homepage,
+    timeoutMs,
+    verifiedAt: spec.verifiedAt,
+    hidden: resolveServer(spec as McpSourceSpec) === null,
+    search: buildSearch(spec, timeoutMs),
+    read,
+  });
+
+  mcpProbeEntries.push({
+    name: spec.name,
+    resolveServer: () => resolveServer(spec as McpSourceSpec),
     expectTools: spec.expectTools,
   });
 }

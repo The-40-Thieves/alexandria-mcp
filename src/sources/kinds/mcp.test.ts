@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { startTestMcpServer, type TestMcpServerHandle } from '../../utils/mcpTestServer.js';
-import { catalog, getAdapter } from '../registry.js';
-import { defineMcpSource, mcpProbeEntries } from './mcp.js';
+import { catalog, getAdapter, register } from '../registry.js';
+import { defineMcpSource, defineMcpSourceWithDelegatedRead, mcpProbeEntries } from './mcp.js';
 
 function baseSpec(handle: TestMcpServerHandle, name: string) {
   return {
@@ -129,4 +129,49 @@ test('defineMcpSource', async (t) => {
       timeoutMs: 5000,
     });
   });
+
+  await t.test(
+    'defineMcpSourceWithDelegatedRead: search() still calls the tool, read() bypasses the server entirely',
+    async () => {
+      let delegateReadCalls = 0;
+      register('mcp_test_delegate_target', {
+        description: 'stand-in for e.g. arxiv',
+        supportsIngest: true,
+        async search() {
+          return [];
+        },
+        async read(id) {
+          delegateReadCalls++;
+          return { title: `delegated ${id}`, authors: [] };
+        },
+      });
+
+      const handle = await startTestMcpServer({
+        search: () => ({
+          content: [{ type: 'text', text: 'ignored' }],
+          structuredContent: { ok: true },
+        }),
+      });
+      t.after(() => handle.close());
+
+      defineMcpSourceWithDelegatedRead(
+        {
+          ...baseSpec(handle, 'mcp_test_delegating_source'),
+          search: {
+            tool: 'search',
+            args: (q) => ({ query: q }),
+            normalize: () => [{ id: '1', source: 'x', title: 't', authors: [], hasFullText: true }],
+          },
+        },
+        (id) => getAdapter('mcp_test_delegate_target').read(id),
+      );
+
+      const results = await getAdapter('mcp_test_delegating_source').search('x', 5);
+      assert.equal(results.length, 1);
+
+      const read = await getAdapter('mcp_test_delegating_source').read('2407.06581');
+      assert.equal(read.title, 'delegated 2407.06581');
+      assert.equal(delegateReadCalls, 1);
+    },
+  );
 });
