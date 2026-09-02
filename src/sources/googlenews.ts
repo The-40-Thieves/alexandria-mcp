@@ -52,7 +52,7 @@ export async function googlenewsRead(id: string): Promise<ReadResult> {
 }
 
 register('googlenews', {
-  description: 'Google News — search-by-query RSS aggregator across global news sources.',
+  description: 'Google News: search-by-query RSS aggregator across global news sources.',
   supportsIngest: false,
   kind: 'rss',
   cluster: 'news_global',

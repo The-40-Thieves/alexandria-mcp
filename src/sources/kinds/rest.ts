@@ -19,6 +19,7 @@ export interface RestSpec<TRaw> {
   pacing?: SourceMeta['pacing'];
   timeoutMs?: number;
   headers?: Record<string, string>;
+  verifiedAt?: string;
   search: {
     url: (q: string, limit: number) => string;
     method?: 'GET' | 'POST';
@@ -114,7 +115,7 @@ export function defineRest<TRaw>(spec: RestSpec<TRaw>): void {
     headers: spec.headers,
     auth: spec.auth,
     pacing: spec.pacing,
-    verifiedAt: '2026-09-01',
+    verifiedAt: spec.verifiedAt,
     search,
     read,
   });

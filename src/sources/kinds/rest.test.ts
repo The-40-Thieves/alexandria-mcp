@@ -177,6 +177,33 @@ test('defineRest', async (t) => {
     assert.equal(results[0].id, '1');
   });
 
+  await t.test('registers with verifiedAt undefined when the spec omits it', async () => {
+    stubFetch();
+    defineRest<FakeRaw>({
+      name: 'test-rest-no-verified-at',
+      description: 'Test',
+      cluster: 'developer',
+      freshness: 'static',
+      homepage: 'https://example.org',
+      supportsIngest: false,
+      search: {
+        url: () => 'https://example.org/search',
+        pick: (raw) => raw.items,
+        normalize: (item) => ({
+          id: item.id,
+          source: 'test-rest-no-verified-at',
+          title: item.name,
+          authors: [],
+          hasFullText: false,
+        }),
+      },
+    });
+    const { listSources } = await import('../registry.js');
+    const meta = listSources().find((s) => s.name === 'test-rest-no-verified-at');
+    assert.ok(meta);
+    assert.equal(meta?.verifiedAt, undefined);
+  });
+
   await t.test('read() builds its own request and normalizes the raw response', async () => {
     globalThis.fetch = (async (url: string | URL) => {
       assert.equal(String(url), 'https://example.org/item/42');

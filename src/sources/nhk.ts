@@ -70,7 +70,7 @@ export async function nhkRead(id: string): Promise<ReadResult> {
 
 register('nhk', {
   description:
-    'NHK World News — Japanese public broadcaster, English-language world news headlines.',
+    'NHK World News: Japanese public broadcaster, English-language world news headlines.',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'news_regional',

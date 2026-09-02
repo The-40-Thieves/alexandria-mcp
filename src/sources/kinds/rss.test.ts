@@ -42,6 +42,13 @@ test('parseFeedItems', async (t) => {
     assert.deepEqual(items[1].authors, ['New Editor']);
     assert.equal(items[1].published, '2026-09-01T09:00:00Z');
   });
+
+  await t.test('strips HTML tags and decodes entities out of the summary', () => {
+    const items = parseFeedItems(fixture('html-description.xml'));
+    assert.equal(items.length, 1);
+    assert.doesNotMatch(items[0].summary ?? '', /[<>]/);
+    assert.match(items[0].summary ?? '', /quantum computing/);
+  });
 });
 
 test('defineRssSource', async (t) => {
@@ -115,6 +122,24 @@ test('defineRssSource', async (t) => {
     assert.equal(result.metadataOnly, true);
     assert.equal(result.externalUrl, 'https://example.org/advisory/2');
   });
+
+  await t.test(
+    'search matches a token inside HTML markup and returns a tag-free description',
+    async () => {
+      stubFetch(fixture('html-description.xml'));
+      defineRssSource({
+        name: 'test-rss-html-description',
+        url: 'https://example.org/feed.xml',
+        description: 'Test feed',
+        cluster: 'news_global',
+        homepage: 'https://example.org',
+      });
+      const results = await getAdapter('test-rss-html-description').search('quantum', 10);
+      assert.equal(results.length, 1);
+      assert.doesNotMatch(results[0].description ?? '', /[<>]/);
+      assert.match(results[0].description ?? '', /quantum computing/);
+    },
+  );
 
   await t.test('registers with the RSS kind defaults', async () => {
     defineRssSource({

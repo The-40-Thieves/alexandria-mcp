@@ -5,6 +5,7 @@
 import { parseFeed } from 'feedsmith';
 import type { LibraryResult, ReadResult } from '../../types.js';
 import { fetchText } from '../../utils/http.js';
+import { stripHtml } from '../../utils/text-clean.js';
 import type { Cluster, Freshness } from '../registry.js';
 import { register } from '../registry.js';
 
@@ -18,6 +19,7 @@ export interface FeedConfig {
   freshness?: Freshness;
   timeoutMs?: number;
   headers?: Record<string, string>;
+  verifiedAt?: string;
 }
 
 export interface FeedItem {
@@ -31,6 +33,16 @@ export interface FeedItem {
 
 function first(...values: Array<string | undefined>): string | undefined {
   return values.find((v) => Boolean(v));
+}
+
+// Feed summaries routinely arrive as HTML fragments (Google News wraps its
+// title in an <a>, some publishers ship full <content:encoded> markup).
+// Strip tags/decode entities once, here, so both the token-match filter and
+// LibraryResult.description see plain text.
+function cleanSummary(summary?: string): string | undefined {
+  if (!summary) return undefined;
+  const cleaned = stripHtml(summary);
+  return cleaned || undefined;
 }
 
 // Normalizes feedsmith's parseFeed() output (RSS 2.0, Atom, RDF, JSON Feed)
@@ -47,8 +59,8 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
         id: link || (item.guid?.value ?? item.title ?? ''),
         title: item.title ?? '',
         link,
-        published: first(item.pubDate, item.dc?.date, item.dc?.dates?.[0]),
-        summary: first(item.description, item.content?.encoded),
+        published: first(item.pubDate, item.dc?.dates?.[0], item.dc?.date),
+        summary: cleanSummary(first(item.description, item.content?.encoded)),
         authors,
       };
     });
@@ -65,7 +77,7 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
         title: entry.title ?? '',
         link,
         published: first(entry.published, entry.updated),
-        summary: first(entry.summary, entry.content),
+        summary: cleanSummary(first(entry.summary, entry.content)),
         authors: (entry.authors ?? []).map((a) => a.name).filter((n): n is string => Boolean(n)),
       };
     });
@@ -78,8 +90,8 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
         id: item.link ?? item.rdf?.about ?? '',
         title: item.title ?? '',
         link: item.link ?? '',
-        published: first(item.dc?.date, item.dc?.dates?.[0]),
-        summary: item.description,
+        published: first(item.dc?.dates?.[0], item.dc?.date),
+        summary: cleanSummary(item.description),
         authors,
       };
     });
@@ -91,7 +103,7 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
     title: item.title ?? '',
     link: item.url ?? item.external_url ?? '',
     published: item.date_published,
-    summary: first(item.summary, item.content_text),
+    summary: cleanSummary(first(item.summary, item.content_text)),
     authors: (item.authors ?? []).map((a) => a.name).filter((n): n is string => Boolean(n)),
   }));
 }
@@ -140,7 +152,7 @@ export function defineRssSource(cfg: FeedConfig): void {
     return matched.slice(0, limit).map((item) => toResult(cfg.name, item));
   }
 
-  // TODO(stage-6): fetchTier — once the web fetch tier lands, read(id) should
+  // TODO(stage-6): fetchTier. Once the web fetch tier lands, read(id) should
   // retrieve and extract the article body at the item's link instead of
   // returning metadata only.
   async function read(id: string): Promise<ReadResult> {
@@ -162,7 +174,7 @@ export function defineRssSource(cfg: FeedConfig): void {
     homepage: cfg.homepage,
     timeoutMs,
     headers: cfg.headers,
-    verifiedAt: '2026-09-01',
+    verifiedAt: cfg.verifiedAt,
     search,
     read,
   });
