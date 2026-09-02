@@ -132,11 +132,13 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
 // <source ...> or </source> sequence so a page cannot close its own block
 // early and have the rest of its bytes read as prompt instructions, or
 // forge an extra numbered source. Entity-escaping the angle bracket keeps
-// the text readable while making the tag inert.
+// the text readable while making the tag inert. Whitespace between the
+// bracket, the slash, and the tag name is tolerated by lenient readers, so
+// the match tolerates it too; otherwise "< source" would slip through.
 export function escapeSourceText(text: string): string {
   // Escapes only the angle bracket, so the rest of the sequence (including
-  // its original casing) is preserved as readable text.
-  return text.replace(/<(?=\/?source)/gi, '&lt;');
+  // its original casing and spacing) is preserved as readable text.
+  return text.replace(/<(?=\s*\/?\s*source)/gi, '&lt;');
 }
 
 // Same reasoning for the title, which lands inside a quoted attribute:
