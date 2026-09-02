@@ -72,6 +72,9 @@ export const PROBE_QUERIES: Record<string, string> = {
   // epss only accepts a single CVE id; the default query isn't one.
   epss: 'CVE-2021-44228',
   nvd: 'openssl',
+  // cwe is a single-id lookup with no keyword search; the default query
+  // isn't a CWE number.
+  cwe: 'CWE-79',
 };
 const DEFAULT_QUERY = 'history of science';
 

@@ -71,3 +71,4 @@ import './kev.js';
 import './euvd.js';
 import './epss.js';
 import './nvd.js';
+import './cwe.js';
