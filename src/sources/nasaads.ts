@@ -79,6 +79,11 @@ register('nasaads', {
   description:
     'NASA ADS — Astrophysics Data System. Premier portal for astronomy, astrophysics, and physics research. Requires NASA_ADS_API_KEY (free at ui.adsabs.harvard.edu).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'science',
+  freshness: 'daily',
+  homepage: 'https://ui.adsabs.harvard.edu',
+  verifiedAt: '2026-09-01',
   search: nasaadsSearch,
   async read(id) {
     const raw = await nasaadsRead(id);

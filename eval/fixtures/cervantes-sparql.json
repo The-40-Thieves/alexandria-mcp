@@ -1,0 +1,33 @@
+{
+  "head": { "link": [], "vars": ["work", "title", "authorLabel"] },
+  "results": {
+    "distinct": false,
+    "ordered": true,
+    "bindings": [
+      {
+        "work": { "type": "uri", "value": "https://data.cervantesvirtual.com/work/698268" },
+        "title": {
+          "type": "literal",
+          "value": "El amor hace milagros : Comedia nueva tomada del cap\u00EDtulo veinte del Libro II de la Historia de Don Quijote de la Mancha"
+        },
+        "authorLabel": { "type": "literal", "value": "G\u00F3mez Labrador, Pedro Benito" }
+      },
+      {
+        "work": { "type": "uri", "value": "https://data.cervantesvirtual.com/work/724610" },
+        "title": {
+          "type": "literal",
+          "value": "Mar\u00EDa Zambrano y la hermen\u00E9utica del Quijote"
+        },
+        "authorLabel": { "type": "literal", "value": "Guti\u00E9rrez Carbajo, Francisco" }
+      },
+      {
+        "work": { "type": "uri", "value": "https://data.cervantesvirtual.com/work/15343" },
+        "title": {
+          "type": "literal",
+          "value": "Semi\u00F3tica del Quijote : teor\u00EDa y pr\u00E1ctica de la ficci\u00F3n narrativa"
+        },
+        "authorLabel": { "type": "literal", "value": "Paz Gago, Jos\u00E9 Mar\u00EDa, 1966-" }
+      }
+    ]
+  }
+}

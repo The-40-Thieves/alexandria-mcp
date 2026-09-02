@@ -1,0 +1,50 @@
+{
+  "count": 42115,
+  "offsetMark": "AoE/BVdDUEQtMjAwOS0wMS0xMi9XQ1BELTIwMDktMDEtMTItUGcxNA==",
+  "results": [
+    {
+      "title": "Directive on Arctic Region Policy",
+      "packageId": "WCPD-2009-01-19",
+      "granuleId": "WCPD-2009-01-19-Pg47-2",
+      "lastModified": "2025-10-27T14:46:35Z",
+      "governmentAuthor": [
+        "National Archives and Records Administration",
+        "Office of the Federal Register"
+      ],
+      "dateIssued": "2009-01-09",
+      "collectionCode": "CPD",
+      "dateIngested": "2010-08-03",
+      "download": {
+        "premisLink": "https://api.govinfo.gov/packages/WCPD-2009-01-19/premis",
+        "txtLink": "https://api.govinfo.gov/packages/WCPD-2009-01-19/granules/WCPD-2009-01-19-Pg47-2/htm",
+        "zipLink": "https://api.govinfo.gov/packages/WCPD-2009-01-19/zip",
+        "modsLink": "https://api.govinfo.gov/packages/WCPD-2009-01-19/granules/WCPD-2009-01-19-Pg47-2/mods",
+        "pdfLink": "https://api.govinfo.gov/packages/WCPD-2009-01-19/granules/WCPD-2009-01-19-Pg47-2/pdf"
+      },
+      "relatedLink": null,
+      "resultLink": "https://api.govinfo.gov/packages/WCPD-2009-01-19/granules/WCPD-2009-01-19-Pg47-2/summary"
+    },
+    {
+      "title": "Remarks on Signing Proclamations To Establish the Marianas Trench Marine National Monument, Pacific Remote Islands Marine National Monument, and the Rose Atoll Marine National Monument",
+      "packageId": "WCPD-2009-01-12",
+      "granuleId": "WCPD-2009-01-12-Pg5",
+      "lastModified": "2025-10-27T14:48:01Z",
+      "governmentAuthor": [
+        "National Archives and Records Administration",
+        "Office of the Federal Register"
+      ],
+      "dateIssued": "2009-01-06",
+      "collectionCode": "CPD",
+      "dateIngested": "2010-08-03",
+      "download": {
+        "premisLink": "https://api.govinfo.gov/packages/WCPD-2009-01-12/premis",
+        "txtLink": "https://api.govinfo.gov/packages/WCPD-2009-01-12/granules/WCPD-2009-01-12-Pg5/htm",
+        "zipLink": "https://api.govinfo.gov/packages/WCPD-2009-01-12/zip",
+        "modsLink": "https://api.govinfo.gov/packages/WCPD-2009-01-12/granules/WCPD-2009-01-12-Pg5/mods",
+        "pdfLink": "https://api.govinfo.gov/packages/WCPD-2009-01-12/granules/WCPD-2009-01-12-Pg5/pdf"
+      },
+      "relatedLink": null,
+      "resultLink": "https://api.govinfo.gov/packages/WCPD-2009-01-12/granules/WCPD-2009-01-12-Pg5/summary"
+    }
+  ]
+}

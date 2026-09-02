@@ -65,6 +65,11 @@ register('osti', {
   description:
     'DOE OSTI — Department of Energy research: nuclear, energy, physics, materials science. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'science',
+  freshness: 'daily',
+  homepage: 'https://www.osti.gov',
+  verifiedAt: '2026-09-01',
   search: ostiSearch,
   async read(id) {
     const raw = await ostiRead(id);

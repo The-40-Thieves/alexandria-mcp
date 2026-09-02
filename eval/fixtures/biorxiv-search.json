@@ -1,0 +1,56 @@
+{
+  "messages": [
+    {
+      "status": "ok",
+      "category": "all",
+      "interval": "2026-08-25:2026-09-01",
+      "funder": "all",
+      "cursor": 0,
+      "count": 30,
+      "count_new_papers": "1160",
+      "total": "1628"
+    }
+  ],
+  "collection": [
+    {
+      "doi": "10.64898/2026.08.20.745969",
+      "title": "Model-based assessment of race, sex, and electrode montage in ECT",
+      "authors": "Khadka, N.; Huang, Y.; Deng, Z.-D.; Truong, D. Q.; Venkatasubramanian, G.; Tu, Y.; Ma, W.; Abbott, C. C.; Datta, A.",
+      "date": "2026-08-25",
+      "category": "neuroscience",
+      "abstract": "Objective: This computational modeling study quantified the influence of sex and race-related cranial anatomy on predicted brain-wide current flow during electroconvulsive therapy (ECT) across convent"
+    },
+    {
+      "doi": "10.64898/2026.06.23.734064",
+      "title": "Stability-driven multi-omics integration for reproducible latent structure",
+      "authors": "Guan, H.; Gerwen, M. v.; Kim-Schulze, S.; Colicino, E.; Dolios, G.; Petrick, L.",
+      "date": "2026-08-25",
+      "category": "bioinformatics",
+      "abstract": "High-dimensional multi-omics data integration offers novel opportunities to characterize complex biological systems. Even though sampling variability frequently compromises findings, particularly in s"
+    },
+    {
+      "doi": "10.1101/2025.07.04.663162",
+      "title": "p53 is a selective barrier to chromosome loss in cancer",
+      "authors": "F. Marques, J.; Dias Louro, M. A.; Schubert, M.; Winkler, T.; Wolf-Dankovich, G.; Davoli, T.; Ben-David, U.; Kops, G. J.",
+      "date": "2026-08-25",
+      "category": "cancer biology",
+      "abstract": "Aneuploidy and TP53 mutations are among the most frequent genetic alterations in cancer. p53 inactivation is widely considered a key enabling event for aneuploidy emergence. However, whether p53 prote"
+    },
+    {
+      "doi": "10.64898/2026.08.21.746177",
+      "title": "An exact version of Hunt's ancestor-descendant directional random walk parameterization",
+      "authors": "Ergon, R.",
+      "date": "2026-08-25",
+      "category": "paleontology",
+      "abstract": "Hunt's ancestor-descendant parameterization for fitting of evolutionary models to empirical paleontological sequences assumes independent log-likelihoods for the transitions between populations (Hunt,"
+    },
+    {
+      "doi": "10.1101/2025.02.22.639627",
+      "title": "Perinatal environmental enrichment affects murine neonates' brain structure before their active engagement with environment",
+      "authors": "Kaller, M. S.; Ligneul, C.; Allemang-Grand, R.; Zhang, T. Y.; Ellegood, J.; Meaney, M.; Lerch, J. P.",
+      "date": "2026-08-25",
+      "category": "neuroscience",
+      "abstract": "Early life experiences shape individuals. Environmental enrichment, an experimental paradigm used to study the effect of increased environmental complexity and novelty in animal models, has long been "
+    }
+  ]
+}

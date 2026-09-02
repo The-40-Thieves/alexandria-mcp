@@ -34,10 +34,7 @@ function parseYear(dateStr?: string): number | undefined {
   return m ? parseInt(m[1], 10) : undefined;
 }
 
-export async function nasaSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<NTRSResponse>(
-    `${BASE}/citations/search?keyword=${encodeURIComponent(query)}&rows=${limit}`,
-  );
+export function normalizeNasa(data: NTRSResponse): LibraryResult[] {
   return (data.results || []).map((d) => ({
     id: String(d.id),
     source: 'nasa' as const,
@@ -49,6 +46,12 @@ export async function nasaSearch(query: string, limit = 10): Promise<LibraryResu
     previewUrl: `https://ntrs.nasa.gov/citations/${d.id}`,
     description: d.abstract?.substring(0, 300),
   }));
+}
+
+export async function nasaSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const params = new URLSearchParams({ q: query, 'page[size]': String(limit) });
+  const data = await fetchJSON<NTRSResponse>(`${BASE}/citations/search?${params}`);
+  return normalizeNasa(data);
 }
 
 export async function nasaRead(id: string): Promise<{
@@ -72,6 +75,11 @@ register('nasa', {
   description:
     'NASA NTRS — space science, aeronautics, and engineering technical reports. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'science',
+  freshness: 'daily',
+  homepage: 'https://ntrs.nasa.gov',
+  verifiedAt: '2026-09-01',
   search: nasaSearch,
   async read(id) {
     const raw = await nasaRead(id);

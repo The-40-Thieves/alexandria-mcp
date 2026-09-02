@@ -44,10 +44,7 @@ function parseId(raw: string): string {
   return raw.replace(/^https?:\/\/arxiv\.org\/abs\//, '').replace(/v\d+$/, '');
 }
 
-export async function arxivSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const xml = await fetchText(
-    `${API}?search_query=all:${encodeURIComponent(query)}&max_results=${limit}&sortBy=relevance`,
-  );
+export function normalizeArxiv(xml: string): LibraryResult[] {
   return xml
     .split('<entry>')
     .slice(1)
@@ -70,6 +67,13 @@ export async function arxivSearch(query: string, limit = 10): Promise<LibraryRes
         description: summary.substring(0, 300),
       };
     });
+}
+
+export async function arxivSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const xml = await fetchText(
+    `${API}?search_query=all:${encodeURIComponent(query)}&max_results=${limit}&sortBy=relevance`,
+  );
+  return normalizeArxiv(xml);
 }
 
 export async function arxivRead(id: string): Promise<{
@@ -116,6 +120,16 @@ register('arxiv', {
   description:
     'arXiv — 2M+ open access preprints: physics, math, CS, biology, economics, statistics. Full HTML text for most papers (2018+).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://arxiv.org',
+  verifiedAt: '2026-09-01',
+  // arXiv's API terms of use ask for a single connection at a time with at
+  // least a 3s gap between requests; the registry's rateLimited() wrapper
+  // already serializes calls per source, so this interval both spaces
+  // requests out and keeps them to one in flight.
+  pacing: { minIntervalMs: 3100 },
   search: arxivSearch,
   async read(id) {
     const raw = await arxivRead(id);

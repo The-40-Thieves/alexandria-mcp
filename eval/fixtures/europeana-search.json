@@ -1,0 +1,37 @@
+{
+  "items": [
+    {
+      "id": "/2048441/item_ZWLIOSHYKPBTPNMN46QRDD5GJKJ4EU2L",
+      "title": ["Science", "Science", "Science"],
+      "dcCreator": ["Ziche, Paul", "Ziche, Paul", "Ziche, Paul"],
+      "year": null,
+      "dcLanguage": ["eng"],
+      "guid": "https://www.europeana.eu/item/2048441/item_ZWLIOSHYKPBTPNMN46QRDD5GJKJ4EU2L?utm_source=api&utm_medium=api&utm_campaign=api2demo",
+      "edmIsShownBy": null
+    },
+    {
+      "id": "/2048441/item_5CVZY2IT6PIAP4CK4RGUQSRWBALNMGFP",
+      "title": [
+        "Einheitswissenschaft :Schriften = Unified science = Science unitaire",
+        "Unified Science: Writings = Unified Science = Science Unitaire",
+        "Einheitswissenschaft :Schriften = Unified science = Science unitaire"
+      ],
+      "dcCreator": null,
+      "year": null,
+      "dcLanguage": ["ger"],
+      "guid": "https://www.europeana.eu/item/2048441/item_5CVZY2IT6PIAP4CK4RGUQSRWBALNMGFP?utm_source=api&utm_medium=api&utm_campaign=api2demo",
+      "edmIsShownBy": null
+    },
+    {
+      "id": "/90901/nd_ark__59851_bmcx92n1",
+      "title": ["Science Fiction", "Science Fiction", "Science Fiction"],
+      "dcCreator": ["Gullón, Ricardo"],
+      "year": ["2007"],
+      "dcLanguage": ["spa"],
+      "guid": "https://www.europeana.eu/item/90901/nd_ark__59851_bmcx92n1?utm_source=api&utm_medium=api&utm_campaign=api2demo",
+      "edmIsShownBy": null
+    }
+  ],
+  "itemsCount": 3,
+  "success": true
+}

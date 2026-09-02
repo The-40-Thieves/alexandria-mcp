@@ -1,0 +1,21 @@
+{
+  "url": "/library/urn:cts:greekLit:tlg0012.tlg001/",
+  "json_url": "/library/urn:cts:greekLit:tlg0012.tlg001/json/",
+  "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001/text/",
+  "texts": [
+    {
+      "url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/",
+      "json_url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/json/",
+      "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-grc2/text/",
+      "urn": "urn:cts:greekLit:tlg0012.tlg001.perseus-grc2"
+    },
+    {
+      "url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-eng3/",
+      "json_url": "/library/urn:cts:greekLit:tlg0012.tlg001.perseus-eng3/json/",
+      "text_url": "/library/passage/urn:cts:greekLit:tlg0012.tlg001.perseus-eng3/text/",
+      "urn": "urn:cts:greekLit:tlg0012.tlg001.perseus-eng3"
+    }
+  ],
+  "urn": "urn:cts:greekLit:tlg0012.tlg001",
+  "label": "Iliad"
+}

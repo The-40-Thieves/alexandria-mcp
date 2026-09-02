@@ -24,6 +24,17 @@ interface GBResponse {
   items?: GBVolume[];
 }
 
+function getKey(): string {
+  const key = process.env.GOOGLE_BOOKS_API_KEY;
+  if (!key)
+    throw new Error(
+      'Google Books requires GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted, ' +
+        'confirmed live: every unauthenticated request returns 429 "Quota exceeded"). ' +
+        'Create a free key at: https://console.cloud.google.com/apis/credentials then set GOOGLE_BOOKS_API_KEY.',
+    );
+  return key;
+}
+
 function buildUrl(q: string, maxResults: number): string {
   const params = new URLSearchParams({
     q,
@@ -31,15 +42,12 @@ function buildUrl(q: string, maxResults: number): string {
     printType: 'books',
     filter: 'partial', // at minimum a preview
     projection: 'full',
+    key: getKey(),
   });
-  const key = process.env.GOOGLE_BOOKS_API_KEY;
-  if (key) params.set('key', key);
   return `${API}?${params}`;
 }
 
-export async function googleBooksSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const data = await fetchJSON<GBResponse>(buildUrl(query, Math.min(limit, 40)));
-
+export function normalizeGoogleBooks(data: GBResponse, limit: number): LibraryResult[] {
   return (data.items ?? []).slice(0, limit).map((v) => {
     const info = v.volumeInfo;
     const access = v.accessInfo ?? info.accessInfo;
@@ -58,6 +66,11 @@ export async function googleBooksSearch(query: string, limit: number): Promise<L
   });
 }
 
+export async function googleBooksSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  const data = await fetchJSON<GBResponse>(buildUrl(query, Math.min(limit, 40)));
+  return normalizeGoogleBooks(data, limit);
+}
+
 export async function googleBooksRead(id: string): Promise<{
   title: string;
   authors: string[];
@@ -68,9 +81,7 @@ export async function googleBooksRead(id: string): Promise<{
   externalUrl?: string;
   note?: string;
 }> {
-  const data = await fetchJSON<GBVolume>(
-    `${API}/${id}${process.env.GOOGLE_BOOKS_API_KEY ? `?key=${process.env.GOOGLE_BOOKS_API_KEY}` : ''}`,
-  );
+  const data = await fetchJSON<GBVolume>(`${API}/${id}?key=${getKey()}`);
   const info = data.volumeInfo;
   const access = data.accessInfo;
   const publicDomain = access?.publicDomain ?? false;
@@ -113,8 +124,14 @@ export async function googleBooksRead(id: string): Promise<{
 
 register('googlebooks', {
   description:
-    'Google Books — 40M+ books. Full text for public domain titles; preview snippets for in-copyright works. Set GOOGLE_BOOKS_API_KEY for higher rate limits.',
+    'Google Books: 40M+ books. Full text for public domain titles; preview snippets for in-copyright works. Requires free GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'daily',
+  homepage: 'https://books.google.com',
+  verifiedAt: '2026-09-01',
+  auth: { type: 'query', env: 'GOOGLE_BOOKS_API_KEY', param: 'key' },
   search: googleBooksSearch,
   async read(id) {
     return googleBooksRead(id);

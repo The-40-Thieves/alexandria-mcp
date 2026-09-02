@@ -4,39 +4,80 @@ import { fetchJSON } from '../utils/http.js';
 import { normaliseWhitespace } from '../utils/text-clean.js';
 import { register, truncateText } from './registry.js';
 
-const API = 'https://ctext.org/api.pl';
+// Migrated off the legacy ctext.org/api.pl CGI endpoint (retired) to the
+// current api.ctext.org REST API. Ids are now ctp: URNs (e.g. "ctp:analects")
+// instead of bare titleids. gettextinfo is keyless; gettext (the actual
+// passage text) is restricted to registered IPs or an API key per ctext's
+// own docs (https://ctext.org/tools/api); pass CTEXT_API_KEY if set, and
+// surface the live "requires authentication" error clearly otherwise.
+const API = 'https://api.ctext.org';
 
-interface CtextSearchResult {
-  result: Array<{ id: string; title: string; type: string }>;
+function apiKeyParam(): string {
+  const key = process.env.CTEXT_API_KEY;
+  return key ? `&apikey=${encodeURIComponent(key)}` : '';
 }
 
-interface CtextTextNode {
-  id: string;
-  title: string;
-  text?: string;
-  books?: CtextTextNode[];
-  chapters?: CtextTextNode[];
+interface CtextApiError {
+  error?: { code: string; description: string };
 }
 
-export async function ctextSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const params = new URLSearchParams({
-    if: 'searchtexts',
-    q: query,
-    args: limit.toString(),
-  });
+interface CtextSearchResponse extends CtextApiError {
+  books?: Array<{ id?: string; title: string; urn: string }>;
+}
 
-  const data = await fetchJSON<CtextSearchResult>(`${API}?${params}`);
+interface CtextTextInfo extends CtextApiError {
+  title?: string;
+  toptitle?: string;
+  topurn?: string;
+  workurn?: string;
+  // Present for some multi-chapter works; absent for others (observed live
+  // on 2026-09-01, gettextinfo for "ctp:analects" carries no chapter list).
+  chapters?: Array<{ title: string; urn: string }>;
+  books?: Array<{ title: string; urn: string }>;
+}
 
-  return (data.result ?? []).slice(0, limit).map((item) => ({
-    id: item.id,
+interface CtextGetText extends CtextApiError {
+  urn?: string;
+  fulltext?: Array<{ type: string; content: string }>;
+}
+
+export function normalizeCtextSearch(data: CtextSearchResponse, limit: number): LibraryResult[] {
+  return (data.books ?? []).slice(0, limit).map((item) => ({
+    id: item.urn,
     source: 'ctext' as const,
     title: item.title,
     authors: [],
     language: 'zh',
-    subjects: ['Chinese classics', item.type].filter(Boolean),
+    subjects: ['Chinese classics'],
     hasFullText: true,
-    previewUrl: `https://ctext.org/${item.id}`,
+    previewUrl: `https://ctext.org/${item.urn.replace(/^ctp:/, '')}`,
   }));
+}
+
+export async function ctextSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  const data = await fetchJSON<CtextSearchResponse>(
+    `${API}/searchtexts?title=${encodeURIComponent(query)}`,
+  );
+  return normalizeCtextSearch(data, limit);
+}
+
+function flattenFullText(data: CtextGetText): string {
+  return (data.fulltext ?? [])
+    .map((s) => s.content)
+    .join('\n')
+    .trim();
+}
+
+async function fetchChapterText(urn: string): Promise<string> {
+  const data = await fetchJSON<CtextGetText>(
+    `${API}/gettext?urn=${encodeURIComponent(urn)}${apiKeyParam()}`,
+  );
+  if (data.error) {
+    throw new Error(
+      `ctext gettext for "${urn}" requires authentication (registered IP or CTEXT_API_KEY): ${data.error.description}`,
+    );
+  }
+  return flattenFullText(data);
 }
 
 export async function ctextRead(id: string): Promise<{
@@ -45,18 +86,18 @@ export async function ctextRead(id: string): Promise<{
   authors: string[];
   language?: string;
 }> {
-  // Fetch the text tree to get structure
-  const data = await fetchJSON<CtextTextNode>(`${API}?if=gettextinfo&ci=${encodeURIComponent(id)}`);
-
-  const title = data.title ?? id;
-  const chapters = data.chapters ?? data.books ?? [];
+  const info = await fetchJSON<CtextTextInfo>(
+    `${API}/gettextinfo?urn=${encodeURIComponent(id)}${apiKeyParam()}`,
+  );
+  if (info.error) {
+    throw new Error(`ctext gettextinfo for "${id}" failed: ${info.error.description}`);
+  }
+  const title = info.title ?? info.toptitle ?? id;
+  const chapters = info.chapters ?? info.books ?? [];
 
   if (chapters.length === 0) {
-    // Leaf node — fetch text directly
-    const textData = await fetchJSON<{ text: string }>(
-      `${API}?if=gettext&ci=${encodeURIComponent(id)}&ids=0`,
-    );
-    return { text: normaliseWhitespace(textData.text ?? ''), title, authors: [], language: 'zh' };
+    const text = await fetchChapterText(id);
+    return { text: normaliseWhitespace(text), title, authors: [], language: 'zh' };
   }
 
   const limit = pLimit(5);
@@ -66,10 +107,7 @@ export async function ctextRead(id: string): Promise<{
         limit(async () => {
           await new Promise((r) => setTimeout(r, 300));
           try {
-            const chData = await fetchJSON<{ text: string }>(
-              `${API}?if=gettext&ci=${encodeURIComponent(chapter.id)}&ids=0`,
-            );
-            const text = (chData.text ?? '').trim();
+            const text = await fetchChapterText(chapter.urn);
             if (text.length > 20) return `\n\n# ${chapter.title}\n\n${text}`;
           } catch {
             /* skip */
@@ -90,8 +128,13 @@ export async function ctextRead(id: string): Promise<{
 
 register('ctext', {
   description:
-    'Chinese Text Project — pre-Qin and Han dynasty classical Chinese texts with English translations.',
+    'Chinese Text Project: pre-Qin and Han dynasty classical Chinese texts with English translations. Full-text read requires a registered IP or optional CTEXT_API_KEY per ctext.org/tools/api; search stays keyless.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://ctext.org',
+  verifiedAt: '2026-09-01',
   search: ctextSearch,
   async read(id) {
     const raw = await ctextRead(id);

@@ -189,6 +189,11 @@ export async function internetClassicsRead(id: string): Promise<{
 register('internetclassics', {
   description: 'Internet Classics Archive (MIT) — 440+ classical works in English translation.',
   supportsIngest: true,
+  kind: 'scrape',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'http://classics.mit.edu',
+  verifiedAt: '2026-09-01',
   search: (q, l) => Promise.resolve(internetClassicsSearch(q, l)),
   async read(id) {
     const raw = await internetClassicsRead(id);

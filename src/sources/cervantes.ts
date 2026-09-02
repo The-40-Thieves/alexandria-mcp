@@ -1,55 +1,78 @@
 import { parse } from 'node-html-parser';
 import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
+import { fetchJSON, fetchText } from '../utils/http.js';
 import { normaliseWhitespace, stripHtml } from '../utils/text-clean.js';
 import { register, truncateText } from './registry.js';
 
 const BASE = 'https://www.cervantesvirtual.com';
-const SEARCH = `${BASE}/buscador/`;
+const SPARQL_ENDPOINT = 'https://data.cervantesvirtual.com/sparql';
+// The linked-data graph (data.cervantesvirtual.com), confirmed live 2026-09
+// via a discovery query (`SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a ?t } }`).
+// It is a Virtuoso store cataloguing works with RDA/MADS ontologies, not the
+// dcterms:BibliographicResource class the original spec assumed (that class
+// has zero instances in the default graph).
+const GRAPH = 'http://localhost:8890/DAV/bvmc';
 
-// The Cervantes Virtual Library has a search engine
-// Results come as HTML — we scrape the search results page.
+// The library's own /buscador/ search page used to be scraped for results,
+// but its markup is unstable and frequently returns zero matches even for
+// well-known works. The SPARQL endpoint over the same catalog is a more
+// stable interface: filter Work labels (rdfs:label) by substring, and
+// resolve each work's rdaregistry.info/Elements/w/author link to its label.
+export async function cervantesSparqlSearch(
+  query: string,
+  limit: number,
+): Promise<LibraryResult[]> {
+  const escaped = query.toLowerCase().replace(/"/g, '\\"');
+  const sparql = `
+    SELECT ?work ?title ?authorLabel WHERE {
+      GRAPH <${GRAPH}> {
+        ?work a <http://rdaregistry.info/Elements/c/Work> ;
+              <http://www.w3.org/2000/01/rdf-schema#label> ?title .
+        OPTIONAL {
+          ?work <http://rdaregistry.info/Elements/w/author> ?authorNode .
+          ?authorNode <http://www.w3.org/2000/01/rdf-schema#label> ?authorLabel
+        }
+        FILTER(CONTAINS(LCASE(STR(?title)), "${escaped}"))
+      }
+    } LIMIT ${limit}`;
 
-export async function cervantesSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const params = new URLSearchParams({
-    q: query,
-    tipo: 'texto',
-    rows: String(limit),
+  const body = new URLSearchParams({ query: sparql });
+  const data = await fetchJSON<CervantesSparqlResponse>(SPARQL_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/sparql-results+json',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
   });
+  return normalizeCervantesSparql(data, limit);
+}
 
-  const html = await fetchText(`${SEARCH}?${params}`);
-  const root = parse(html);
+interface SparqlBinding {
+  work: { value: string };
+  title: { value: string };
+  authorLabel?: { value: string };
+}
+interface CervantesSparqlResponse {
+  results?: { bindings?: SparqlBinding[] };
+}
 
-  const items = root
-    .querySelectorAll('.result-item, article.resultado, .item-resultado')
-    .slice(0, limit);
-  if (items.length === 0) {
-    // Fallback: curated catalog
-    return cervantessCatalogSearch(query, limit);
-  }
-
-  return items.map((el) => {
-    const titleEl = el.querySelector('a.titulo, h2 a, h3 a, .title a');
-    const title = titleEl?.text?.trim() ?? '';
-    const href = titleEl?.getAttribute('href') ?? '';
-    const authEl = el.querySelector('.autor, .creator, .author');
-    const author = authEl?.text?.trim() ?? '';
-    const dateEl = el.querySelector('.fecha, .date, .year');
-    const year = dateEl?.text?.trim() ? parseInt(dateEl.text.trim(), 10) : undefined;
-    const id = href.replace(BASE, '').replace(/^\//, '');
-
-    return {
-      id: id || title,
-      source: 'cervantes' as const,
-      title,
-      authors: author ? [author] : [],
-      year: Number.isNaN(year ?? NaN) ? undefined : year,
-      language: 'es',
-      subjects: ['Spanish literature'],
-      hasFullText: true,
-      previewUrl: href.startsWith('http') ? href : `${BASE}${href}`,
-    };
-  });
+export function normalizeCervantesSparql(
+  data: CervantesSparqlResponse,
+  limit: number,
+): LibraryResult[] {
+  return (data.results?.bindings ?? []).slice(0, limit).map((b) => ({
+    id: b.work.value,
+    source: 'cervantes' as const,
+    title: b.title.value,
+    authors: b.authorLabel ? [b.authorLabel.value] : [],
+    language: 'es',
+    subjects: ['Spanish literature'],
+    // The SPARQL catalog carries bibliographic metadata, not confirmed
+    // scrapable full text, unlike the curated catalog below.
+    hasFullText: false,
+    previewUrl: b.work.value,
+  }));
 }
 
 const CURATED: Array<{
@@ -126,7 +149,7 @@ const CURATED: Array<{
   },
 ];
 
-function cervantessCatalogSearch(query: string, limit: number): LibraryResult[] {
+function cervantesCatalogSearch(query: string, limit: number): LibraryResult[] {
   const q = query.toLowerCase();
   const terms = q.split(/\s+/);
   return CURATED.filter((e) =>
@@ -146,6 +169,16 @@ function cervantessCatalogSearch(query: string, limit: number): LibraryResult[] 
     }));
 }
 
+export async function cervantesSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  try {
+    const sparqlResults = await cervantesSparqlSearch(query, limit);
+    if (sparqlResults.length > 0) return sparqlResults;
+  } catch {
+    /* fall through to the curated catalog */
+  }
+  return cervantesCatalogSearch(query, limit);
+}
+
 export async function cervantesRead(id: string): Promise<{
   text: string;
   title: string;
@@ -153,6 +186,18 @@ export async function cervantesRead(id: string): Promise<{
   language?: string;
 }> {
   const entry = CURATED.find((e) => e.id === id);
+  if (!entry && id.startsWith('https://data.cervantesvirtual.com/work/')) {
+    // SPARQL catalog entries have no confirmed scrapable full-text page;
+    // read() would need a documented text-download link this dataset
+    // doesn't expose. Caller sees this as metadataOnly at the registry
+    // level once wrapped; surface a clear error instead of scraping a
+    // BVMC.Labs metadata page and calling that "full text".
+    throw new Error(
+      `Cervantes Virtual work ${id} has bibliographic metadata only via the SPARQL catalog; ` +
+        `no full text is available for this id. Browse it at ${id} directly.`,
+    );
+  }
+
   const url = entry?.url ?? (id.startsWith('http') ? id : `${BASE}/${id}`);
   if (url.startsWith('http') && !url.startsWith(BASE)) {
     throw new Error(`Invalid URL: ${url}`);
@@ -161,7 +206,6 @@ export async function cervantesRead(id: string): Promise<{
   const html = await fetchText(url);
   const root = parse(html);
 
-  // Find the text content div
   for (const el of root.querySelectorAll(
     'script, style, nav, header, footer, .nav, .header, .footer, .sidebar',
   )) {
@@ -183,8 +227,13 @@ export async function cervantesRead(id: string): Promise<{
 
 register('cervantes', {
   description:
-    'Cervantes Virtual Library — Spanish and Portuguese literature. Cervantes, Borges, Lorca, Neruda, Rulfo, Calderón, San Juan de la Cruz.',
+    'Cervantes Virtual Library: Spanish and Portuguese literature. Search via the SPARQL linked-data catalog (data.cervantesvirtual.com); full text available for a small curated set of well-known works (Quijote, Lorca, Neruda, Borges, Rulfo, Calderón, San Juan de la Cruz).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://www.cervantesvirtual.com',
+  verifiedAt: '2026-09-01',
   search: cervantesSearch,
   async read(id) {
     const raw = await cervantesRead(id);

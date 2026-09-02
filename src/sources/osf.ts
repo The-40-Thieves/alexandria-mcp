@@ -82,6 +82,11 @@ register('osf', {
   description:
     'OSF Preprints — PsyArXiv, SocArXiv, EarthArXiv, engrXiv, and more via Open Science Framework. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://osf.io',
+  verifiedAt: '2026-09-01',
   search: osfSearch,
   async read(id) {
     const raw = await osfRead(id);

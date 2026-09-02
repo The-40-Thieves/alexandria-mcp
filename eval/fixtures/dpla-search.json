@@ -1,0 +1,18 @@
+{
+  "_source_note": "DPLA_API_KEY is required to call /v2/items live (confirmed: unauthenticated calls now return 403 invalid_api_key as of 2026-09) and DPLA offers no public demo key, so this fixture is built from DPLA's documented field reference (pro.dp.la/developers/field-reference) rather than freshly recorded from the shell.",
+  "count": 1,
+  "docs": [
+    {
+      "id": "1abc2def3ghi4jkl5mno6pqr",
+      "sourceResource": {
+        "title": ["The History of Science in the United States"],
+        "creator": ["Smith, Jane"],
+        "date": { "begin": "1932" },
+        "subject": [{ "name": "Science--History" }, { "name": "United States" }],
+        "language": [{ "name": "English" }],
+        "type": ["text"]
+      },
+      "isShownAt": "https://example-repository.org/items/1abc2def3ghi4jkl5mno6pqr"
+    }
+  ]
+}

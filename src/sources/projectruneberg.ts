@@ -152,6 +152,11 @@ register('projectruneberg', {
   description:
     'Project Runeberg — Scandinavian literature and cultural heritage. Ibsen, Strindberg, Lagerlöf, Andersen, Kierkegaard.',
   supportsIngest: true,
+  kind: 'scrape',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://runeberg.org',
+  verifiedAt: '2026-09-01',
   search: (q, l) => Promise.resolve(runbergSearch(q, l)),
   async read(id) {
     const raw = await runbergRead(id);

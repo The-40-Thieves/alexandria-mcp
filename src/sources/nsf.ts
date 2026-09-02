@@ -71,6 +71,11 @@ register('nsf', {
   description:
     'NSF Awards — National Science Foundation research grants and abstracts across all scientific disciplines.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'science',
+  freshness: 'daily',
+  homepage: 'https://www.nsf.gov',
+  verifiedAt: '2026-09-01',
   search: nsfSearch,
   async read(id) {
     const raw = await nsfRead(id);

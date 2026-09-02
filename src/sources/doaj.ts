@@ -68,6 +68,11 @@ register('doaj', {
   description:
     'DOAJ — Directory of Open Access Journals. 12M+ peer-reviewed OA articles from 20,000+ journals. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://doaj.org',
+  verifiedAt: '2026-09-01',
   search: doajSearch,
   async read(id) {
     const raw = await doajRead(id);

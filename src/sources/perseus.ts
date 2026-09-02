@@ -1,14 +1,16 @@
-import { XMLParser } from 'fast-xml-parser';
 import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
+import { fetchJSON, fetchText } from '../utils/http.js';
 import { normaliseWhitespace } from '../utils/text-clean.js';
 import { register, truncateText } from './registry.js';
 
-// Perseus CTS API — Tufts University
-const CTS = 'http://www.perseus.tufts.edu/hopper/CTS';
+// Perseus's old CTS API (perseus.tufts.edu/hopper/CTS) is dead (connection
+// refused, confirmed 2026-09). Scaife (scaife.perseus.org) is Perseus's
+// current CTS reading environment; its /library/{urn}/json/ endpoint
+// returns metadata + navigation instead of the old GetPassage/GetValidReff
+// XML, and /library/passage/{urn}/text/ returns plain text directly (no
+// TEI/XML to strip).
+const SCAIFE = 'https://scaife.perseus.org';
 const MAX_PASSAGES = 50; // cap to avoid hundreds of API calls
-
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
 // Well-known URN prefixes for search simulation (CTS has no keyword search API)
 const PERSEUS_CATALOG: Array<{
@@ -150,8 +152,27 @@ export function perseusSearch(query: string, limit: number): LibraryResult[] {
       language: e.language,
       subjects: e.subjects,
       hasFullText: true,
-      previewUrl: `http://www.perseus.tufts.edu/hopper/text?doc=${e.urn}`,
+      previewUrl: `${SCAIFE}/library/${e.urn}/`,
     }));
+}
+
+interface ScaifeTocEntry {
+  urn: string;
+  text_url: string;
+  label?: string;
+  num?: string;
+}
+
+interface ScaifeWorkJson {
+  urn: string;
+  texts?: Array<{ urn: string }>; // work-level: pick an edition
+  toc?: ScaifeTocEntry[]; // edition-level: passage navigation
+  text_url?: string;
+}
+
+async function resolveEditionUrn(urn: string): Promise<string> {
+  const data = await fetchJSON<ScaifeWorkJson>(`${SCAIFE}/library/${urn}/json/`);
+  return data.texts?.[0]?.urn ?? urn;
 }
 
 export async function perseusRead(id: string): Promise<{
@@ -165,22 +186,15 @@ export async function perseusRead(id: string): Promise<{
     const ids = PERSEUS_CATALOG.map((e) => e.id).join(', ');
     throw new Error(`Unknown Perseus ID: "${id}". Valid IDs: ${ids}`);
   }
-  const urn = entry.urn;
 
-  // Get top-level passages (books/sections)
-  const refsXml = await fetchText(`${CTS}?request=GetValidReff&urn=${urn}&level=1`);
-  const refsDoc = parser.parse(refsXml) as Record<string, unknown>;
+  const editionUrn = await resolveEditionUrn(entry.urn);
+  const edition = await fetchJSON<ScaifeWorkJson>(`${SCAIFE}/library/${editionUrn}/json/`);
+  const toc = (edition.toc ?? []).slice(0, MAX_PASSAGES);
 
-  // Extract URNs from the XML response
-  const reffText = JSON.stringify(refsDoc);
-  const urnMatches = [...reffText.matchAll(/"(urn:cts:[^"]+)"/g)].map((m) => m[1]);
-  const passages = urnMatches.filter((u) => u !== urn).slice(0, MAX_PASSAGES);
-
-  if (passages.length === 0) {
-    // Try fetching the whole text as one passage
-    await new Promise((r) => setTimeout(r, 500));
-    const xml = await fetchText(`${CTS}?request=GetPassage&urn=${urn}`);
-    const text = extractText(xml);
+  if (toc.length === 0) {
+    const text = await fetchText(
+      `${SCAIFE}${edition.text_url ?? `/library/passage/${editionUrn}/text/`}`,
+    );
     return {
       text: normaliseWhitespace(text),
       title: entry.title,
@@ -190,40 +204,36 @@ export async function perseusRead(id: string): Promise<{
   }
 
   const parts: string[] = [];
-  for (const passageUrn of passages) {
+  for (const passage of toc) {
     await new Promise((r) => setTimeout(r, 300));
     try {
-      const xml = await fetchText(`${CTS}?request=GetPassage&urn=${passageUrn}`);
-      const text = extractText(xml);
-      if (text.length > 50) parts.push(text);
+      const text = await fetchText(`${SCAIFE}${passage.text_url}`);
+      if (text.trim().length > 20) {
+        const label = [passage.label, passage.num].filter(Boolean).join(' ');
+        parts.push(label ? `\n\n# ${label}\n\n${text}` : text);
+      }
     } catch {
       /* skip bad passage */
     }
   }
 
   return {
-    text: normaliseWhitespace(parts.join('\n\n')),
+    text: normaliseWhitespace(parts.join('\n')),
     title: entry.title,
     authors: entry.authors,
     language: entry.language,
   };
 }
 
-function extractText(xml: string): string {
-  // Strip XML/TEI tags, keep text content
-  return xml
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/\s{3,}/g, ' ')
-    .trim();
-}
-
 register('perseus', {
   description:
-    'Perseus Digital Library — classical Greek, Latin, and Arabic texts with translations.',
+    'Perseus Digital Library: classical Greek, Latin, and Arabic texts with translations, served via the Scaife reading environment.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://scaife.perseus.org',
+  verifiedAt: '2026-09-01',
   search: (query, limit) => Promise.resolve(perseusSearch(query, limit)),
   async read(id) {
     const raw = await perseusRead(id);

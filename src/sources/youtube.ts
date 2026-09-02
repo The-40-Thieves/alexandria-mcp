@@ -72,7 +72,7 @@ interface YTSearchResponse {
 
 export async function youtubeSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) throw new Error('YOUTUBE_API_KEY is required for the youtube source');
+  if (!apiKey) throw new Error('youtube requires YOUTUBE_API_KEY for search');
 
   const params = new URLSearchParams({
     part: 'snippet',
@@ -151,6 +151,47 @@ interface YoutubeReadResult {
   metadataOnly?: boolean;
   note?: string;
   externalUrl: string;
+}
+
+interface SupadataTranscriptResponse {
+  content?: string;
+  lang?: string;
+  availableLangs?: string[];
+}
+
+// Supadata (https://supadata.ai) is a paid third-party transcript API that
+// wraps the same kind of undocumented extraction this file does itself,
+// but as someone else's maintained service. Preferred when configured
+// since it doesn't depend on this file's Innertube client staying current.
+export async function supadataRead(id: string): Promise<YoutubeReadResult | undefined> {
+  const apiKey = process.env.SUPADATA_API_KEY;
+  if (!apiKey) return undefined;
+
+  const externalUrl = `https://www.youtube.com/watch?v=${id}`;
+  const params = new URLSearchParams({ videoId: id, text: 'true' });
+  const data = await fetchJSON<SupadataTranscriptResponse>(
+    `https://api.supadata.ai/v1/youtube/transcript?${params}`,
+    { headers: { 'x-api-key': apiKey } },
+  );
+
+  if (!data.content) {
+    return {
+      text: '',
+      title: id,
+      authors: [],
+      metadataOnly: true,
+      externalUrl,
+      note: 'Supadata returned no transcript content for this video.',
+    };
+  }
+
+  return {
+    text: data.content,
+    title: id, // Supadata's transcript endpoint doesn't return video title/author
+    authors: [],
+    language: data.lang,
+    externalUrl,
+  };
 }
 
 export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
@@ -241,11 +282,27 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
 
 register('youtube', {
   description:
-    'YouTube — video search via the official Data API v3 (requires YOUTUBE_API_KEY, ~100 searches/day). Transcripts via an undocumented endpoint since no official transcript API exists for third-party videos — same risk profile as codewiki (can break without notice, ToS gray area for automated access; low-volume personal/research use only).',
-  supportsIngest: true,
+    'YouTube: video search via the official Data API v3 (requires YOUTUBE_API_KEY, ~100 searches/day). Transcripts prefer Supadata (SUPADATA_API_KEY, a maintained third-party transcript service) when configured; otherwise fall back to an undocumented endpoint since no official transcript API exists for third-party videos, same risk profile as codewiki (can break without notice, ToS gray area for automated access; low-volume personal/research use only). No ingest: transcripts stay read-only, never indexed.',
+  supportsIngest: false,
+  kind: 'rest',
+  cluster: 'video',
+  freshness: 'realtime',
+  homepage: 'https://www.youtube.com',
+  verifiedAt: '2026-09-01',
+  pacing: { dailyCap: 90 },
   search: youtubeSearch,
   async read(id) {
-    const raw = await youtubeRead(id);
+    let raw: YoutubeReadResult | undefined;
+    if (process.env.SUPADATA_API_KEY) {
+      try {
+        raw = await supadataRead(id);
+      } catch {
+        /* fall back to the Innertube path below */
+      }
+    }
+    if (!raw || (raw.metadataOnly && !raw.text)) {
+      raw = await youtubeRead(id);
+    }
     if (raw.metadataOnly || !raw.text) {
       return {
         title: raw.title,

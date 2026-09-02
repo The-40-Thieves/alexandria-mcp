@@ -101,6 +101,11 @@ register('legislationscot', {
   description:
     'Scottish Parliament legislation — Acts of the Scottish Parliament (ASP) and Scottish Statutory Instruments (SSI). No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'law',
+  freshness: 'daily',
+  homepage: 'https://www.legislation.gov.uk',
+  verifiedAt: '2026-09-01',
   search: legislationscotSearch,
   async read(id) {
     const raw = await legislationscotRead(id);

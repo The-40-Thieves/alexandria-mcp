@@ -1,0 +1,14 @@
+{
+  "_source_note": "COURTLISTENER_API_KEY is required and this environment has none, so this fixture matches CourtListener's documented /search/?type=o response shape (the same shape the pre-Stage-2 adapter's CLResult/CLSearchResponse types already assumed) rather than being freshly recorded.",
+  "count": 1,
+  "results": [
+    {
+      "id": 9506311,
+      "absolute_url": "/opinion/9506311/brown-v-board-of-education/",
+      "caseName": "Brown v. Board of Education",
+      "dateFiled": "1954-05-17",
+      "snippet": "We conclude that in the field of public education the doctrine of \"separate but equal\" has no place.",
+      "court_id": "scotus"
+    }
+  ]
+}

@@ -109,6 +109,11 @@ register('openlibrary', {
   description:
     'Open Library — 30M+ records. Metadata and discovery; links to Archive.org for text.',
   supportsIngest: false,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'daily',
+  homepage: 'https://openlibrary.org',
+  verifiedAt: '2026-09-01',
   search: openLibrarySearch,
   async read(id) {
     const meta = await openLibraryMeta(id);

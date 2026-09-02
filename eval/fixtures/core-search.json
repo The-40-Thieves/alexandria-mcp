@@ -1,0 +1,22 @@
+{
+  "_source_note": "CORE_API_KEY is required to call api.core.ac.uk/v3 live and this environment has none, so this fixture matches CORE v3's documented /search/works response shape (the same shape the pre-Stage-2 adapter's CoreWork/CoreSearchResponse types already assumed) rather than being freshly recorded.",
+  "totalHits": 2,
+  "results": [
+    {
+      "id": "84371635",
+      "title": "Attention Is All You Need",
+      "authors": [{ "name": "Ashish Vaswani" }, { "name": "Noam Shazeer" }],
+      "yearPublished": 2017,
+      "abstract": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.",
+      "downloadUrl": "https://core.ac.uk/download/84371635.pdf",
+      "fieldOfStudy": ["Computer Science"],
+      "language": { "code": "en" }
+    },
+    {
+      "id": "12345678",
+      "title": "A Survey of Open Access Repositories",
+      "authors": [],
+      "yearPublished": 2019
+    }
+  ]
+}

@@ -35,28 +35,89 @@ interface GHCodeResponse {
   items: GHCodeItem[];
 }
 
+// GitHub's code search API now requires authentication for every caller,
+// even against public repos (confirmed live: an unauthenticated
+// /search/code request returns 401 "Requires authentication"). Without
+// GITHUB_TOKEN, fall back to listing a small set of OpenITI's per-century
+// data repos via the unauthenticated git Trees API and filtering file
+// paths client-side: a real, keyless (if narrower) search over the same
+// corpus rather than failing outright.
+const FALLBACK_REPOS = ['0500AH', '0600AH', '0700AH'];
+
+function pathToResult(repo: string, path: string, previewUrl?: string): LibraryResult {
+  const name = path.split('/').pop() ?? '';
+  const parts = name.split('.');
+  const authorWork = parts.slice(0, 2).join(', ') || name;
+  return {
+    id: `${repo}||${path}`,
+    source: 'openiti' as const,
+    title: authorWork,
+    authors: parts[0] ? [parts[0]] : [],
+    subjects: ['Islamic', 'Islamicate'],
+    hasFullText: true,
+    previewUrl: previewUrl ?? `https://github.com/${ORG}/${repo}/blob/master/${path}`,
+  };
+}
+
+interface GHTreeItem {
+  path: string;
+  type: string;
+}
+interface GHTreeResponse {
+  tree: GHTreeItem[];
+  truncated?: boolean;
+}
+
+// A leaf text file's path looks like:
+//   data/0505Ghazali/0505Ghazali.IhyaCulumDin/0505Ghazali.IhyaCulumDin.Shamela0011606-ara1
+// (no extension). Skip .yml metadata, README.md, and directory entries.
+function isTextFilePath(path: string): boolean {
+  const name = path.split('/').pop() ?? '';
+  return (
+    path.startsWith('data/') &&
+    !name.endsWith('.yml') &&
+    !name.toLowerCase().startsWith('readme') &&
+    name.split('.').length >= 2
+  );
+}
+
+async function openitiUnauthedSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const results: LibraryResult[] = [];
+
+  for (const repo of FALLBACK_REPOS) {
+    if (results.length >= limit) break;
+    try {
+      const data = await fetchJSON<GHTreeResponse>(
+        `${GH_API}/repos/${ORG}/${repo}/git/trees/master?recursive=1`,
+        { headers: { Accept: 'application/vnd.github+json' } },
+      );
+      for (const item of data.tree) {
+        if (item.type !== 'blob' || !isTextFilePath(item.path)) continue;
+        const haystack = item.path.toLowerCase();
+        if (!terms.some((t) => haystack.includes(t))) continue;
+        results.push(pathToResult(repo, item.path));
+        if (results.length >= limit) break;
+      }
+    } catch {
+      /* skip a repo whose tree fetch failed and try the next */
+    }
+  }
+
+  return results.slice(0, limit);
+}
+
 export async function openitiSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  // Search for files in OpenITI org by filename/path (author+work in filename)
+  if (!process.env.GITHUB_TOKEN) return openitiUnauthedSearch(query, limit);
+
   const data = await fetchJSON<GHCodeResponse>(
     `${GH_API}/search/code?q=${encodeURIComponent(query)}+org:${ORG}+in:path&per_page=${limit}`,
     { headers: { ...ghHeaders(), Accept: 'application/vnd.github+json' } },
   );
 
-  return (data.items || []).map((item) => {
-    // Path like: data/0505Ghazali/0505Ghazali.IhyaCulumDin/0505Ghazali.IhyaCulumDin.Shamela0011606-ara1
-    const parts = item.name.split('.');
-    const authorWork = parts.slice(0, 2).join(' — ') || item.name;
-    const id = `${item.repository.name}||${item.path}`;
-    return {
-      id,
-      source: 'openiti' as const,
-      title: authorWork,
-      authors: parts[0] ? [parts[0]] : [],
-      subjects: ['Islamic', 'Islamicate'],
-      hasFullText: true,
-      previewUrl: item.html_url,
-    };
-  });
+  return (data.items || []).map((item) =>
+    pathToResult(item.repository.name, item.path, item.html_url),
+  );
 }
 
 export async function openitiRead(id: string): Promise<{
@@ -98,8 +159,13 @@ export async function openitiRead(id: string): Promise<{
 
 register('openiti', {
   description:
-    'OpenITI — 10,000+ Islamicate texts in Arabic and Persian (OpenITI mARkdown). Set GITHUB_TOKEN for higher rate limits.',
+    'OpenITI: 10,000+ Islamicate texts in Arabic and Persian (OpenITI mARkdown). Set GITHUB_TOKEN for full-corpus code search; without it, search falls back to a small set of per-century data repos (GitHub code search now requires auth even for public repos).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://openiti.org',
+  verifiedAt: '2026-09-01',
   search: openitiSearch,
   async read(id) {
     const raw = await openitiRead(id);

@@ -6,77 +6,71 @@ const BASE = 'https://catalog.data.gov';
 
 interface DataGovResult {
   title?: string;
-  description?: string;
-  identifier?: string;
   slug?: string;
+  identifier?: string;
   publisher?: string;
   keyword?: string[];
   theme?: string[];
-  has_spatial?: boolean;
-  last_harvested_date?: string;
-  landingPage?: string;
-  organization?: {
-    name?: string;
-    slug?: string;
-    organization_type?: string;
-  };
+  organization?: { name?: string };
   dcat?: {
-    accessLevel?: string;
-    language?: string[];
-    modified?: string;
-    issued?: string;
-    license?: string;
     landingPage?: string;
+    issued?: string;
+    language?: string[] | string;
   };
 }
 
 interface DataGovResponse {
-  results: DataGovResult[];
-  after?: string;
-  sort?: string;
+  results?: DataGovResult[];
+  hits?: DataGovResult[];
 }
 
-export async function dataGovSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const params = new URLSearchParams({
-    q: query,
-    per_page: String(Math.min(limit, 100)),
-    sort: 'relevance',
-  });
-
-  const data = await fetchJSON<DataGovResponse>(`${BASE}/search?${params}`);
-
-  return (data.results ?? []).slice(0, limit).map((r) => {
-    const id = r.identifier ?? r.slug ?? r.title ?? '';
-    const landingPage = r.dcat?.landingPage ?? r.landingPage;
-
+export function normalizeDataGov(data: DataGovResponse, limit: number): LibraryResult[] {
+  const items = data.results ?? data.hits ?? [];
+  return items.slice(0, limit).map((r) => {
+    const id = r.slug ?? r.identifier ?? r.title ?? '';
+    const language = Array.isArray(r.dcat?.language) ? r.dcat?.language[0] : r.dcat?.language;
     return {
       id,
       source: 'datagov' as const,
       title: r.title ?? id,
       authors: r.publisher ? [r.publisher] : r.organization?.name ? [r.organization.name] : [],
       year: r.dcat?.issued ? parseInt(r.dcat.issued.slice(0, 4), 10) : undefined,
-      language: r.dcat?.language?.[0]?.replace('en-US', 'en'),
+      language: language?.replace('en-US', 'en'),
       subjects: [...(r.keyword ?? []), ...(r.theme ?? [])].slice(0, 5),
       hasFullText: false,
-      previewUrl: landingPage ?? `https://catalog.data.gov/dataset/${r.slug ?? id}`,
+      previewUrl: r.dcat?.landingPage ?? `https://catalog.data.gov/dataset/${r.slug ?? id}`,
     };
   });
+}
+
+export async function dataGovSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  const params = new URLSearchParams({ q: query, size: String(Math.min(limit, 100)) });
+  const data = await fetchJSON<DataGovResponse>(`${BASE}/search?${params}`);
+  return normalizeDataGov(data, limit);
 }
 
 register('datagov', {
   description:
     'Data.gov — US government open data catalog. 300k+ datasets from federal, state, local, and tribal agencies. No key required. Metadata and discovery.',
   supportsIngest: false,
+  kind: 'rest',
+  cluster: 'government',
+  freshness: 'daily',
+  homepage: 'https://catalog.data.gov',
+  verifiedAt: '2026-09-01',
   search: dataGovSearch,
   async read(id) {
-    // Try to get the harvest record for full metadata
     const landingPage = id.startsWith('http') ? id : `https://catalog.data.gov/dataset/${id}`;
+    const data = await fetchJSON<DataGovResponse>(`${BASE}/api/dataset/${id}`).catch(
+      () => undefined,
+    );
+    const r = data?.results?.[0];
 
     return {
-      title: id,
-      authors: [],
+      title: r?.title ?? id,
+      authors: r?.publisher ? [r.publisher] : [],
       metadataOnly: true,
-      externalUrl: landingPage,
+      externalUrl: r?.dcat?.landingPage ?? landingPage,
       note: 'Data.gov is a metadata catalog. Visit externalUrl to access the actual dataset downloads and documentation.',
     };
   },

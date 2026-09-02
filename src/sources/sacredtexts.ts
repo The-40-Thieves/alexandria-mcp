@@ -1,13 +1,7 @@
-import { parse } from 'node-html-parser';
 import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
+import { register } from './registry.js';
 
 const BASE = 'https://sacred-texts.com';
-const RATE_LIMIT_MS = 1200; // polite: ~50 req/min max
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 // ─── Registry ──────────────────────────────────────────────────────────────
 // Static index of curated texts. Avoids live crawl for search.
@@ -301,152 +295,38 @@ export function sacredTextsSearch(query: string, limit = 10): LibraryResult[] {
   }));
 }
 
-// ─── HTML extraction ───────────────────────────────────────────────────────
-
-// sacred-texts.com page structure:
-//   <div class="nav"> or <table> nav elements → skip
-//   Main content is in the body, after the title banner
-// We extract all visible paragraph text from the body, excluding nav tables.
-
-function extractPageText(html: string): string {
-  const root = parse(html);
-
-  // Remove nav elements and script/style
-  for (const el of root.querySelectorAll('table.nav, .nav, script, style, [class*="nav"]')) {
-    el.remove();
-  }
-
-  // Try to find a main content div first
-  const main =
-    root.querySelector('#main') ||
-    root.querySelector('.main') ||
-    root.querySelector('div[id="body"]') ||
-    root.querySelector('body');
-
-  if (!main) return '';
-
-  return main.text
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{4,}/g, '\n\n\n')
-    .trim();
-}
-
-// Resolve a relative URL against the TOC page URL.
-function resolveUrl(href: string, base: string): string {
-  if (href.startsWith('http')) return href;
-  try {
-    return new URL(href, base).toString();
-  } catch {
-    const dir = base.substring(0, base.lastIndexOf('/') + 1);
-    return dir + href;
-  }
-}
-
-// Fetch the TOC page, find chapter links, return ordered list.
-// Chapter links are typically relative .htm links in the same directory.
-// Excludes navigation and external links.
-async function fetchChapterUrls(tocUrl: string): Promise<string[]> {
-  const html = await fetchText(tocUrl);
-  const root = parse(html);
-
-  // Remove nav elements
-  for (const el of root.querySelectorAll('table.nav, .nav, script, style')) {
-    el.remove();
-  }
-
-  const tocDir = tocUrl.substring(0, tocUrl.lastIndexOf('/') + 1);
-
-  const links = root
-    .querySelectorAll('a[href]')
-    .map((a) => a.getAttribute('href') ?? '')
-    .filter((href) => {
-      if (!href || href.startsWith('#') || href.startsWith('mailto:')) return false;
-      if (href.startsWith('http') && !href.startsWith(BASE)) return false;
-      // Only local .htm/.html files in the same or child directory
-      const lower = href.toLowerCase();
-      return lower.endsWith('.htm') || lower.endsWith('.html');
-    })
-    .map((href) => resolveUrl(href, tocUrl))
-    .filter((url) => url.startsWith(tocDir)); // same dir only
-
-  // Deduplicate while preserving order
-  return [...new Set(links)];
-}
-
-// ─── Read ──────────────────────────────────────────────────────────────────
-
-export async function sacredTextsRead(id: string): Promise<{
-  text: string;
-  title: string;
-  authors: string[];
-  language?: string;
-  year?: number;
-}> {
-  const entry = REGISTRY.find((e) => e.id === id);
-  if (!entry) {
-    const ids = REGISTRY.map((e) => e.id).join(', ');
-    throw new Error(
-      `Unknown Sacred Texts ID: "${id}". ` +
-        `Valid IDs: ${ids}. ` +
-        `Use library_search with source="sacredtexts" to find available texts.`,
-    );
-  }
-
-  const chapterUrls = await fetchChapterUrls(entry.tocUrl);
-
-  if (chapterUrls.length === 0) {
-    // Single-page text (e.g. Tao Te Ching)
-    await sleep(RATE_LIMIT_MS);
-    const html = await fetchText(entry.tocUrl);
-    const text = extractPageText(html);
-    return {
-      text,
-      title: entry.title,
-      authors: entry.authors,
-      language: entry.language,
-      year: entry.year,
-    };
-  }
-
-  // Multi-page: fetch each chapter sequentially with rate limiting
-  const parts: string[] = [];
-
-  for (let i = 0; i < chapterUrls.length; i++) {
-    await sleep(RATE_LIMIT_MS);
-    try {
-      const html = await fetchText(chapterUrls[i]);
-      const text = extractPageText(html);
-      if (text.length > 50) parts.push(text);
-    } catch {
-      // Skip failed chapters — don't abort the whole text
-    }
-  }
-
-  if (parts.length === 0) {
-    throw new Error(
-      `Could not extract text from any chapter of "${entry.title}". ` +
-        `The site structure may have changed. Check ${entry.tocUrl}`,
-    );
-  }
-
-  return {
-    text: parts.join('\n\n---\n\n'),
-    title: entry.title,
-    authors: entry.authors,
-    language: entry.language,
-    year: entry.year,
-  };
-}
-
-import { register, truncateText } from './registry.js';
-
+// sacred-texts.com returns HTTP 403 to unauthenticated/automated requests
+// (confirmed live 2026-09, the whole site is bot-gated, not just this
+// scraper's request shape). read() no longer attempts to scrape it; the
+// curated registry search still works entirely offline.
 register('sacredtexts', {
   description:
-    'Sacred-Texts.com — curated registry of religious/philosophical texts: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism.',
+    'Sacred-Texts.com: curated registry of religious/philosophical texts: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism. The live site is bot-gated (HTTP 403); read() returns metadata only.',
   supportsIngest: true,
+  kind: 'scrape',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://sacred-texts.com',
+  verifiedAt: '2026-09-01',
   search: (query, limit) => Promise.resolve(sacredTextsSearch(query, limit)),
   async read(id) {
-    const raw = await sacredTextsRead(id);
-    return { ...raw, ...truncateText(raw.text) };
+    const entry = REGISTRY.find((e) => e.id === id);
+    if (!entry) {
+      const ids = REGISTRY.map((e) => e.id).join(', ');
+      throw new Error(
+        `Unknown Sacred Texts ID: "${id}". ` +
+          `Valid IDs: ${ids}. ` +
+          `Use library_search with source="sacredtexts" to find available texts.`,
+      );
+    }
+    return {
+      title: entry.title,
+      authors: entry.authors,
+      year: entry.year,
+      language: entry.language,
+      metadataOnly: true,
+      externalUrl: entry.tocUrl,
+      note: 'sacred-texts.com returns HTTP 403 to automated requests (bot-gated); full text is not fetchable. Visit externalUrl directly in a browser.',
+    };
   },
 });

@@ -1,0 +1,49 @@
+{
+  "results": [
+    {
+      "id": "http://www.loc.gov/item/wpalh002907/",
+      "title": "[Sacia History]",
+      "contributor": null,
+      "date": null,
+      "subject": [
+        "narratives",
+        "norwegians",
+        "emigration and immigration",
+        "agriculture"
+      ],
+      "language": [
+        "english"
+      ],
+      "online_format": [
+        "pdf",
+        "online text",
+        "image"
+      ],
+      "url": "https://www.loc.gov/item/wpalh002907/"
+    },
+    {
+      "id": "http://www.loc.gov/item/wpalh001302/",
+      "title": "[History of A Buffalo Hunter]",
+      "contributor": [
+        "brown, lorin w.",
+        "tejada, simeon"
+      ],
+      "date": "1939-03-31",
+      "subject": [
+        "life histories",
+        "narratives",
+        "local history",
+        "indians of north america"
+      ],
+      "language": [
+        "english"
+      ],
+      "online_format": [
+        "pdf",
+        "online text",
+        "image"
+      ],
+      "url": "https://www.loc.gov/item/wpalh001302/"
+    }
+  ]
+}

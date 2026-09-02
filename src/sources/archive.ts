@@ -144,6 +144,11 @@ import { register, truncateText } from './registry.js';
 register('archive', {
   description: 'Internet Archive — 41M+ texts, scanned books, historical documents.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://archive.org',
+  verifiedAt: '2026-09-01',
   search: archiveSearch,
   async read(id) {
     const raw = await archiveRead(id);

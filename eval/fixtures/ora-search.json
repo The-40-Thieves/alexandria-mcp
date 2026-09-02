@@ -1,0 +1,41 @@
+{
+  "data": [
+    {
+      "id": "uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52",
+      "attributes": {
+        "title": "Exploring science capital with primary-school-aged children",
+        "index_authors": {
+          "id": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52#index_authors",
+          "type": "document_value",
+          "attributes": {
+            "value": ["Milarski, MR"],
+            "label": "Author"
+          }
+        },
+        "rights_copyright_date": {
+          "id": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52#rights_copyright_date",
+          "type": "document_value",
+          "attributes": {
+            "value": [2021],
+            "label": "Copyright date"
+          }
+        }
+      }
+    },
+    {
+      "id": "uuid:0d641544-4873-46ba-b33a-77c273f994ea",
+      "attributes": {
+        "title": "Looking back at “our science” and “our history”: An exploration of Korean preservice science teachers’ encounters with East Asian history of science",
+        "index_authors": {
+          "id": "https://ora.ox.ac.uk/objects/uuid:0d641544-4873-46ba-b33a-77c273f994ea#index_authors",
+          "type": "document_value",
+          "attributes": {
+            "value": ["Park, W, Song, J"],
+            "label": "Author"
+          }
+        },
+        "rights_copyright_date": null
+      }
+    }
+  ]
+}

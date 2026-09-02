@@ -1,0 +1,46 @@
+<!--
+  Gallica's SRU endpoint is currently blocked for this sandbox's egress IP
+  by an ALTCHA bot-check (curl from the shell returns a "Verification de
+  securite" HTML page for GET requests to
+  gallica.bnf.fr/services/engine/search/sru, and a 500
+  "Could not resolve view with name 'altcha'" for others, evidenced
+  2026-09-01). This fixture is transcribed from Gallica's documented SRU/DC
+  response shape (the same oai_dc:dc-in-srw:record wrapper the pre-Stage-2
+  adapter already parsed, just single- rather than double-encoded query and
+  namespace-stripped) rather than freshly recorded from the shell.
+-->
+<srw:searchRetrieveResponse xmlns:srw="http://www.loc.gov/zing/srw/">
+  <srw:version>1.2</srw:version>
+  <srw:numberOfRecords>2</srw:numberOfRecords>
+  <srw:records>
+    <srw:record>
+      <srw:recordSchema>dc</srw:recordSchema>
+      <srw:recordPacking>xml</srw:recordPacking>
+      <srw:recordData>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Histoire des sciences mathématiques et physiques</dc:title>
+          <dc:creator>Bertrand, Joseph (1822-1900)</dc:creator>
+          <dc:date>1882</dc:date>
+          <dc:language>fre</dc:language>
+          <dc:type>monographie imprimée</dc:type>
+          <dc:identifier>https://gallica.bnf.fr/ark:/12148/bpt6k95207b</dc:identifier>
+        </oai_dc:dc>
+      </srw:recordData>
+      <srw:recordPosition>1</srw:recordPosition>
+    </srw:record>
+    <srw:record>
+      <srw:recordSchema>dc</srw:recordSchema>
+      <srw:recordPacking>xml</srw:recordPacking>
+      <srw:recordData>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Journal des sçavans</dc:title>
+          <dc:date>1665</dc:date>
+          <dc:language>fre</dc:language>
+          <dc:type>publication en série imprimée</dc:type>
+          <dc:identifier>https://gallica.bnf.fr/ark:/12148/cb32798484r/date</dc:identifier>
+        </oai_dc:dc>
+      </srw:recordData>
+      <srw:recordPosition>2</srw:recordPosition>
+    </srw:record>
+  </srw:records>
+</srw:searchRetrieveResponse>

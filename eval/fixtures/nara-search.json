@@ -1,0 +1,26 @@
+{
+  "_source_note": "Trimmed from the worked example on https://www.archives.gov/research/catalog/help/api-getting-started (NARA's own published API docs). NARA_API_KEY is required to call this endpoint live and there is no public demo key, so this fixture is transcribed from NARA's documented example response rather than freshly recorded from the shell.",
+  "body": {
+    "hits": {
+      "total": { "value": 1, "relation": "eq" },
+      "hits": [
+        {
+          "_index": "nac-records2",
+          "_id": "417180915",
+          "_score": 83.65058,
+          "_source": {
+            "record": {
+              "levelOfDescription": "item",
+              "recordType": "description",
+              "title": "Tape 677, Conversation 010 (677-010)",
+              "generalRecordsTypes": ["Sound Recordings"],
+              "productionDates": [{ "month": 3, "year": 1972, "day": 6 }],
+              "scopeAndContentNote": "On March 6, 1972, President Richard M. Nixon, H. R. (\"Bob\") Haldeman, John D. Ehrlichman, and Alexander P. Butterfield met in the Oval Office of the White House from 12:31 pm to 1:28 pm.",
+              "naId": 417180915
+            }
+          }
+        }
+      ]
+    }
+  }
+}

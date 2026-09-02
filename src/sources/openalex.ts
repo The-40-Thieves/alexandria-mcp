@@ -3,8 +3,14 @@ import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
 
 const BASE = 'https://api.openalex.org';
-const MAILTO = process.env.CONTACT_EMAIL || '';
-if (!MAILTO) console.warn('CONTACT_EMAIL environment variable is not set');
+
+function authParam(): string {
+  const apiKey = process.env.OPENALEX_API_KEY;
+  if (apiKey) return `api_key=${encodeURIComponent(apiKey)}`;
+  const mailto = process.env.CONTACT_EMAIL || '';
+  if (!mailto) console.warn('CONTACT_EMAIL environment variable is not set');
+  return `mailto=${encodeURIComponent(mailto)}`;
+}
 
 interface OAWork {
   id: string;
@@ -19,9 +25,14 @@ interface OAWork {
   cited_by_count?: number;
 }
 
+interface OAMeta {
+  count: number;
+  cost_usd?: number;
+}
+
 interface OAResponse {
   results: OAWork[];
-  meta?: { count: number };
+  meta?: OAMeta;
 }
 
 // OpenAlex stores abstracts as inverted index — reconstruct
@@ -35,10 +46,7 @@ function invertedToAbstract(inv?: Record<string, number[]>): string {
   return words.map((w) => w[0]).join(' ');
 }
 
-export async function openalexSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<OAResponse>(
-    `${BASE}/works?search=${encodeURIComponent(query)}&per_page=${limit}&mailto=${MAILTO}`,
-  );
+export function normalizeOpenAlex(data: OAResponse): LibraryResult[] {
   return (data.results || []).map((w) => ({
     id: w.id.replace('https://openalex.org/', ''),
     source: 'openalex' as const,
@@ -55,6 +63,23 @@ export async function openalexSearch(query: string, limit = 10): Promise<Library
   }));
 }
 
+function logCost(meta: OAMeta | undefined, context: string): void {
+  // The paid api_key tier bills $0.001/search against a $1/day allowance
+  // (pacing.dailyCap:900 below approximates that ceiling); surface the
+  // per-call cost so it's visible without adding a metrics dependency.
+  if (meta?.cost_usd !== undefined && process.env.DEBUG) {
+    console.error(`[openalex] ${context} cost_usd=${meta.cost_usd}`);
+  }
+}
+
+export async function openalexSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const data = await fetchJSON<OAResponse>(
+    `${BASE}/works?search=${encodeURIComponent(query)}&per_page=${limit}&${authParam()}`,
+  );
+  logCost(data.meta, `search("${query}")`);
+  return normalizeOpenAlex(data);
+}
+
 export async function openalexRead(id: string): Promise<{
   text: string;
   title: string;
@@ -62,7 +87,7 @@ export async function openalexRead(id: string): Promise<{
   year?: number;
   language?: string;
 }> {
-  const w = await fetchJSON<OAWork>(`${BASE}/works/${id}?mailto=${MAILTO}`);
+  const w = await fetchJSON<OAWork>(`${BASE}/works/${id}?${authParam()}`);
   const abstract = invertedToAbstract(w.abstract_inverted_index);
   return {
     text: abstract || `No abstract available for OpenAlex work ${id}`,
@@ -75,8 +100,14 @@ export async function openalexRead(id: string): Promise<{
 
 register('openalex', {
   description:
-    'OpenAlex — 200M+ scholarly works. Free replacement for Scopus/Web of Science. Covers all disciplines. No API key required.',
+    'OpenAlex: 200M+ scholarly works. Free replacement for Scopus/Web of Science. Covers all disciplines. No API key required (set CONTACT_EMAIL for the polite pool, or OPENALEX_API_KEY for the paid tier).',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://openalex.org',
+  verifiedAt: '2026-09-01',
+  pacing: { dailyCap: 900 },
   search: openalexSearch,
   async read(id) {
     const raw = await openalexRead(id);

@@ -100,6 +100,11 @@ register('legislation', {
   description:
     'legislation.gov.uk — UK Acts of Parliament, Statutory Instruments, and devolved legislation with time-aware full text. No API key required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'law',
+  freshness: 'daily',
+  homepage: 'https://www.legislation.gov.uk',
+  verifiedAt: '2026-09-01',
   search: legislationSearch,
   async read(id) {
     const raw = await legislationRead(id);

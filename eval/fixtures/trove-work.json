@@ -1,0 +1,17 @@
+{
+  "_source_note": "TROVE_API_KEY is required and Trove offers no public demo key (only the free registered key described in the NLA data agreement, which this environment does not have), so this fixture matches the work-record identifier/linktype shape documented in Trove's own API technical guide (trove.nla.gov.au/about/create-something/using-api/v3/api-technical-guide) rather than being freshly recorded.",
+  "work": {
+    "id": "151678302",
+    "title": "Shipping intelligence",
+    "contributor": ["The Argus"],
+    "issued": "1901",
+    "identifier": [
+      {
+        "type": "url",
+        "linktype": "fulltext",
+        "linktext": "View online",
+        "value": "https://trove.nla.gov.au/newspaper/article/18341291"
+      }
+    ]
+  }
+}

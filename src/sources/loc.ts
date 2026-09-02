@@ -19,16 +19,7 @@ interface LOCResponse {
   results: LOCResult[];
 }
 
-export async function locSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const params = new URLSearchParams({
-    q: query,
-    fo: 'json',
-    c: String(limit),
-    fa: 'online-format:online text',
-  });
-
-  const data = await fetchJSON<LOCResponse>(`${LOC}/search/?${params}`);
-
+export function normalizeLoc(data: LOCResponse, limit: number): LibraryResult[] {
   return (data.results ?? []).slice(0, limit).map((r) => ({
     id: r.id,
     source: 'loc' as const,
@@ -42,10 +33,27 @@ export async function locSearch(query: string, limit: number): Promise<LibraryRe
   }));
 }
 
+export async function locSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  const params = new URLSearchParams({
+    q: query,
+    fo: 'json',
+    c: String(limit),
+    fa: 'online-format:online text',
+  });
+  const data = await fetchJSON<LOCResponse>(`${LOC}/search/?${params}`);
+  return normalizeLoc(data, limit);
+}
+
 register('loc', {
   description:
     'Library of Congress — US history, maps, newspapers, manuscripts. 170M+ items. Metadata and discovery.',
   supportsIngest: false,
+  kind: 'rest',
+  cluster: 'archives',
+  freshness: 'daily',
+  homepage: 'https://www.loc.gov',
+  verifiedAt: '2026-09-01',
+  pacing: { minIntervalMs: 3100 }, // loc.gov's stated limit is ~20 req/min
   search: locSearch,
   async read(id) {
     return {

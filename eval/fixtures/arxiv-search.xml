@@ -1,0 +1,67 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/p9J6ediO5Z0zhJ1Mxg9GYeO+Wxo</id>
+  <title>arXiv Query: search_query=all:transformer&amp;id_list=&amp;start=0&amp;max_results=2</title>
+  <updated>2026-09-02T00:45:16Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:transformer&amp;start=0&amp;max_results=2&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>2</opensearch:itemsPerPage>
+  <opensearch:totalResults>177198</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2201.00978v1</id>
+    <title>PyramidTNT: Improved Transformer-in-Transformer Baselines with Pyramid Architecture</title>
+    <updated>2022-01-04T04:56:57Z</updated>
+    <link href="https://arxiv.org/abs/2201.00978v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2201.00978v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Transformer networks have achieved great progress for computer vision tasks. Transformer-in-Transformer (TNT) architecture utilizes inner transformer and outer transformer to extract both local and global representations. In this work, we present new TNT baselines by introducing two advanced designs: 1) pyramid architecture, and 2) convolutional stem. The new "PyramidTNT" significantly improves the original TNT by establishing hierarchical representations. PyramidTNT achieves better performances than the previous state-of-the-art vision transformers such as Swin Transformer. We hope this new baseline will be helpful to the further research and application of vision transformer. Code will be available at https://github.com/huawei-noah/CV-Backbones/tree/master/tnt_pytorch.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-01-04T04:56:57Z</published>
+    <arxiv:comment>Tech Report. An extension of "Transformer in Transformer" (arXiv:2103.00112)</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Kai Han</name>
+    </author>
+    <author>
+      <name>Jianyuan Guo</name>
+    </author>
+    <author>
+      <name>Yehui Tang</name>
+    </author>
+    <author>
+      <name>Yunhe Wang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2104.11502v1</id>
+    <title>Learning to Cluster Faces via Transformer</title>
+    <updated>2021-04-23T09:43:36Z</updated>
+    <link href="https://arxiv.org/abs/2104.11502v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2104.11502v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Face clustering is a useful tool for applications like automatic face annotation and retrieval. The main challenge is that it is difficult to cluster images from the same identity with different face poses, occlusions, and image quality. Traditional clustering methods usually ignore the relationship between individual images and their neighbors which may contain useful context information. In this paper, we repurpose the well-known Transformer and introduce a Face Transformer for supervised face clustering. In Face Transformer, we decompose the face clustering into two steps: relation encoding and linkage predicting. Specifically, given a face image, a \textbf{relation encoder} module aggregates local context information from its neighbors and a \textbf{linkage predictor} module judges whether a pair of images belong to the same cluster or not. In the local linkage graph view, Face Transformer can generate more robust node and edge representations compared to existing methods. Experiments on both MS-Celeb-1M and DeepFashion show that our method achieves state-of-the-art performance, e.g., 91.12\% in pairwise F-score on MS-Celeb-1M.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2021-04-23T09:43:36Z</published>
+    <arxiv:comment>Face Transformer</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Jinxing Ye</name>
+    </author>
+    <author>
+      <name>Xioajiang Peng</name>
+    </author>
+    <author>
+      <name>Baigui Sun</name>
+    </author>
+    <author>
+      <name>Kai Wang</name>
+    </author>
+    <author>
+      <name>Xiuyu Sun</name>
+    </author>
+    <author>
+      <name>Hao Li</name>
+    </author>
+    <author>
+      <name>Hanqing Wu</name>
+    </author>
+  </entry>
+</feed>

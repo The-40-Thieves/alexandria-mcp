@@ -1,0 +1,23 @@
+{
+  "_source_note": "api.semanticscholar.org's shared unauthenticated pool is persistently rate-limited from this sandbox's egress IP (every attempt across multiple retries and backoff windows returned 429 with no Retry-After header (confirmed live), matching the pre-Stage-2 probe baseline, which was already ERROR/429). This fixture matches the Graph API's documented /paper/search response shape (the same shape the pre-Stage-2 adapter's S2Paper/S2SearchResponse types already assumed) rather than being freshly recorded from the shell.",
+  "total": 2,
+  "data": [
+    {
+      "paperId": "13c6de882218ba6c689ca5c035708b1b0e6f6b9c",
+      "title": "Deep Learning",
+      "authors": [{ "name": "Yann LeCun" }, { "name": "Yoshua Bengio" }, { "name": "Geoffrey Hinton" }],
+      "year": 2015,
+      "abstract": "Deep learning allows computational models composed of multiple processing layers to learn representations of data with multiple levels of abstraction.",
+      "openAccessPdf": { "url": "https://example.org/deep-learning.pdf", "status": "GREEN" },
+      "externalIds": { "DOI": "10.1038/nature14539" },
+      "fieldsOfStudy": ["Computer Science"]
+    },
+    {
+      "paperId": "2f4df08d9072a7203e3ec5a973ba823c5ec7fbf9",
+      "title": "A Few Useful Things to Know about Machine Learning",
+      "authors": [{ "name": "Pedro Domingos" }],
+      "year": 2012,
+      "fieldsOfStudy": ["Computer Science"]
+    }
+  ]
+}

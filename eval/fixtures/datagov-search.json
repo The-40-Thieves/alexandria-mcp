@@ -1,0 +1,123 @@
+{
+  "results": [
+    {
+      "title": "NYC Climate Budgeting Report: Climate Alignment Assessment and Capital Climate Investments",
+      "slug": "nyc-climate-budgeting-report-climate-alignment-assessment-and-capital-climate-investments",
+      "identifier": "https://data.cityofnewyork.us/api/views/c99a-c5ux",
+      "publisher": "data.cityofnewyork.us",
+      "keyword": [
+        "capital climate investments",
+        "climate",
+        "climate alignment assessment",
+        "climate budgeting",
+        "executive budget"
+      ],
+      "theme": ["City Government"],
+      "dcat": {
+        "landingPage": "https://data.cityofnewyork.us/d/c99a-c5ux",
+        "issued": "2025-07-28",
+        "language": null
+      }
+    },
+    {
+      "title": "State of the Climate Monthly Overview - Synoptic Discussion",
+      "slug": "state-of-the-climate-monthly-overview-synoptic-discussion",
+      "identifier": "https://data.noaa.gov/waf/NOAA/NESDIS/ncei/aim/iso/xml/C00768.xml",
+      "publisher": "DOC/NOAA/NESDIS/NCEI > National Centers for Environmental Information, NESDIS, NOAA, U.S. Department of Commerce",
+      "keyword": [
+        "Earth Science > Atmosphere > Atmospheric Pressure",
+        "Earth Science > Atmosphere > Atmospheric Pressure > Oscillations",
+        "Earth Science > Atmosphere > Atmospheric Pressure > Pressure Anomalies",
+        "Earth Science > Atmosphere > Atmospheric Pressure > Sea Level",
+        "Earth Science > Atmosphere > Atmospheric Pressure > Surface Pressure",
+        "Earth Science > Atmosphere > Atmospheric Radiation",
+        "Earth Science > Atmosphere > Atmospheric Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature > Temperature Anomalies",
+        "Earth Science > Atmosphere > Precipitation",
+        "Earth Science > Atmosphere > Precipitation > Precipitation Anomalies",
+        "Earth Science > Atmosphere > Atmospheric Winds",
+        "Earth Science > Atmosphere > Atmospheric Water Vapor",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > Arctic Oscillation > Ao",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > Eastern Pacific Oscillation > Ep/Np",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > El Nino Southern Oscillation (enso) > Enso",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > Madden-Julian Oscillation > Mjo",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > North Atlantic Oscillation > Na",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > Pacific/North American (pna) Pattern > Pna",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > Eastern Pacific Oscillation > Ep/Np",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > Tropical/Northern Hemisphere Pattern > Tnh",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > West Pacific Index > Wp",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Temperature Indicators > Temperature Trends",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Temperature Indicators > Temperature Variability",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Precipitation Indicators > Precipitation Trends",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Precipitation Indicators > Precipitation Variability",
+        "Earth Science > Oceans > Ocean Temperature > Sea Surface Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Atmospheric Temperature Indices > Residential Energy Demand Temperature Index",
+        "Climate Extremes Index, Cei",
+        "Continent > North America > United States Of America",
+        "Vertical Location > Land Surface",
+        "Vertical Location > Sea Surface",
+        "Vertical Location > Stratosphere",
+        "Vertical Location > Troposphere",
+        "DOC/NOAA/NESDIS/NCDC > National Climatic Data Center, NESDIS, NOAA, U.S. Department of Commerce",
+        "DOC/NOAA/NESDIS/NCEI > National Centers for Environmental Information, NESDIS, NOAA, U.S. Department of Commerce"
+      ],
+      "theme": ["geospatial"],
+      "dcat": {
+        "landingPage": "https://www.ncdc.noaa.gov/climate-monitoring/index.php",
+        "issued": "1998-01-01T00:00:00.000+00:00",
+        "language": []
+      }
+    },
+    {
+      "title": "State of the Climate - Global Analysis",
+      "slug": "state-of-the-climate-global-analysis",
+      "identifier": "https://data.noaa.gov/waf/NOAA/NESDIS/ncei/aim/iso/xml/C00672.xml",
+      "publisher": "DOC/NOAA/NESDIS/NCEI > National Centers for Environmental Information, NESDIS, NOAA, U.S. Department of Commerce",
+      "keyword": [
+        "Earth Science > Atmosphere > Atmospheric Pressure > Pressure Anomalies",
+        "Earth Science > Atmosphere > Atmospheric Pressure > Sea Level Pressure",
+        "Earth Science > Atmosphere > Atmospheric Radiation",
+        "Earth Science > Atmosphere > Atmospheric Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Atmospheric Temperature Indices > Residential Energy Demand\n\t\t\t\t\t\t\ttemperature Index",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature > Air Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature > Maximum/Minimum Temperature",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature > Temperature Anomalies",
+        "Earth Science > Atmosphere > Atmospheric Temperature > Surface Temperature > Temperature Tendency",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Temperature Indicators",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Temperature Indicators > Temperature Trends",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Temperature Indicators > Temperature Variability",
+        "Earth Science > Atmosphere > Precipitation",
+        "Earth Science > Atmosphere > Precipitation > Precipitation Amount",
+        "Earth Science > Atmosphere > Precipitation > Precipitation Anomalies",
+        "Earth Science > Atmosphere > Precipitation > Precipitation Rate",
+        "Earth Science > Atmosphere > Precipitation > Liquid Precipitation > Rain",
+        "Earth Science > Atmosphere > Precipitation > Solid Precipitation > Snow",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Precipitation Indicators > Precipitation Trends",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Precipitation Indicators > Precipitation Variability",
+        "Earth Science > Oceans > Ocean Temperature > Sea Surface Temperature",
+        "Earth Science > Climate Indicators > Cryospheric Indicators > Ice Extent",
+        "Earth Science > Cryosphere > Sea Ice > Ice Extent",
+        "Earth Science > Oceans > Sea Ice > Ice Extent",
+        "Earth Science > Terrestrial Hydrosphere > Snow/Ice > Ice Extent",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Teleconnections > El Nino Southern Oscillation\n\t\t\t\t\t\t\t(enso) > Enso",
+        "Earth Science > Climate Indicators > Atmospheric/Ocean Indicators > Extreme Weather",
+        "Geographic Region > Global",
+        "Vertical Location > Land Surface",
+        "Vertical Location > Sea Surface",
+        "Vertical Location > Stratosphere",
+        "Vertical Location > Troposphere",
+        "DOC/NOAA/NESDIS/NCDC > National Climatic Data Center, NESDIS, NOAA, U.S. Department of Commerce",
+        "DOC/NOAA/NESDIS/NCEI > National Centers for Environmental Information, NESDIS, NOAA, U.S. Department of Commerce"
+      ],
+      "theme": ["geospatial"],
+      "dcat": {
+        "landingPage": "https://www.ncdc.noaa.gov/climate-monitoring/index.php",
+        "issued": "1998-01-01T00:00:00.000+00:00",
+        "language": []
+      }
+    }
+  ]
+}

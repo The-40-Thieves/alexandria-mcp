@@ -198,6 +198,11 @@ register('ccel', {
   description:
     'Christian Classics Ethereal Library — patristics, Reformation theology, and Christian philosophy. Augustine, Aquinas, Calvin, Luther, Boethius, Origen, Edwards.',
   supportsIngest: true,
+  kind: 'scrape',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://www.ccel.org',
+  verifiedAt: '2026-09-01',
   search: (q, l) => Promise.resolve(ccelSearch(q, l)),
   async read(id) {
     const raw = await ccelRead(id);
