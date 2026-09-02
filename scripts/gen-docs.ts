@@ -126,7 +126,12 @@ function buildHealthExample(sources: Source[]): string {
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of sources) byKind[s.kind]++;
   const kindStr = `{ rest: ${byKind.rest}, hub: ${byKind.hub}, rss: ${byKind.rss}, mcp: ${byKind.mcp}, scrape: ${byKind.scrape} }`;
-  return `{ status: "ok", version: "${VERSION}", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, tools: 9 }`;
+  // quota/cache are runtime counters (Task 4's StateStore); the doc example
+  // shows a freshly-started process (nothing reserved or cached yet) rather
+  // than today's actual date, so this line does not drift day to day.
+  const quotaStr = '{ day: "2026-09-02", reserved: 0, sources: 0 }';
+  const cacheStr = '{ entries: 0 }';
+  return `{ status: "ok", version: "${VERSION}", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
 }
 
 function applyReadmeSubstitutions(content: string, sources: Source[]): string {
@@ -237,9 +242,14 @@ const FEATURE_ENVS: EnvVar[] = [
       'Path to the shared undici RFC 9111 http-cache SQLite database. Defaults to data/http-cache.db inside the package; falls back to an in-memory cache if that location cannot be created.',
   },
   {
+    name: 'ALEXANDRIA_STATE_DB',
+    comment:
+      'Path to the node:sqlite database backing the daily quota ledger and search result cache. Defaults to data/alexandria.db inside the package; set to ":memory:" to force the in-memory store, or falls back to it automatically if the path can\'t be created.',
+  },
+  {
     name: 'ALEXANDRIA_LEDGER',
     comment:
-      'Set to "supabase" (with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY) to persist the daily quota ledger; otherwise it is in-memory only.',
+      'Set to "supabase" (with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY) to persist the daily quota ledger there instead of ALEXANDRIA_STATE_DB.',
   },
   {
     name: 'SEARXNG_URL',

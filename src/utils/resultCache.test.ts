@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cacheKey, parseTtlMs, ResultCache } from './resultCache.ts';
+import { MemoryStateStore } from './stateStore.ts';
 
 test('resultCache', async (t) => {
   await t.test('returns undefined on miss', () => {
@@ -27,7 +28,7 @@ test('resultCache', async (t) => {
   });
 
   await t.test('evicts the oldest entry once max is exceeded', () => {
-    const c = new ResultCache<number>(1000, 2);
+    const c = new ResultCache<number>(1000, new MemoryStateStore(2));
     c.set('a', 1, 0);
     c.set('b', 2, 0);
     c.set('c', 3, 0);

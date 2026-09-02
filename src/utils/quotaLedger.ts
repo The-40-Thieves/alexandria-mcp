@@ -1,7 +1,8 @@
-// THE-311: a daily usage cap per source, backed by an in-memory store by
-// default or (when configured) a Supabase table shared across processes.
+// THE-311: a daily usage cap per source, backed by node:sqlite (Task 4) by
+// default, or (when configured) a Supabase table shared across processes.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { stateStore as defaultStateStore, type StateStore } from './stateStore.ts';
 
 export class QuotaExceededError extends Error {
   source: string;
@@ -33,6 +34,29 @@ export class MemoryLedgerStore implements LedgerStore {
     const next = (this.counts.get(key) ?? 0) + 1;
     this.counts.set(key, next);
     return next;
+  }
+}
+
+// Adapts a Task 4 StateStore to LedgerStore: increments unconditionally
+// (Number.MAX_SAFE_INTEGER as the store's own cap, so it never rejects
+// here) and reads the count back, leaving the cap check to reserveQuota()
+// below exactly as MemoryLedgerStore always has. This is what
+// createLedger() returns by default, so the ledger now persists across
+// restarts via whichever store stateStore.ts selected (sqlite or memory).
+export class StateLedgerStore implements LedgerStore {
+  private store: StateStore;
+
+  constructor(store: StateStore) {
+    this.store = store;
+  }
+
+  async get(source: string, day: string): Promise<number> {
+    return this.store.getQuota(source, day);
+  }
+
+  async increment(source: string, day: string): Promise<number> {
+    this.store.reserveQuota(source, day, Number.MAX_SAFE_INTEGER);
+    return this.store.getQuota(source, day);
   }
 }
 
@@ -70,12 +94,12 @@ export function utcDay(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
-export function createLedger(): LedgerStore {
+export function createLedger(store: StateStore = defaultStateStore): LedgerStore {
   const { ALEXANDRIA_LEDGER, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
   if (ALEXANDRIA_LEDGER === 'supabase' && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     return new SupabaseLedgerStore(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   }
-  return new MemoryLedgerStore();
+  return new StateLedgerStore(store);
 }
 
 // Atomically reserves one unit of a source's daily quota: increments the

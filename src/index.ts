@@ -545,7 +545,7 @@ export function createHttpApp(): express.Express {
   app.get('/mcp', handleMcpRequest);
   app.delete('/mcp', handleMcpRequest);
   app.get('/health', (_req, res) => {
-    const { sources, visible, hidden, byKind } = healthSummary();
+    const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
     res.json({
       status: 'ok',
       version: VERSION,
@@ -553,6 +553,8 @@ export function createHttpApp(): express.Express {
       visible,
       hidden,
       byKind,
+      quota,
+      cache,
       tools: TOOL_COUNT,
     });
   });

@@ -337,6 +337,26 @@ describe('healthSummary', () => {
     assert.equal(after.hidden, before.hidden + 1);
     assert.equal(after.byKind.mcp, before.byKind.mcp + 1);
   });
+
+  it('a search call is reflected in quota.reserved and cache.entries (Task 4)', async () => {
+    register('t_health_quota', {
+      description: 'x',
+      supportsIngest: false,
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
+    });
+    const before = healthSummary();
+    await getAdapter('t_health_quota').search('q', 1);
+    const after = healthSummary();
+    assert.equal(after.quota.reserved, before.quota.reserved + 1);
+    assert.equal(after.quota.sources, before.quota.sources + 1);
+    assert.equal(after.cache.entries, before.cache.entries + 1);
+    assert.equal(after.quota.day, before.quota.day);
+  });
 });
 
 // Regression test for the guard ordering bug: quota was reserved and the
