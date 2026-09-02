@@ -59,3 +59,4 @@ import './apollo.js';
 import './ora.js';
 import './codewiki.js';
 import './youtube.js';
+import './feeds/security.js';
