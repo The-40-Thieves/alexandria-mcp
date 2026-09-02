@@ -1,5 +1,5 @@
 import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
+import { fetchWithRetry } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
 
 const GRAPH = 'https://api.semanticscholar.org/graph/v1';
@@ -9,6 +9,24 @@ const FIELDS = 'paperId,title,authors,year,abstract,openAccessPdf,externalIds,fi
 function headers(): Record<string, string> {
   const key = process.env.SEMANTIC_SCHOLAR_API_KEY;
   return key ? { 'x-api-key': key } : {};
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Semantic Scholar's shared unauthenticated pool 429s aggressively; on a
+// 429 read Retry-After and sleep once before retrying, rather than failing
+// immediately or retrying indefinitely.
+async function s2Fetch<T>(url: string): Promise<T> {
+  let res = await fetchWithRetry(url, { headers: headers() });
+  if (res.status === 429) {
+    const retryAfterSec = Number(res.headers.get('retry-after'));
+    await sleep((Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec : 1) * 1000);
+    res = await fetchWithRetry(url, { headers: headers() });
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${url}`);
+  return res.json() as Promise<T>;
 }
 
 interface S2Paper {
@@ -31,7 +49,7 @@ interface S2RecommendResponse {
   recommendedPapers: S2Paper[];
 }
 
-function mapPaper(p: S2Paper): LibraryResult {
+export function mapPaper(p: S2Paper): LibraryResult {
   return {
     id: p.paperId,
     source: 'semanticscholar' as const,
@@ -48,9 +66,8 @@ function mapPaper(p: S2Paper): LibraryResult {
 }
 
 export async function s2Search(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<S2SearchResponse>(
+  const data = await s2Fetch<S2SearchResponse>(
     `${GRAPH}/paper/search?query=${encodeURIComponent(query)}&fields=${FIELDS}&limit=${limit}`,
-    { headers: headers() },
   );
   return (data.data || []).map(mapPaper);
 }
@@ -62,9 +79,7 @@ export async function s2Read(id: string): Promise<{
   year?: number;
   language?: string;
 }> {
-  const p = await fetchJSON<S2Paper>(`${GRAPH}/paper/${id}?fields=${FIELDS}`, {
-    headers: headers(),
-  });
+  const p = await s2Fetch<S2Paper>(`${GRAPH}/paper/${id}?fields=${FIELDS}`);
   const text = p.abstract || '';
   if (!text)
     throw new Error(
@@ -80,17 +95,21 @@ export async function s2Read(id: string): Promise<{
 }
 
 export async function s2Recommend(paperId: string, limit = 20): Promise<LibraryResult[]> {
-  const data = await fetchJSON<S2RecommendResponse>(
+  const data = await s2Fetch<S2RecommendResponse>(
     `${REC}/papers/forpaper/${paperId}?fields=${FIELDS}&limit=${limit}`,
-    { headers: headers() },
   );
   return (data.recommendedPapers || []).map(mapPaper);
 }
 
 register('semanticscholar', {
   description:
-    'Semantic Scholar — 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend.',
+    'Semantic Scholar — 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend. Set SEMANTIC_SCHOLAR_API_KEY for a dedicated rate pool.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://www.semanticscholar.org',
+  pacing: { minIntervalMs: 1100 },
   search: s2Search,
   async read(id) {
     const raw = await s2Read(id);
