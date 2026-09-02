@@ -1,6 +1,15 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 export const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
 const RETRY_DELAY_MS = 1_000;
+
+// An ambient abort signal a caller can set up around a whole call (registry.ts's
+// withGuards() does this, scoped to its own timeout). fetchWithRetry() below
+// reads it so that once the caller has given up, the in-flight fetch attempt
+// is cancelled immediately and no further retry is started, instead of the
+// retry loop running to completion after the caller already stopped waiting.
+export const requestContext = new AsyncLocalStorage<{ signal: AbortSignal }>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -13,17 +22,20 @@ export async function fetchWithRetry(
   retries = DEFAULT_RETRIES,
 ): Promise<Response> {
   let lastError: Error = new Error('Unknown error');
+  const ambient = requestContext.getStore()?.signal;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) await sleep(RETRY_DELAY_MS * attempt);
+    if (ambient?.aborted) throw ambient.reason ?? new Error('This operation was aborted');
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const signal = ambient ? AbortSignal.any([controller.signal, ambient]) : controller.signal;
 
     try {
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal,
+        signal,
         headers: {
           'User-Agent': 'library-mcp-server/1.0 (open source research tool)',
           ...options.headers,
@@ -34,6 +46,7 @@ export async function fetchWithRetry(
     } catch (err) {
       clearTimeout(timer);
       lastError = err instanceof Error ? err : new Error(String(err));
+      if (ambient?.aborted) throw ambient.reason ?? lastError;
       // Don't retry on abort (timeout) for last attempt
       if (attempt === retries) break;
     }

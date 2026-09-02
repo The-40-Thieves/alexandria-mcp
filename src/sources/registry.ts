@@ -1,4 +1,5 @@
 import type { LibraryResult, ReadResult } from '../types.js';
+import { requestContext } from '../utils/http.js';
 import { createLedger, type LedgerStore, reserveQuota } from '../utils/quotaLedger.js';
 import { rateLimited } from '../utils/rateLimit.js';
 import { cacheKey, searchCache } from '../utils/resultCache.js';
@@ -95,9 +96,18 @@ export function register(name: string, adapter: SourceAdapter): void {
 // Rejects with the message existing callers already match on (e.g.
 // scripts/probe.ts's classify()'s /abort/i test) once `meta.timeoutMs`
 // elapses, whichever of the underlying call or the timer settles first.
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+// Also aborts `controller` on that same deadline, so http.ts's
+// fetchWithRetry() (which reads the ambient signal `controller.signal` is
+// wired to via requestContext, see withGuards()) cancels its in-flight
+// fetch and stops retrying instead of continuing after this caller has
+// already given up.
+function withTimeout<T>(p: Promise<T>, ms: number, controller: AbortController): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('This operation was aborted')), ms);
+    const timer = setTimeout(() => {
+      const err = new Error('This operation was aborted');
+      controller.abort(err);
+      reject(err);
+    }, ms);
     p.then(
       (v) => {
         clearTimeout(timer);
@@ -126,18 +136,26 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       const cached = searchCache.get(key);
       if (cached) return cached;
       await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
+      const controller = new AbortController();
       const result = await withTimeout(
-        rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.search(query, limit)),
+        requestContext.run({ signal: controller.signal }, () =>
+          rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.search(query, limit)),
+        ),
         adapter.timeoutMs,
+        controller,
       );
       searchCache.set(key, result);
       return result;
     },
     async read(id) {
       await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
+      const controller = new AbortController();
       return await withTimeout(
-        rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.read(id)),
+        requestContext.run({ signal: controller.signal }, () =>
+          rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.read(id)),
+        ),
         adapter.timeoutMs,
+        controller,
       );
     },
   };
