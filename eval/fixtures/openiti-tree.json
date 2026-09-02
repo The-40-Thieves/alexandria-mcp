@@ -1,0 +1,45 @@
+{
+  "tree": [
+    {
+      "path": "data/0476IbnAbiSaqrAnbari/0476IbnAbiSaqrAnbari.Hadith/0476IbnAbiSaqrAnbari.Hadith.ShamAY0032933-ara1",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c0d7c88795075b91d0c1b13d40398fb64cacb9e8",
+      "size": 24253,
+      "url": "https://api.github.com/repos/OpenITI/0500AH/git/blobs/c0d7c88795075b91d0c1b13d40398fb64cacb9e8"
+    },
+    {
+      "path": "data/0476IbnAbiSaqrAnbari/0476IbnAbiSaqrAnbari.Hadith/0476IbnAbiSaqrAnbari.Hadith.ShamAY0032933-ara1.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bfee2206c2da05ddaacd52283e2be4b55a05b755",
+      "size": 828,
+      "url": "https://api.github.com/repos/OpenITI/0500AH/git/blobs/bfee2206c2da05ddaacd52283e2be4b55a05b755"
+    },
+    {
+      "path": "data/0476IbnAbiSaqrAnbari/0476IbnAbiSaqrAnbari.Hadith/0476IbnAbiSaqrAnbari.Hadith.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b64f91b4ed87844e5791698d4377bd52436c3c55",
+      "size": 1095,
+      "url": "https://api.github.com/repos/OpenITI/0500AH/git/blobs/b64f91b4ed87844e5791698d4377bd52436c3c55"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9ef7191fc4189953ed14641f219842d1ffda3690",
+      "size": 524,
+      "url": "https://api.github.com/repos/OpenITI/0500AH/git/blobs/9ef7191fc4189953ed14641f219842d1ffda3690"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a25eb936b9c59380cf5ae466a43298c353d27a8",
+      "size": 8,
+      "url": "https://api.github.com/repos/OpenITI/0500AH/git/blobs/1a25eb936b9c59380cf5ae466a43298c353d27a8"
+    }
+  ],
+  "truncated": false
+}
