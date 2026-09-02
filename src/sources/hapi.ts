@@ -11,10 +11,25 @@ import { truncateText } from './registry.js';
 
 const BASE = 'https://hapi.humdata.org/api/v2';
 
-const ISO3_BY_NAME = new Map(ISO3_COUNTRIES);
+// Diacritic- and case-insensitive: an unaccented query like "Cote d'Ivoire"
+// or "TURKIYE" needs to match the accented ISO short names in
+// ISO3_COUNTRIES ("Cote d'Ivoire", "Turkiye"). NFD decomposes each accented
+// character into a base letter plus a combining mark; stripping the
+// combining marks block (U+0300 to U+036F) leaves the plain base letters.
+function normalizeCountryKey(s: string): string {
+  return s
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+const ISO3_BY_NAME = new Map(
+  ISO3_COUNTRIES.map(([name, code]) => [normalizeCountryKey(name), code]),
+);
 
 export function resolveIso3(query: string): string | undefined {
-  return ISO3_BY_NAME.get(query.trim().toLowerCase());
+  return ISO3_BY_NAME.get(normalizeCountryKey(query));
 }
 
 interface HapiConflictEvent {

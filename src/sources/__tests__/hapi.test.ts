@@ -23,6 +23,10 @@ test('resolveIso3', async (t) => {
   await t.test('returns undefined for a non-country query', () => {
     assert.equal(resolveIso3('drought risk'), undefined);
   });
+  await t.test('is diacritic-insensitive', () => {
+    assert.equal(resolveIso3("Cote d'Ivoire"), 'CIV');
+    assert.equal(resolveIso3('TURKIYE'), 'TUR');
+  });
 });
 
 test('normalizeHapiConflictEvent', async (t) => {
