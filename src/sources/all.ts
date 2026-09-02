@@ -75,6 +75,7 @@ import './swiftevolution.js';
 import './mdn.js';
 import './context7.js';
 import './ietf.js';
+import './w3c.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';

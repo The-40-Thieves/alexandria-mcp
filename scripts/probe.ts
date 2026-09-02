@@ -86,6 +86,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   tc39: '',
   swiftevolution: '',
   ietf: 'tls',
+  w3c: 'css',
 };
 const DEFAULT_QUERY = 'history of science';
 
