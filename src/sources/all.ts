@@ -108,3 +108,4 @@ import './ucdp.js';
 import './wikicurrent.js';
 import './federalregister.js';
 import './congress.js';
+import './regulations.js';
