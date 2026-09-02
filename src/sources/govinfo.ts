@@ -1,7 +1,7 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { stripHtml } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { stripHtml } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.govinfo.gov';
 

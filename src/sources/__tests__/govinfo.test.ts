@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { govinfoSearch, normalizeGovInfo } from '../govinfo.js';
+import { govinfoSearch, normalizeGovInfo } from '../govinfo.ts';
 
 // Recorded from the shell using GovInfo's public DEMO_KEY (per the docs at
 // api.govinfo.gov/docs), never used in code, only to capture this fixture.

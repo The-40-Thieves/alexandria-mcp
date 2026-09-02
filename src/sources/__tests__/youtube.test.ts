@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { captionJsonUrl, supadataRead } from '../youtube.js';
+import { captionJsonUrl, supadataRead } from '../youtube.ts';
 
 test('supadataRead', async (t) => {
   await t.test('returns undefined when SUPADATA_API_KEY is unset (caller falls back)', async () => {

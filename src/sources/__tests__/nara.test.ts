@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { naraSearch, normalizeNara } from '../nara.js';
+import { naraSearch, normalizeNara } from '../nara.ts';
 
 // Trimmed from NARA's own documented example response (see the
 // "_source_note" field in the fixture): NARA_API_KEY is required to call

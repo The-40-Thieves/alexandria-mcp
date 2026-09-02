@@ -2,9 +2,9 @@
 // API key required. A custom register() rather than defineRest(): search()
 // branches between two different endpoints depending on whether the query
 // looks like a currency code (or pair) or free text.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.frankfurter.dev/v1';
 const CODE = /^[A-Za-z]{3}$/;

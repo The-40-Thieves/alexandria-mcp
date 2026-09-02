@@ -10,9 +10,9 @@
 // one env var (envs?: string[] is deferred, not added in this stage); hidden
 // is set explicitly to reflect the two-env fallback the single-env
 // isConfigured() check can't express.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.regulations.gov/v4';
 

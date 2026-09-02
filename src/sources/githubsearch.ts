@@ -1,8 +1,8 @@
 // GitHub code search. Requires GITHUB_TOKEN: GitHub's /search/code endpoint
 // returns 401 for unauthenticated requests, unlike /search/repositories.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://api.github.com';
 

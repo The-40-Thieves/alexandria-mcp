@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { runbergSearch } from '../projectruneberg.js';
+import { runbergSearch } from '../projectruneberg.ts';
 
 test('runbergSearch', async (t) => {
   await t.test('finds book by exact title', () => {

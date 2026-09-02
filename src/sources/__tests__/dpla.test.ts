@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { dplaSearch, normalizeDpla } from '../dpla.js';
+import { dplaSearch, normalizeDpla } from '../dpla.ts';
 
 // DPLA_API_KEY is required to call this live and DPLA offers no public demo
 // key, so this fixture is built from DPLA's documented field reference

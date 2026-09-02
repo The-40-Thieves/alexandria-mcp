@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { VERSION } from './version.js';
+import { VERSION } from './version.ts';
 
 test('VERSION', async (t) => {
   await t.test('matches package.json, the single source of the version', () => {

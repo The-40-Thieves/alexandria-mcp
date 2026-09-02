@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeArxiv } from '../arxiv.js';
+import { normalizeArxiv } from '../arxiv.ts';
 
 const xml = readFileSync(path.resolve(process.cwd(), 'eval/fixtures/arxiv-search.xml'), 'utf8');
 

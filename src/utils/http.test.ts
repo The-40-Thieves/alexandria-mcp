@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fetchWithRetry, retryAfterMs } from './http.js';
+import { fetchWithRetry, retryAfterMs } from './http.ts';
 
 test('retryAfterMs', async (t) => {
   await t.test('missing header falls back to 1000ms', () => {

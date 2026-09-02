@@ -4,9 +4,9 @@
 // package's known vulnerabilities. OSV's query endpoint rejects a bare
 // package name with no ecosystem ("invalid query"), so a plain word with no
 // colon and no id shape returns no results rather than erroring.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.osv.dev/v1';
 const ID_PATTERN = /^(CVE|GHSA|PYSEC|RUSTSEC|GO)-/i;

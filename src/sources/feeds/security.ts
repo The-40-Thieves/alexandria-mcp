@@ -1,5 +1,5 @@
 // Security advisory and vulnerability disclosure RSS/Atom feeds.
-import { defineRssSource } from '../kinds/rss.js';
+import { defineRssSource } from '../kinds/rss.ts';
 
 defineRssSource({
   name: 'exploitdb',

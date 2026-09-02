@@ -8,8 +8,8 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Cluster, catalog, type Freshness } from '../sources/registry.js';
-import { embed, hasEmbeddingsConfigured } from './providers.js';
+import { type Cluster, catalog, type Freshness } from '../sources/registry.ts';
+import { embed, hasEmbeddingsConfigured } from './providers.ts';
 
 export interface CatalogEntry {
   name: string;
@@ -19,15 +19,16 @@ export interface CatalogEntry {
   vector?: number[];
 }
 
-// Resolved from __dirname, not process.cwd(): the default used to depend on
-// where the process was started, so the same install read and wrote a
-// different cache file per working directory (and, run from anywhere but
-// the repo root, silently re-embedded the whole catalog every start).
-// __dirname is dist/utils/ after a build and src/utils/ under tsx, so
-// ../../eval lands at the package root either way.
+// Resolved from import.meta.dirname, not process.cwd(): the default used to
+// depend on where the process was started, so the same install read and
+// wrote a different cache file per working directory (and, run from
+// anywhere but the repo root, silently re-embedded the whole catalog every
+// start). import.meta.dirname is dist/utils/ after a build and
+// src/utils/ under native execution, so ../../eval lands at the package
+// root either way.
 // ALEXANDRIA_CATALOG_CACHE overrides it, which is also how tests point
 // persistence at a throwaway file.
-const DEFAULT_CACHE_PATH = path.resolve(__dirname, '../../eval/catalog-embeddings.json');
+const DEFAULT_CACHE_PATH = path.resolve(import.meta.dirname, '../../eval/catalog-embeddings.json');
 
 function cachePath(): string {
   return process.env.ALEXANDRIA_CATALOG_CACHE ?? DEFAULT_CACHE_PATH;

@@ -28,11 +28,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import '../src/sources/all.js';
-import { listSources } from '../src/sources/registry.js';
-import { planRoute } from '../src/tools/libraryAsk.js';
-import { candidates } from '../src/utils/catalogIndex.js';
-import { hasEmbeddingsConfigured, roleConfig } from '../src/utils/providers.js';
+import '../src/sources/all.ts';
+import { listSources } from '../src/sources/registry.ts';
+import { planRoute } from '../src/tools/libraryAsk.ts';
+import { candidates } from '../src/utils/catalogIndex.ts';
+import { hasEmbeddingsConfigured, roleConfig } from '../src/utils/providers.ts';
 
 export interface GoldenQuery {
   query: string;

@@ -1,6 +1,6 @@
 // THE-166: a short TTL cache for search results, keyed by source+query+limit.
 
-import type { LibraryResult } from '../types.js';
+import type { LibraryResult } from '../types.ts';
 
 interface Entry<T> {
   value: T;
@@ -9,11 +9,13 @@ interface Entry<T> {
 
 export class ResultCache<T> {
   private store = new Map<string, Entry<T>>();
+  private ttlMs: number;
+  private max: number;
 
-  constructor(
-    private ttlMs: number,
-    private max = 500,
-  ) {}
+  constructor(ttlMs: number, max = 500) {
+    this.ttlMs = ttlMs;
+    this.max = max;
+  }
 
   get(key: string, now = Date.now()): T | undefined {
     const entry = this.store.get(key);

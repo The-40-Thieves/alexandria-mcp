@@ -7,10 +7,10 @@
 // https://api.githubcopilot.com/mcp/ on 2026-09-02 using the operator's
 // own gh CLI token for that one-off check only (not read from or written
 // to this deployment's env) - see the task-5 report.
-import type { LibraryResult, ReadResult } from '../../types.js';
-import type { RemoteServerConfig } from '../../utils/mcpClientPool.js';
-import { defineMcpSource } from '../kinds/mcp.js';
-import { truncateText } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import type { RemoteServerConfig } from '../../utils/mcpClientPool.ts';
+import { defineMcpSource } from '../kinds/mcp.ts';
+import { truncateText } from '../registry.ts';
 
 function server(): RemoteServerConfig | null {
   const token = process.env.GITHUB_TOKEN;

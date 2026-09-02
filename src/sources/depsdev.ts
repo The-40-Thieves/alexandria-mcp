@@ -4,9 +4,9 @@
 // ("no results match query") unless a specific version is also given, so
 // both branches use /v3/systems/{system}/packages/{name} directly, which
 // returns a package's full version list either way.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const BASE = 'https://api.deps.dev/v3';
 const DEFAULT_SYSTEM = 'npm';

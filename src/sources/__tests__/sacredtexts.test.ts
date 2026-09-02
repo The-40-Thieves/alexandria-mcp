@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getAdapter } from '../registry.js';
-import { sacredTextsSearch } from '../sacredtexts.js';
-import '../sacredtexts.js';
+import { getAdapter } from '../registry.ts';
+import { sacredTextsSearch } from '../sacredtexts.ts';
+import '../sacredtexts.ts';
 
 test('sacredTextsSearch', async (t) => {
   await t.test('matches by title/author/subject/tradition', () => {

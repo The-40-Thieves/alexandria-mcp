@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { startTestMcpServer, type TestMcpServerHandle } from '../../utils/mcpTestServer.js';
-import { catalog, getAdapter, register } from '../registry.js';
-import { defineMcpSource, defineMcpSourceWithDelegatedRead, mcpProbeEntries } from './mcp.js';
+import { startTestMcpServer, type TestMcpServerHandle } from '../../utils/mcpTestServer.ts';
+import { catalog, getAdapter, register } from '../registry.ts';
+import { defineMcpSource, defineMcpSourceWithDelegatedRead, mcpProbeEntries } from './mcp.ts';
 
 function baseSpec(handle: TestMcpServerHandle, name: string) {
   return {

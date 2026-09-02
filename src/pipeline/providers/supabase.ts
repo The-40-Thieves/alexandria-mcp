@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Chunk, VectorStoreProvider } from '../../types.js';
+import type { Chunk, VectorStoreProvider } from '../../types.ts';
 
 export class SupabaseVectorStoreProvider implements VectorStoreProvider {
   private client: SupabaseClient;

@@ -2,9 +2,9 @@
 // per-query search API), downloaded once per process and filtered
 // client-side by token match, the same static-download convention as
 // attack.ts, peps.ts, tc39.ts and swiftevolution.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const URL = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json';
 const UA = 'alexandria-mcp/10 (+https://github.com/The-40-Thieves/alexandria-mcp)';

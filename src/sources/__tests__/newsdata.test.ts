@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeNewsdata } from '../newsdata.js';
-import { getAdapter } from '../registry.js';
+import { normalizeNewsdata } from '../newsdata.ts';
+import { getAdapter } from '../registry.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/newsdata-latest.json'), 'utf8'),

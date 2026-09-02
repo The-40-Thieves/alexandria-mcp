@@ -7,9 +7,9 @@
 // without writing, so CI can catch a registry change that docs weren't
 // regenerated for.
 import fs from 'node:fs';
-import '../src/sources/all.js';
-import { type Cluster, listSources, type SourceKind } from '../src/sources/registry.js';
-import { VERSION } from '../src/version.js';
+import '../src/sources/all.ts';
+import { type Cluster, listSources, type SourceKind } from '../src/sources/registry.ts';
+import { VERSION } from '../src/version.ts';
 
 const README_PATH = 'README.md';
 const ENV_EXAMPLE_PATH = '.env.example';

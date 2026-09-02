@@ -4,8 +4,8 @@
 // duplicates (the same work returned under slightly different titles by two
 // sources) before anything gets read or cited.
 import { z } from 'zod';
-import type { LibraryResult } from '../types.js';
-import { chatJSON } from './providers.js';
+import type { LibraryResult } from '../types.ts';
+import { chatJSON } from './providers.ts';
 
 export interface FusedResult extends LibraryResult {
   score: number;

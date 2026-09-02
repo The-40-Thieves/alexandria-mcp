@@ -1,8 +1,8 @@
 // EPA Toxics Release Inventory (TRI): facility search by name. No API key
 // required.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://data.epa.gov/efservice';
 

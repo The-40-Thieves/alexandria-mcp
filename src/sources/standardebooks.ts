@@ -1,8 +1,8 @@
 import { parse } from 'node-html-parser';
-import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
-import { normaliseWhitespace, stripHtml } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchText } from '../utils/http.ts';
+import { normaliseWhitespace, stripHtml } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 // Standard Ebooks' OPDS catalog feed used by the old adapter is no longer a
 // practical way to search (it lists the whole catalog with no query

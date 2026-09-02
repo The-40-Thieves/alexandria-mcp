@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeW3c, w3cSearch } from '../w3c.js';
+import { normalizeW3c, w3cSearch } from '../w3c.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/w3c-specifications.json'), 'utf8'),

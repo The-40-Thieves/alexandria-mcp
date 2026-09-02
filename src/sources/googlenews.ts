@@ -1,10 +1,10 @@
 // Google News RSS search. Unlike the fixed-feed sources in src/sources/feeds/,
 // the search URL is built per query, so this registers directly instead of
 // going through defineRssSource()'s single-feed FeedConfig.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
-import { parseFeedItems } from './kinds/rss.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchText } from '../utils/http.ts';
+import { parseFeedItems } from './kinds/rss.ts';
+import { register } from './registry.ts';
 
 const TIMEOUT_MS = 20000;
 

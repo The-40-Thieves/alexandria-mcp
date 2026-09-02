@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const API = 'https://www.googleapis.com/books/v1/volumes';
 
@@ -91,7 +91,7 @@ export async function googleBooksRead(id: string): Promise<{
     // Direct text: https://books.google.com/books/download/{id}.txt?id={id}&output=txt
     try {
       const textUrl = `https://books.google.com/books/download/${id}.txt?id=${id}&output=txt`;
-      const { fetchText } = await import('../utils/http.js');
+      const { fetchText } = await import('../utils/http.ts');
       const text = await fetchText(textUrl);
       if (text && text.length > 500) {
         return {

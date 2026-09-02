@@ -5,9 +5,9 @@
 // public preview endpoint; UN_COMTRADE_KEY, if present, is sent as
 // Ocp-Apim-Subscription-Key (needed only for the full /data/v1/get/
 // endpoint, which this adapter does not call).
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://comtradeapi.un.org/public/v1/preview/C/A/HS';
 const HS_CODE = /^\d{2,10}$/;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeTc39, tc39Search } from '../tc39.js';
+import { normalizeTc39, tc39Search } from '../tc39.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/tc39-proposals.json'), 'utf8'),

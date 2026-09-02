@@ -1,5 +1,5 @@
-import type { EmbeddingProvider } from '../../types.js';
-import { embed } from '../../utils/providers.js';
+import type { EmbeddingProvider } from '../../types.ts';
+import { embed } from '../../utils/providers.ts';
 
 // Thin wrapper over the shared per-role provider table (THE-318): batching
 // and the embeddings role's config resolution (OPENAI_API_KEY or

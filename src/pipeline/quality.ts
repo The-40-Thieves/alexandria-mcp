@@ -1,5 +1,5 @@
-import type { Chunk } from '../types.js';
-import { ocrQualityScore } from '../utils/text-clean.js';
+import type { Chunk } from '../types.ts';
+import { ocrQualityScore } from '../utils/text-clean.ts';
 
 // Chunks below this threshold are dropped before ingestion.
 // 0.75 means at least 75% of characters must be "clean".

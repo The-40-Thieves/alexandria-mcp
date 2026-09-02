@@ -1,5 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": ["src/index.ts", "scripts/*.ts", "src/sources/all.ts"],
+  "entry": ["scripts/*.ts", "scripts/rewrite-relative-js-imports.mjs", "src/sources/all.ts"],
   "ignoreExportsUsedInFile": true
 }

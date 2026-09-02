@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { devtoSearch, normalizeDevtoArticle, normalizeDevtoFeedResult } from '../devto.js';
+import { devtoSearch, normalizeDevtoArticle, normalizeDevtoFeedResult } from '../devto.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/devto-articles.json'), 'utf8'),

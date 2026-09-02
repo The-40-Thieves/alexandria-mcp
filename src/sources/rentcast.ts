@@ -1,9 +1,9 @@
 // RentCast: US rental and sale market statistics by ZIP code. Requires
 // RENTCAST_API_KEY (header X-Api-Key); the free tier is 50 requests/month,
 // so pacing caps this source to one call per day.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://api.rentcast.io/v1';
 

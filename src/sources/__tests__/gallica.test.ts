@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeGallica } from '../gallica.js';
+import { normalizeGallica } from '../gallica.ts';
 
 // Recorded shape is transcribed from Gallica's documented SRU/DC response
 // (see the fixture's own header comment); the endpoint currently returns

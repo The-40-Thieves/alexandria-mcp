@@ -4,8 +4,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import '../sources/all.js';
-import { listSources } from '../sources/registry.js';
+import '../sources/all.ts';
+import { listSources } from '../sources/registry.ts';
 import {
   bm25Candidates,
   buildCatalog,
@@ -13,7 +13,7 @@ import {
   candidates,
   resetCatalogCacheForTests,
   withClusterFloor,
-} from './catalogIndex.js';
+} from './catalogIndex.ts';
 
 function synthetic(overrides: Partial<CatalogEntry> & Pick<CatalogEntry, 'name'>): CatalogEntry {
   return {

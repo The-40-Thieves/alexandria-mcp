@@ -4,9 +4,9 @@
 // defineRest(): the GED API has no documented per-event-id lookup, so
 // read() returns metadata pointing back at UCDP rather than guessing at an
 // unverified filter parameter.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const BASE = 'https://ucdpapi.pcr.uu.se/api/gedevents/26.1';
 

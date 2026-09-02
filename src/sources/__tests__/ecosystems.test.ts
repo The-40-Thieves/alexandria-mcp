@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { ecosystemsSearch, normalizeEcosystems } from '../ecosystems.js';
+import { ecosystemsSearch, normalizeEcosystems } from '../ecosystems.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/ecosystems-search.json'), 'utf8'),

@@ -3,9 +3,9 @@
 // metadata only until the fetchTier web-fetch tier lands in Stage 6 (the
 // same TODO convention used by mdn.ts, nhk.ts and kinds/rss.ts), since a
 // Federal Register document body is an HTML page, not a JSON API.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://www.federalregister.gov/api/v1';
 

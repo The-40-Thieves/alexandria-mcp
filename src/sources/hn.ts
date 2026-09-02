@@ -1,8 +1,8 @@
 // Hacker News, via the Algolia HN Search API. No API key required.
-import type { LibraryResult } from '../types.js';
-import { stripHtml } from '../utils/text-clean.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { stripHtml } from '../utils/text-clean.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://hn.algolia.com/api/v1';
 

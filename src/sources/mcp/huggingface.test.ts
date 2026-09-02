@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeHuggingFace } from './huggingface.js';
+import { normalizeHuggingFace } from './huggingface.ts';
 
 // A trimmed version of the real structuredContent returned by hf_fs for
 // `{"operations":[{"cmd":"search","args":["hf://papers","vision language

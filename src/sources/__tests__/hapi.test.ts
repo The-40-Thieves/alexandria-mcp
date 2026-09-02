@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeHapiConflictEvent, normalizeHapiLocation, resolveIso3 } from '../hapi.js';
-import { getAdapter } from '../registry.js';
+import { normalizeHapiConflictEvent, normalizeHapiLocation, resolveIso3 } from '../hapi.ts';
+import { getAdapter } from '../registry.ts';
 
 const events = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/hapi-conflict-events.json'), 'utf8'),

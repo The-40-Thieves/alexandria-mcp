@@ -1,6 +1,6 @@
-import type { LibraryResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { cleanArchiveText } from '../utils/text-clean.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { cleanArchiveText } from '../utils/text-clean.ts';
 
 const IA_SEARCH = 'https://archive.org/advancedsearch.php';
 const IA_DOWNLOAD = 'https://archive.org/download';
@@ -139,7 +139,7 @@ export async function archiveRead(identifier: string): Promise<{
   };
 }
 
-import { register, truncateText } from './registry.js';
+import { register, truncateText } from './registry.ts';
 
 register('archive', {
   description: 'Internet Archive — 41M+ texts, scanned books, historical documents.',

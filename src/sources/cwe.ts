@@ -1,8 +1,8 @@
 // MITRE CWE REST API: single-id weakness lookup, no keyword search endpoint.
 // A query that isn't a CWE number (optionally "CWE-"-prefixed) returns [].
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const BASE = 'https://cwe-api.mitre.org/api/v1/cwe/weakness';
 const ID_PATTERN = /^(CWE-)?(\d+)$/i;

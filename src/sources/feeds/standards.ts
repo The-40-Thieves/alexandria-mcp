@@ -1,5 +1,5 @@
 // Standards body publication RSS feeds.
-import { defineRssSource } from '../kinds/rss.js';
+import { defineRssSource } from '../kinds/rss.ts';
 
 // The Stage 3 URL (.../CSRC/media/feeds/publications/all.xml) 404s as of
 // 2026-09-01; CSRC moved its publications feeds under /CSRC/media/feeds/pubs/.

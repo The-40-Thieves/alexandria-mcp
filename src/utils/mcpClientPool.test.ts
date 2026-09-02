@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isTransportTrouble, McpClientPool, type RemoteServerConfig } from './mcpClientPool.js';
-import { startTestMcpServer, type TestMcpServerHandle } from './mcpTestServer.js';
+import { isTransportTrouble, McpClientPool, type RemoteServerConfig } from './mcpClientPool.ts';
+import { startTestMcpServer, type TestMcpServerHandle } from './mcpTestServer.ts';
 
 function cfg(handle: TestMcpServerHandle, name = 'test-server'): RemoteServerConfig {
   return { name, url: handle.url, timeoutMs: 5000 };

@@ -1,9 +1,9 @@
 // NIST NVD: the National Vulnerability Database. Works keyless at a slow
 // pace (public rate limit); NVD_API_KEY, if present, is sent as the apiKey
 // header and buys a much faster pace.
-import type { LibraryResult } from '../types.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
 

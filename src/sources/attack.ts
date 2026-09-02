@@ -2,9 +2,9 @@
 // process (lazy, module-scope cache) and filtered client-side by token
 // match against attack-pattern name+description, the same static-download
 // convention as kev.ts, peps.ts, tc39.ts and swiftevolution.ts.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const URL =
   'https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json';

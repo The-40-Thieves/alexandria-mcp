@@ -1,4 +1,4 @@
-import type { EmbeddingProvider, VectorStoreProvider } from '../../types.js';
+import type { EmbeddingProvider, VectorStoreProvider } from '../../types.ts';
 
 export type { EmbeddingProvider, VectorStoreProvider };
 
@@ -22,7 +22,7 @@ export async function buildEmbeddingProvider(
 ): Promise<EmbeddingProvider> {
   switch (name) {
     case 'openai': {
-      const { OpenAIEmbeddingProvider } = await import('./openai.js');
+      const { OpenAIEmbeddingProvider } = await import('./openai.ts');
       return new OpenAIEmbeddingProvider();
     }
     default:
@@ -39,7 +39,7 @@ export async function buildVectorStoreProvider(
 ): Promise<VectorStoreProvider> {
   switch (name) {
     case 'supabase': {
-      const { SupabaseVectorStoreProvider } = await import('./supabase.js');
+      const { SupabaseVectorStoreProvider } = await import('./supabase.ts');
       return new SupabaseVectorStoreProvider();
     }
     default:

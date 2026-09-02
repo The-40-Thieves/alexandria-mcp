@@ -29,15 +29,11 @@
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
 import { parseHTML } from 'linkedom';
-import { fetchWithRetry } from '../utils/http.js';
+import { fetchWithRetry } from '../utils/http.ts';
 
-// defuddle/node only declares an ESM "import" condition (no "require"), and
-// this package compiles to CommonJS (no "type": "module" in package.json,
-// matching the rest of the repo's tsc/NodeNext setup); a static import would
-// resolve through require() and fail with ERR_PACKAGE_PATH_NOT_EXPORTED.
-// Node's dynamic import() always goes through the ESM resolver regardless of
-// the importing module's own format, so it works from CommonJS. Cached after
-// the first call so every tryDefuddle() call after the first is synchronous.
+// Loaded dynamically rather than with a static import so it is only pulled
+// in when tier 1 actually runs, not on every module load. Cached after the
+// first call so every tryDefuddle() call after the first is synchronous.
 let defuddlePromise: Promise<typeof import('defuddle/node').Defuddle> | undefined;
 function loadDefuddle(): Promise<typeof import('defuddle/node').Defuddle> {
   if (!defuddlePromise) {

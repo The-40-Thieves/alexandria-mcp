@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import test from 'node:test';
-import type { LibraryResult } from '../types.js';
-import { llmRerank, rrf } from './fuse.js';
+import type { LibraryResult } from '../types.ts';
+import { llmRerank, rrf } from './fuse.ts';
 
 function result(source: string, id: string, title: string): LibraryResult {
   return { id, source, title, authors: [], hasFullText: false };

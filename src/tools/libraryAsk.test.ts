@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
-import '../sources/all.js';
-import { resetCatalogCacheForTests } from '../utils/catalogIndex.js';
-import { detectFreshnessPreference, libraryAsk, runAsk } from './libraryAsk.js';
+import '../sources/all.ts';
+import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
+import { detectFreshnessPreference, libraryAsk, runAsk } from './libraryAsk.ts';
 
 const arxivFixture = readFileSync(
   path.resolve(process.cwd(), 'eval/fixtures/arxiv-search.xml'),

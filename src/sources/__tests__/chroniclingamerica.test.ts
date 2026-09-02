@@ -2,11 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeChroniclingAmerica } from '../chroniclingamerica.js';
+import { normalizeChroniclingAmerica } from '../chroniclingamerica.ts';
 
-// Tests always run from the repo root (npm test / npx tsx --test), so a
-// cwd-relative path avoids import.meta (invalid once tsc emits CommonJS,
-// since this package.json has no "type": "module").
+// Tests always run from the repo root (npm test), so a cwd-relative path
+// is equivalent to one resolved from import.meta.dirname here.
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/chroniclingamerica-search.json'), 'utf8'),
 );

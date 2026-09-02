@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { europeanaSearch, normalizeEuropeana } from '../europeana.js';
+import { europeanaSearch, normalizeEuropeana } from '../europeana.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/europeana-search.json'), 'utf8'),

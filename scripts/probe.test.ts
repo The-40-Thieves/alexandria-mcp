@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { mcpProbeEntries } from '../src/sources/kinds/mcp.js';
-import { startTestMcpServer, type TestMcpServerHandle } from '../src/utils/mcpTestServer.js';
+import { mcpProbeEntries } from '../src/sources/kinds/mcp.ts';
+import { startTestMcpServer, type TestMcpServerHandle } from '../src/utils/mcpTestServer.ts';
 import {
   classify,
   EXPECTED_EMPTY,
   MCP_SNAPSHOT_DIR,
   mcpToolsSnapshotOrDrift,
   regressions,
-} from './probe.js';
+} from './probe.ts';
 
 test('probe classification', async (t) => {
   await t.test('OK when results present', () => {

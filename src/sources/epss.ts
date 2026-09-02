@@ -1,9 +1,9 @@
 // FIRST.org EPSS: Exploit Prediction Scoring System. Only accepts a single
 // CVE id as a query; anything else returns [] rather than a meaningless
 // unfiltered score list. No API key required.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register } from './registry.ts';
 
 const BASE = 'https://api.first.org/data/v1/epss';
 const CVE_PATTERN = /^CVE-\d{4}-\d+$/i;

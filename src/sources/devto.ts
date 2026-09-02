@@ -5,9 +5,9 @@
 // result for every query tried (curl evidence in the task report), so a
 // multi-token search may currently return [] until dev.to's backend
 // changes; the tag path is unaffected. No API key required.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://dev.to/api';
 

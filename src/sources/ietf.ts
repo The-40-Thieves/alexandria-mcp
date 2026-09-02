@@ -2,9 +2,9 @@
 // defineRest(): read() fetches the RFC's plain-text body from
 // rfc-editor.org, not JSON, which defineRest()'s JSON-only read() can't
 // handle.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const DATATRACKER = 'https://datatracker.ietf.org/api/v1/doc/document';
 const RFC_EDITOR = 'https://www.rfc-editor.org/rfc';

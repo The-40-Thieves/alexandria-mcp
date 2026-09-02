@@ -3,9 +3,9 @@
 // defineRest(): read() delegates to the existing arxiv adapter, since every
 // hfpapers id is an arXiv id and arxiv.ts already fetches the HTML full
 // text for it.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { getAdapter, register } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { getAdapter, register } from './registry.ts';
 
 const BASE = 'https://huggingface.co/api/papers';
 

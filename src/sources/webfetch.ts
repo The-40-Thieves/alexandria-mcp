@@ -4,9 +4,9 @@
 // fetch and extract the text of any page the caller already has a URL for,
 // e.g. a link surfaced by another source's search() or by the caller
 // themselves. Always registered (no key, no env-gated URL to hide behind).
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 export async function webfetchSearch(): Promise<LibraryResult[]> {
   return [];

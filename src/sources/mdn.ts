@@ -3,10 +3,10 @@
 // tier lands in Stage 6 (the same TODO convention used by nhk.ts and
 // kinds/rss.ts), since MDN articles are HTML pages, not a JSON API, and
 // defineRest()'s read() always expects a JSON response.
-import type { LibraryResult, ReadResult } from '../types.js';
-import { fetchJSON } from '../utils/http.js';
-import { fetchAsText } from '../web/fetchTier.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult, ReadResult } from '../types.ts';
+import { fetchJSON } from '../utils/http.ts';
+import { fetchAsText } from '../web/fetchTier.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://developer.mozilla.org/api/v1';
 const ORIGIN = 'https://developer.mozilla.org';

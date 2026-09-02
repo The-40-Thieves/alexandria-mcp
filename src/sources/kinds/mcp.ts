@@ -5,10 +5,10 @@
 // they are never prefixed or exposed through this repo's own tool
 // surface (registry.ts's SourceAdapter shape is identical to every other
 // kind's).
-import type { LibraryResult, ReadResult } from '../../types.js';
-import { pool, type RemoteServerConfig, TOOL_ERROR_PREFIX } from '../../utils/mcpClientPool.js';
-import type { AuthSpec, Cluster, Freshness } from '../registry.js';
-import { getAdapter, register } from '../registry.js';
+import type { LibraryResult, ReadResult } from '../../types.ts';
+import { pool, type RemoteServerConfig, TOOL_ERROR_PREFIX } from '../../utils/mcpClientPool.ts';
+import type { AuthSpec, Cluster, Freshness } from '../registry.ts';
+import { getAdapter, register } from '../registry.ts';
 
 export interface McpSourceSpec {
   name: string;

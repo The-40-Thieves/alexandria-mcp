@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeJinaArxiv, normalizeJinaRead, normalizeJinaWeb, parseYamlHit } from './jina.js';
+import { normalizeJinaArxiv, normalizeJinaRead, normalizeJinaWeb, parseYamlHit } from './jina.ts';
 
 // Ground truth for jina's per-hit YAML formatting: generated with the
 // `yaml` npm package's stringify() (the same one jina's own MCP server

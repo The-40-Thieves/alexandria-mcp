@@ -1,10 +1,10 @@
 // Stack Exchange (stackoverflow.com site). Works keyless at the shared
 // rate limit; STACKEXCHANGE_KEY, if set, is appended as the key query
 // param for a dedicated pool.
-import type { LibraryResult } from '../types.js';
-import { stripHtml } from '../utils/text-clean.js';
-import { defineRest } from './kinds/rest.js';
-import { truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { stripHtml } from '../utils/text-clean.ts';
+import { defineRest } from './kinds/rest.ts';
+import { truncateText } from './registry.ts';
 
 const BASE = 'https://api.stackexchange.com/2.3';
 

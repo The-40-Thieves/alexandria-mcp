@@ -1,10 +1,10 @@
-import type { Chunk, ChunkMetadata, IndexPreview, IngestResult, LibrarySource } from '../types.js';
+import type { Chunk, ChunkMetadata, IndexPreview, IngestResult, LibrarySource } from '../types.ts';
 import {
   buildEmbeddingProvider,
   buildVectorStoreProvider,
   resolveConfig,
-} from './providers/index.js';
-import { avgQuality, filterChunks, scoreChunk } from './quality.js';
+} from './providers/index.ts';
+import { avgQuality, filterChunks, scoreChunk } from './quality.ts';
 
 const TARGET_CHUNK_WORDS = 350;
 const MCP_NAME_PREFIX = 'library';

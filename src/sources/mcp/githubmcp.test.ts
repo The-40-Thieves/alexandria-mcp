@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeGithubMcpRead, normalizeGithubMcpSearch, splitGithubMcpId } from './githubmcp.js';
+import { normalizeGithubMcpRead, normalizeGithubMcpSearch, splitGithubMcpId } from './githubmcp.ts';
 
 // A trimmed version of the real JSON text search_code returned for
 // {query: "addEventListener language:javascript"} against

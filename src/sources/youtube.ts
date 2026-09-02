@@ -25,9 +25,9 @@
 // read() spends zero Data API quota — it only uses the unofficial
 // Innertube + timedtext path.
 
-import type { LibraryResult } from '../types.js';
-import { fetchJSON, fetchText } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchJSON, fetchText } from '../utils/http.ts';
+import { register, truncateText } from './registry.ts';
 
 const SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
 const PLAYER_URL = 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false';

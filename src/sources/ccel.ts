@@ -1,8 +1,8 @@
 import { parse } from 'node-html-parser';
-import type { LibraryResult } from '../types.js';
-import { fetchText } from '../utils/http.js';
-import { normaliseWhitespace } from '../utils/text-clean.js';
-import { register, truncateText } from './registry.js';
+import type { LibraryResult } from '../types.ts';
+import { fetchText } from '../utils/http.ts';
+import { normaliseWhitespace } from '../utils/text-clean.ts';
+import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://www.ccel.org';
 
