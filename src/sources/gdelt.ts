@@ -78,7 +78,6 @@ register('gdelt', {
   freshness: 'realtime',
   homepage: 'https://www.gdeltproject.org',
   timeoutMs: TIMEOUT_MS,
-  verifiedAt: '2026-09-01',
   pacing: { minIntervalMs: 5000 },
   search: gdeltSearch,
   read: gdeltRead,
