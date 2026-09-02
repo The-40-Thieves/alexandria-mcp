@@ -145,10 +145,15 @@ export class McpClientPool {
       const items = Array.isArray(content)
         ? (content as Array<{ type?: string; text?: string }>)
         : [];
+      // Joined with a blank line: some servers (e.g. jina) return one
+      // text content item per hit rather than one item for the whole
+      // response, and a blank-line join lets a caller recover the
+      // individual items by splitting on blank lines without this pool
+      // needing to expose the raw content array itself.
       const text = items
         .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
         .map((c) => c.text)
-        .join('\n');
+        .join('\n\n');
       const structured = 'structuredContent' in result ? result.structuredContent : undefined;
       return { text, structured };
     });

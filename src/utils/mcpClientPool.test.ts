@@ -27,6 +27,22 @@ test('McpClientPool', async (t) => {
     assert.deepEqual(result.structured, { echoQuery: 'vision language models', echoLimit: 3 });
   });
 
+  await t.test('joins multiple text content items with a blank line', async () => {
+    const handle = await startTestMcpServer({
+      search: () => ({
+        content: [
+          { type: 'text', text: 'title: A' },
+          { type: 'text', text: 'title: B' },
+        ],
+      }),
+    });
+    t.after(() => handle.close());
+
+    const pool = new McpClientPool();
+    const result = await pool.call(cfg(handle), 'search', { query: 'x' });
+    assert.equal(result.text, 'title: A\n\ntitle: B');
+  });
+
   await t.test('reuses one pooled client across repeated calls to the same server', async () => {
     let searchCalls = 0;
     const handle = await startTestMcpServer({
