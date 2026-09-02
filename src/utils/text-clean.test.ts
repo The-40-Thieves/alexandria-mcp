@@ -144,3 +144,43 @@ Post-text`;
     });
   });
 });
+
+// The shared stripHtml used to strip only the tags, leaving JavaScript and
+// CSS rules behind as body text. arxiv.ts and govinfo.ts each carried their
+// own near-copy that did handle it; both now use this one.
+test('stripHtml drops script and style bodies', async (t) => {
+  await t.test('removes a script body, not just its tags', () => {
+    const out = stripHtml('<p>Real text.</p><script>var leak = "secret";</script>');
+    assert.match(out, /Real text\./);
+    assert.doesNotMatch(out, /var leak/);
+    assert.doesNotMatch(out, /secret/);
+  });
+
+  await t.test('removes a style body, not just its tags', () => {
+    const out = stripHtml('<style>body { color: red; }</style><p>Real text.</p>');
+    assert.match(out, /Real text\./);
+    assert.doesNotMatch(out, /color: red/);
+  });
+
+  await t.test('handles attributes, mixed case, and a spaced closing tag', () => {
+    const out = stripHtml(
+      '<SCRIPT type="text/javascript">bad()</SCRIPT ><StYlE media="all">.x{}</style><p>Kept.</p>',
+    );
+    assert.match(out, /Kept\./);
+    assert.doesNotMatch(out, /bad\(\)/);
+    assert.doesNotMatch(out, /\.x\{\}/);
+  });
+
+  await t.test('removes several scripts, keeping the prose between them', () => {
+    const out = stripHtml('<script>a()</script>One.<script>b()</script>Two.');
+    assert.match(out, /One\./);
+    assert.match(out, /Two\./);
+    assert.doesNotMatch(out, /a\(\)|b\(\)/);
+  });
+
+  await t.test('still decodes entities and strips ordinary tags', () => {
+    // Tags become a single space each, so removed tags leave doubles;
+    // only runs of 3+ whitespace collapse. Unchanged by this fix.
+    assert.equal(stripHtml('<b>a</b> &amp; <i>b</i>'), 'a  &  b');
+  });
+});

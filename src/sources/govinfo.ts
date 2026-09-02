@@ -1,5 +1,6 @@
 import type { LibraryResult } from '../types.js';
 import { fetchJSON, fetchText } from '../utils/http.js';
+import { stripHtml } from '../utils/text-clean.js';
 import { register, truncateText } from './registry.js';
 
 const BASE = 'https://api.govinfo.gov';
@@ -12,20 +13,6 @@ function key(): string {
         'then set GOVINFO_API_KEY in your environment.',
     );
   return k;
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 interface GovInfoSearchResult {

@@ -8,9 +8,18 @@ export function stripGutenbergWrapper(text: string): string {
 }
 
 // Strip HTML tags, decode common entities, normalise whitespace.
-// Used for Archive.org texts that come back as HTML fragments.
+// Used wherever a source hands back an HTML fragment (Archive.org OCR,
+// arxiv's HTML rendition, GovInfo package HTML).
+//
+// <script> and <style> bodies are removed WHOLE, before tag stripping.
+// Dropping only the tags would leave the JavaScript and the CSS rules
+// behind as body text, which then gets chunked, embedded and cited as if
+// it were prose. This has to run first: once `<[^>]+>` has eaten the
+// opening and closing tags there is nothing left to pair them by.
 export function stripHtml(html: string): string {
   return html
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, ' ')
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

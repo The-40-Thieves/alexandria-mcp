@@ -1,5 +1,6 @@
 import type { LibraryResult } from '../types.js';
 import { fetchText } from '../utils/http.js';
+import { stripHtml } from '../utils/text-clean.js';
 import { register, truncateText } from './registry.js';
 
 const API = 'https://export.arxiv.org/api/query';
@@ -24,20 +25,6 @@ function xmlAll(xml: string, tag: string): string[] {
     m = re.exec(xml);
   }
   return out;
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function parseId(raw: string): string {
