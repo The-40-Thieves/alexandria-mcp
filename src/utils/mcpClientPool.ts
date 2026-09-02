@@ -143,17 +143,24 @@ export class McpClientPool {
       // here). Narrow explicitly rather than assuming the former.
       const content: unknown = 'content' in result ? result.content : [];
       const items = Array.isArray(content)
-        ? (content as Array<{ type?: string; text?: string }>)
+        ? (content as Array<{ type?: string; text?: string; resource?: { text?: string } }>)
         : [];
       // Joined with a blank line: some servers (e.g. jina) return one
       // text content item per hit rather than one item for the whole
       // response, and a blank-line join lets a caller recover the
       // individual items by splitting on blank lines without this pool
-      // needing to expose the raw content array itself.
-      const text = items
-        .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
-        .map((c) => c.text)
-        .join('\n\n');
+      // needing to expose the raw content array itself. An embedded-text
+      // resource item (e.g. GitHub's get_file_contents, which returns a
+      // one-line text summary plus the actual file content as a
+      // `resource` item) contributes its resource.text alongside any
+      // plain text items, in content order.
+      const textParts: string[] = [];
+      for (const item of items) {
+        if (item.type === 'text' && typeof item.text === 'string') textParts.push(item.text);
+        else if (item.type === 'resource' && typeof item.resource?.text === 'string')
+          textParts.push(item.resource.text);
+      }
+      const text = textParts.join('\n\n');
       const structured = 'structuredContent' in result ? result.structuredContent : undefined;
       return { text, structured };
     });

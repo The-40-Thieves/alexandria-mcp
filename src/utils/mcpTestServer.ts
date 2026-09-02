@@ -12,9 +12,13 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express from 'express';
 import { z } from 'zod';
 
+export type TestContentItem =
+  | { type: 'text'; text: string }
+  | { type: 'resource'; resource: { uri: string; text: string; mimeType?: string } };
+
 export interface TestToolResult {
   [key: string]: unknown;
-  content: Array<{ type: 'text'; text: string }>;
+  content: TestContentItem[];
   structuredContent?: Record<string, unknown>;
 }
 

@@ -43,6 +43,25 @@ test('McpClientPool', async (t) => {
     assert.equal(result.text, 'title: A\n\ntitle: B');
   });
 
+  await t.test('pulls text out of an embedded-text resource content item too', async () => {
+    const handle = await startTestMcpServer({
+      read: () => ({
+        content: [
+          { type: 'text', text: 'successfully downloaded text file' },
+          {
+            type: 'resource',
+            resource: { uri: 'repo://o/r/contents/README.md', text: 'file contents here' },
+          },
+        ],
+      }),
+    });
+    t.after(() => handle.close());
+
+    const pool = new McpClientPool();
+    const result = await pool.call(cfg(handle), 'read', { id: 'x' });
+    assert.equal(result.text, 'successfully downloaded text file\n\nfile contents here');
+  });
+
   await t.test('reuses one pooled client across repeated calls to the same server', async () => {
     let searchCalls = 0;
     const handle = await startTestMcpServer({
