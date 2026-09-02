@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { type DnsLookupAll, dnsResolver } from '../../web/fetchTier.ts';
 import { getAdapter } from '../registry.ts';
 import { defineRssSource, parseFeedItems } from './rss.ts';
 
@@ -53,8 +54,17 @@ test('parseFeedItems', async (t) => {
 
 test('defineRssSource', async (t) => {
   const originalFetch = globalThis.fetch;
+  const originalLookup = dnsResolver.lookup;
+  // read() runs every id through assertFetchableUrl, which resolves
+  // non-literal-IP hostnames via DNS before the mocked fetch above ever
+  // runs. Fix example.org to a public address so these tests never depend
+  // on live DNS.
+  dnsResolver.lookup = (async () => [
+    { address: '93.184.216.34', family: 4 },
+  ]) satisfies DnsLookupAll;
   t.after(() => {
     globalThis.fetch = originalFetch;
+    dnsResolver.lookup = originalLookup;
   });
 
   function stubFetch(body: string) {
