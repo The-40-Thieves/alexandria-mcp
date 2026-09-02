@@ -1,0 +1,18 @@
+{
+  "time": 12,
+  "href": "https://api.reliefweb.int/v2/reports",
+  "count": 1,
+  "totalCount": 1,
+  "data": [
+    {
+      "id": "4012345",
+      "score": 12.5,
+      "fields": {
+        "title": "Sudan: Humanitarian Response Situation Report",
+        "url": "https://reliefweb.int/report/sudan/humanitarian-response-situation-report",
+        "date": { "created": "2026-08-15T00:00:00+00:00" },
+        "body": "Access constraints continue to hamper the delivery of humanitarian assistance across Sudan."
+      }
+    }
+  ]
+}
