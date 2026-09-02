@@ -192,22 +192,46 @@ function assertIpClassAllowed(cls: IpClass, rawUrl: string, detail?: string): vo
   throwForIpClass(cls, rawUrl, detail);
 }
 
-// The hostnames of CRAWL4AI_URL/SEARXNG_URL: known service endpoints this
-// server is configured to talk to, not a user-supplied fetch target, so they
-// are exempt from the private-network guard below even when (as on this
-// deployment) they resolve to a tailnet address.
-function configuredServiceHosts(): Set<string> {
-  const hosts = new Set<string>();
+// The full origins (scheme + host + port) of CRAWL4AI_URL/SEARXNG_URL: the
+// service endpoints this server is configured to call itself.
+//
+// Matching on origin rather than hostname is the point. These services run
+// on tailnet/private addresses, so a hostname-only allowlist let any
+// caller-supplied URL naming that host through the private-network guard,
+// on ANY port and ANY scheme, turning the webfetch source into an internal
+// port scanner for the box crawl4ai and SearXNG run on.
+export function configuredServiceOrigins(): Set<string> {
+  const origins = new Set<string>();
   for (const envVar of ['CRAWL4AI_URL', 'SEARXNG_URL']) {
     const value = process.env[envVar];
     if (!value) continue;
     try {
-      hosts.add(new URL(value).hostname.toLowerCase());
+      origins.add(new URL(value).origin.toLowerCase());
     } catch {
       // Malformed env value; nothing to allow-list.
     }
   }
-  return hosts;
+  return origins;
+}
+
+// Guard for THIS server's own outbound call to a configured service
+// endpoint, which is the only case the allowlist covers. A user-supplied
+// fetch target is never checked against it: assertFetchableUrl() applies
+// the private-range rules to every target, including one that names a
+// service host, so pointing webfetch at http://<crawl4ai-host>:22/ is
+// refused like any other private address.
+export function assertConfiguredServiceUrl(rawUrl: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error(`fetchAsText: not a valid service URL: ${rawUrl}`);
+  }
+  if (!configuredServiceOrigins().has(parsed.origin.toLowerCase())) {
+    throw new Error(
+      `fetchAsText: refusing to call a service endpoint outside the configured origins: ${rawUrl}`,
+    );
+  }
 }
 
 function stripBrackets(hostname: string): string {
@@ -223,7 +247,7 @@ function stripBrackets(hostname: string): string {
 // delegate, however this function ends up being reached.
 //
 // Checks, in order: valid http(s) URL, no embedded credentials
-// (user:pass@host), the configured-service allowlist, then .internal/.local
+// (user:pass@host), then .internal/.local
 // and 'localhost' by string, then IP classification — directly for a
 // literal IP host (skips DNS), or via dns.lookup(..., { all: true }) for an
 // ordinary hostname, checking EVERY returned address (closes the gap where
@@ -255,9 +279,10 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
     );
   }
 
+  // No service-endpoint exemption here on purpose: see
+  // assertConfiguredServiceUrl(). A caller-supplied target that happens to
+  // name the crawl4ai or SearXNG host is still a caller-supplied target.
   const hostname = stripBrackets(parsed.hostname).toLowerCase();
-  if (configuredServiceHosts().has(hostname)) return;
-
   if (hostname.endsWith('.internal') || hostname.endsWith('.local')) {
     throw new Error(`fetchAsText: refusing to fetch a private-network host: ${rawUrl}`);
   }
@@ -461,6 +486,9 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
   const token = process.env.CRAWL4AI_API_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
   const crawlUrl = `${base.replace(/\/$/, '')}/crawl`;
+  // This server's own outbound call, so it is checked against the
+  // configured origins rather than the private-range rules.
+  assertConfiguredServiceUrl(crawlUrl);
   const response = await fetchWithRetry(
     crawlUrl,
     {

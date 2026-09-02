@@ -9,6 +9,7 @@
 // hits rather than a crash).
 import type { LibraryResult, ReadResult } from '../../types.js';
 import type { RemoteServerConfig } from '../../utils/mcpClientPool.js';
+import { assertFetchableUrl } from '../../web/fetchTier.js';
 import { defineMcpSource, defineMcpSourceWithDelegatedRead } from '../kinds/mcp.js';
 import { getAdapter, truncateText } from '../registry.js';
 
@@ -168,6 +169,11 @@ defineMcpSource({
     tool: 'read_url',
     args: (id) => ({ url: id }),
     normalize: (text, _structured, id) => normalizeJinaRead(text, id),
+    // read_url makes the remote server fetch whatever URL it is handed, so
+    // an unguarded id turns this source into an SSRF proxy: same threat the
+    // web fetch tier guards, one hop removed. Reuse that guard rather than
+    // writing a second one. It runs before any pool call.
+    guard: (id) => assertFetchableUrl(id),
   },
   expectTools: ['search_web', 'read_url'],
   // JINA_API_KEY is a feature env (it also enables fetch tier 2). The
