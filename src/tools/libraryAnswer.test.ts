@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import test from 'node:test';
 import { register } from '../sources/registry.js';
 import { resetCatalogCacheForTests } from '../utils/catalogIndex.js';
-import { libraryAnswer } from './libraryAnswer.js';
+import { dropDanglingCitations, extractCitationNumbers, libraryAnswer } from './libraryAnswer.js';
 
 interface FakeServer {
   url: string;
@@ -114,6 +114,41 @@ function registerFakeSources(): void {
   });
 }
 
+test('extractCitationNumbers / dropDanglingCitations', async (t) => {
+  await t.test('a 4+ digit bracketed number (e.g. a year) is not a citation marker', () => {
+    assert.deepEqual(extractCitationNumbers('The year was [2024].'), []);
+    assert.equal(
+      dropDanglingCitations('The year was [2024].', 1),
+      'The year was [2024].',
+      'a sentence with only prose in brackets is never dropped',
+    );
+  });
+
+  await t.test(
+    'a marker beyond sourceCount (but <= 99) is dangling and the sentence is dropped',
+    () => {
+      assert.deepEqual(extractCitationNumbers('This has [3].'), [3]);
+      assert.equal(dropDanglingCitations('This has [3].', 2), '');
+    },
+  );
+
+  await t.test('a comma-separated marker list validates against sourceCount', () => {
+    assert.deepEqual(extractCitationNumbers('Cites two sources [1, 2].'), [1, 2]);
+    assert.equal(
+      dropDanglingCitations('Cites two sources [1, 2].', 2),
+      'Cites two sources [1, 2].',
+    );
+  });
+
+  await t.test('two adjacent single markers both validate', () => {
+    assert.deepEqual(extractCitationNumbers('Cites two sources [1][2].'), [1, 2]);
+    assert.equal(
+      dropDanglingCitations('Cites two sources [1][2].', 2),
+      'Cites two sources [1][2].',
+    );
+  });
+});
+
 test('libraryAnswer', async (t) => {
   const originalEnv = { ...process.env };
   t.after(() => {
@@ -182,6 +217,7 @@ test('libraryAnswer', async (t) => {
 
       assert.match(result.answer, /rate limiting in November 2025 \[1\]/);
       assert.doesNotMatch(result.answer, /bad citation/, 'the dangling [2] sentence was dropped');
+      assert.deepEqual(result.warnings, [], 'at least one sentence survived with a valid citation');
 
       const sources = result.results.map((r) => r.source);
       assert.ok(sources.includes('zzftest_full'));
@@ -190,6 +226,67 @@ test('libraryAnswer', async (t) => {
       assert.deepEqual(result.routing.map((r) => r.source).sort(), [
         'zzftest_full',
         'zzftest_meta',
+      ]);
+    },
+  );
+
+  await t.test('warns and keeps the raw answer when the model cites nothing at all', async () => {
+    registerFakeSources();
+    resetCatalogCacheForTests();
+
+    const router = await startFakeChatServer(() => ({
+      intent: `find info about ${TOKEN}`,
+      routes: [{ source: 'zzftest_full', query: TOKEN, reason: 'full text match' }],
+    }));
+    t.after(() => router.close());
+
+    const uncitedAnswer = `The ${TOKEN} API changed in November 2025, but no source is cited here.`;
+    const synth = await startFakeChatServer(() => uncitedAnswer);
+    t.after(() => synth.close());
+
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+    const result = await libraryAnswer(`what changed in ${TOKEN}`, { readTop: 4 });
+
+    assert.equal(result.answer, uncitedAnswer, 'the raw answer is kept, nothing to drop');
+    assert.deepEqual(result.citations, [], 'no markers means no referenced citations');
+    assert.deepEqual(result.warnings, ['answer contains no citation markers']);
+  });
+
+  await t.test(
+    'warns and falls back to a source listing when every sentence is dropped as uncited',
+    async () => {
+      registerFakeSources();
+      resetCatalogCacheForTests();
+
+      const router = await startFakeChatServer(() => ({
+        intent: `find info about ${TOKEN}`,
+        routes: [{ source: 'zzftest_full', query: TOKEN, reason: 'full text match' }],
+      }));
+      t.after(() => router.close());
+
+      // Only one source is read (sourceCount === 1), so [5] is dangling and
+      // this single sentence is the entire answer: dropping it empties the
+      // whole thing.
+      const synth = await startFakeChatServer(
+        () => 'This claim cites a source that does not exist [5].',
+      );
+      t.after(() => synth.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+      const result = await libraryAnswer(`what changed in ${TOKEN}`, { readTop: 4 });
+
+      assert.match(result.answer, /^Sources: \[1\] Full Text Item$/);
+      assert.deepEqual(result.citations, [], 'nothing surviving references any source');
+      assert.deepEqual(result.warnings, [
+        'all sentences were dropped as uncited; returning the sources without a synthesized answer',
       ]);
     },
   );

@@ -27,6 +27,7 @@ export interface ResearchRound {
   round: number;
   queries: string[];
   newSources: number;
+  truncated: boolean;
 }
 
 export interface LibraryResearchResult {
@@ -189,8 +190,24 @@ export async function libraryResearch(
       message: `round ${thisRound}: searching ${queries.length} queries`,
     });
 
+    // The deadline is also checked here, inside each per-query worker,
+    // right before it calls answerFn. Round boundaries alone (the checks
+    // above and below) can only stop the *next* round; with concurrency 3,
+    // a slow round could otherwise overrun the budget by a full round's
+    // worth of calls. Checking per-query caps the overrun at whatever is
+    // already in flight (at most RESEARCH_CONCURRENCY calls), and any
+    // query skipped this way marks the round truncated.
+    let truncated = false;
     const answers = await Promise.all(
-      queries.map((q) => limit(() => answerFn(q, { readTop: 2 }).catch(() => undefined))),
+      queries.map((q) =>
+        limit(() => {
+          if (Date.now() >= deadline) {
+            truncated = true;
+            return undefined;
+          }
+          return answerFn(q, { readTop: 2 }).catch(() => undefined);
+        }),
+      ),
     );
 
     const newLearnings: string[] = [];
@@ -212,7 +229,7 @@ export async function libraryResearch(
       }
     }
 
-    rounds.push({ round: thisRound, queries, newSources: newSourceCount });
+    rounds.push({ round: thisRound, queries, newSources: newSourceCount, truncated });
     learnings = [...learnings, ...newLearnings];
 
     await emitProgress(onProgress, {

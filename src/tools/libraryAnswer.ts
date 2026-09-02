@@ -32,6 +32,7 @@ export interface LibraryAnswerResult {
   citations: Citation[];
   results: Array<LibraryResult & { score: number }>;
   routing: RouteItem[];
+  warnings: string[];
 }
 
 interface KnowledgeHit {
@@ -152,16 +153,56 @@ function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-const CITATION_MARKER_RE = /\[(\d+)\]/g;
+// A citation marker is a bracketed, comma-separated list of up to
+// 3-digit numbers, e.g. "[1]", "[1,2]", "[1, 2]". A 4+ digit number never
+// matches (so "[2024]" isn't a marker at all), and a matched 3-digit
+// number >= 100 is still treated as ordinary prose (a page number, a
+// year written with only 3 digits is unlikely but harmless either way)
+// rather than a citation, since no source list realistically runs that
+// high. Only numbers in [1, PROSE_NUMBER_MAX] are citation candidates;
+// among those, anything beyond the actual source count is dangling.
+const CITATION_BRACKET_RE = /\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\]/g;
+const PROSE_NUMBER_MAX = 99;
+
+export function extractCitationNumbers(text: string): number[] {
+  const nums: number[] = [];
+  for (const match of text.matchAll(CITATION_BRACKET_RE)) {
+    for (const part of match[1].split(',')) {
+      const n = Number(part.trim());
+      if (Number.isInteger(n) && n >= 1 && n <= PROSE_NUMBER_MAX) nums.push(n);
+    }
+  }
+  return nums;
+}
 
 // Drops any sentence whose citation marker(s) reference a number outside
-// 1..sourceCount, rather than failing the whole answer.
-function dropDanglingCitations(answer: string, sourceCount: number): string {
+// 1..sourceCount, rather than failing the whole answer. A sentence with no
+// markers, or only markers that read as prose (4+ digits, e.g. a year), is
+// always kept.
+export function dropDanglingCitations(answer: string, sourceCount: number): string {
   const kept = splitSentences(answer).filter((sentence) => {
-    const nums = [...sentence.matchAll(CITATION_MARKER_RE)].map((m) => Number(m[1]));
-    return nums.every((n) => n >= 1 && n <= sourceCount);
+    const nums = extractCitationNumbers(sentence);
+    return nums.every((n) => n <= sourceCount);
   });
   return kept.join(' ');
+}
+
+// Short, unsynthesized listing of the read sources, used as the answer
+// when every sentence the model wrote turned out to be uncited.
+function buildFallbackAnswer(sources: ReadSource[]): string {
+  return `Sources: ${sources.map((s, i) => `[${i + 1}] ${s.item.title}`).join(', ')}`;
+}
+
+function buildCitations(sources: ReadSource[], usedNumbers: Set<number>): Citation[] {
+  return sources
+    .map((s, i) => ({
+      n: i + 1,
+      source: s.item.source,
+      id: s.item.id,
+      title: s.item.title,
+      url: s.item.url,
+    }))
+    .filter((c) => usedNumbers.has(c.n));
 }
 
 export async function libraryAnswer(
@@ -194,21 +235,37 @@ export async function libraryAnswer(
       citations: [],
       results: ranked,
       routing,
+      warnings: [],
     };
   }
 
   const system = buildSynthSystem(sources.length);
   const user = `${query}\n\nSources:\n${buildSourcesBlock(sources)}`;
   const rawAnswer = await chatText('synth', system, user);
-  const answer = dropDanglingCitations(rawAnswer, sources.length);
 
-  const citations: Citation[] = sources.map((s, i) => ({
-    n: i + 1,
-    source: s.item.source,
-    id: s.item.id,
-    title: s.item.title,
-    url: s.item.url,
-  }));
+  const warnings: string[] = [];
+  let answer: string;
+  let usedNumbers: Set<number>;
 
-  return { answer, citations, results: ranked, routing };
+  if (extractCitationNumbers(rawAnswer).length === 0) {
+    warnings.push('answer contains no citation markers');
+    answer = rawAnswer;
+    usedNumbers = new Set();
+  } else {
+    const filtered = dropDanglingCitations(rawAnswer, sources.length);
+    if (filtered.trim().length === 0) {
+      warnings.push(
+        'all sentences were dropped as uncited; returning the sources without a synthesized answer',
+      );
+      answer = buildFallbackAnswer(sources);
+      usedNumbers = new Set();
+    } else {
+      answer = filtered;
+      usedNumbers = new Set(extractCitationNumbers(filtered).filter((n) => n <= sources.length));
+    }
+  }
+
+  const citations = buildCitations(sources, usedNumbers);
+
+  return { answer, citations, results: ranked, routing, warnings };
 }

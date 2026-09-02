@@ -92,6 +92,7 @@ function fakeAnswer(citationId: string, n: number): LibraryAnswerResult {
     citations: [{ n: 1, source: 'fake', id: citationId, title: `Title ${n}` }],
     results: [],
     routing: [],
+    warnings: [],
   };
 }
 
@@ -142,6 +143,11 @@ test('libraryResearch', async (t) => {
       result.rounds.map((r) => r.queries.length),
       [4, 2, 1],
       'breadth halves (ceil) each round',
+    );
+    assert.deepEqual(
+      result.rounds.map((r) => r.truncated),
+      [false, false, false],
+      'a generous time budget never truncates a round',
     );
     assert.equal(result.citations.length, 7, '4 + 2 + 1 unique sources collected');
     assert.equal(result.citations[0].n, 1);
@@ -206,6 +212,47 @@ test('libraryResearch', async (t) => {
     assert.ok(result.rounds.length < 10, 'the time budget cut the loop off well short of depth 10');
     assert.ok(result.rounds.length >= 1);
   });
+
+  await t.test(
+    'checks the deadline per query, truncating a round instead of overrunning by a full round',
+    async () => {
+      // Each answerFn call takes 300ms; concurrency is 3, so the first
+      // batch of 3 (of 6) queries starts immediately and is well underway
+      // before the 150ms deadline. The second batch only gets a turn once
+      // the first batch's slots free up (~300ms in), by which point the
+      // deadline has long passed, so those queries must be skipped rather
+      // than started, and the round marked truncated.
+      const research = await startFakeChatServer(decideResearch);
+      t.after(() => research.close());
+      const synth = await startFakeChatServer(decideSynthNoop);
+      t.after(() => synth.close());
+
+      process.env.ALEXANDRIA_RESEARCH_BASE_URL = research.url;
+      process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+      let calls = 0;
+      const answerFn = async (): Promise<LibraryAnswerResult> => {
+        calls += 1;
+        const n = calls;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return fakeAnswer(`slow-${n}`, n);
+      };
+
+      const result = await libraryResearch(
+        'a topic with a mid-round deadline',
+        { depth: 1, breadth: 6, maxMinutes: 150 / 60_000 },
+        undefined,
+        { answerFn },
+      );
+
+      assert.equal(result.rounds.length, 1);
+      assert.equal(result.rounds[0].truncated, true, 'the round is marked truncated');
+      assert.ok(calls < 6, 'not every query reached answerFn before the deadline');
+      assert.ok(calls >= 1, 'the first in-flight batch still ran before the deadline hit');
+    },
+  );
 
   await t.test('emits a progress notification per round', async () => {
     const research = await startFakeChatServer(decideResearch);

@@ -330,10 +330,10 @@ server.registerTool(
   'library_answer',
   {
     title: 'Answer With Cited Sources',
-    description: `Ask a question in plain English and get a synthesized answer with inline [n] citations. Routes and searches like library_ask, fuses the per-source results with reciprocal rank fusion, reads the top full-text results, and asks an LLM to answer using only those sources. Every factual sentence is cited or marked "not found in the sources"; sentences with a dangling citation are dropped.
+    description: `Ask a question in plain English and get a synthesized answer with inline [n] citations. Routes and searches like library_ask, fuses the per-source results with reciprocal rank fusion, reads the top full-text results, and asks an LLM to answer using only those sources. Every factual sentence is cited or marked "not found in the sources"; sentences with a dangling citation are dropped. If the answer had no citation markers at all, or every sentence was dropped as uncited, a message is added to warnings[] (and, in the all-dropped case, answer falls back to a plain listing of the source titles).
 
 Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY).
-Returns: { answer, citations[], results[], routing[] }`,
+Returns: { answer, citations[], results[], routing[], warnings[] }`,
     inputSchema: {
       query: z.string().min(1).max(1000).describe('Natural language question'),
       max_sources: z
