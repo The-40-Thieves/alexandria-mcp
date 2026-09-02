@@ -121,6 +121,50 @@ test('metricsSnapshot / sourceMetrics / toolMetrics', async (t) => {
     assert.equal(counters.quotaRejections, 1);
     assert.equal(counters.errors, 0);
   });
+
+  // Regression: latencyMsTotal used to start its clock before
+  // rateLimited()'s pacing wait and reserveQuota(), so a paced source's
+  // recorded "provider latency" was actually dominated by queue time. A
+  // near-instant adapter paced at 300ms between calls should record a
+  // TINY total latency even though the wall-clock time between the two
+  // calls is well over 300ms.
+  await t.test(
+    'latencyMsTotal excludes the pacing wait, not just the provider call time',
+    async () => {
+      const PACE_MS = 300;
+      register('metrics_demo_pacing_latency', {
+        description: 'x',
+        supportsIngest: false,
+        pacing: { minIntervalMs: PACE_MS },
+        async search() {
+          return []; // resolves immediately - the only real "provider time" here
+        },
+        async read() {
+          return { title: '', authors: [] };
+        },
+      });
+
+      const adapter = getAdapter('metrics_demo_pacing_latency');
+      const wallStart = Date.now();
+      await adapter.search('q1', 1);
+      // Different query -> a fresh cache key, so this second call actually
+      // reaches the adapter (and the pacing queue) rather than serving from
+      // searchCache.
+      await adapter.search('q2', 1);
+      const wallElapsed = Date.now() - wallStart;
+
+      const counters = sourceMetrics('metrics_demo_pacing_latency');
+      assert.equal(counters.calls, 2);
+      assert.ok(
+        wallElapsed >= PACE_MS - 20,
+        `expected the second call to be paced by ~${PACE_MS}ms, wall-clock elapsed was only ${wallElapsed}ms`,
+      );
+      assert.ok(
+        counters.latencyMsTotal < PACE_MS / 2,
+        `latencyMsTotal (${counters.latencyMsTotal}ms) should exclude the ~${PACE_MS}ms pacing wait, not include it`,
+      );
+    },
+  );
 });
 
 test('sourceCallTotals aggregates calls/errors across every source', () => {

@@ -21,18 +21,59 @@ import pino from 'pino';
 import { config } from './config.ts';
 import { requestContext } from './utils/http.ts';
 
-const SENSITIVE_KEY = /(api[_-]?key|token|secret|password|authoriz(?:ation|ed)|bearer|credential)/i;
+// Word-tokenized rather than one regex: `\bkey\b` does NOT work here
+// because `_` is a word character, so there is no word boundary between
+// "_" and "K" in "ROLE_KEY" - a real gap this fixes (SUPABASE_SERVICE_ROLE_KEY
+// went unredacted under the previous substring-anchored regex, which only
+// matched "key" when immediately preceded by "api"). Splitting on
+// camelCase transitions and any run of non-alphanumeric characters, then
+// comparing whole lowercase words against SENSITIVE_WORDS, catches a
+// standalone "key"/"token"/... segment wherever it sits - ROLE_KEY,
+// api_key, apiKey, Authorization - without a bare substring match also
+// catching an unrelated field that merely contains one as a fragment
+// (monkeyPatch, keyboardLayout).
+const SENSITIVE_WORDS = new Set([
+  'key',
+  'token',
+  'secret',
+  'password',
+  'passwd',
+  'credential',
+  'bearer',
+  'auth',
+  'authorization',
+  'authorised',
+  'authorized',
+]);
 const REDACTED = '[Redacted]';
+const TRUNCATED = '[Truncated]';
 const MAX_DEPTH = 6;
 
+function fieldWords(name: string): string[] {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^a-zA-Z0-9]+/)
+    .map((word) => word.toLowerCase())
+    .filter(Boolean);
+}
+
+function isSensitiveKey(name: string): boolean {
+  return fieldWords(name).some((word) => SENSITIVE_WORDS.has(word));
+}
+
 function redactDeep(value: unknown, depth: number, seen: WeakSet<object>): unknown {
-  if (value === null || typeof value !== 'object' || depth > MAX_DEPTH) return value;
+  if (value === null || typeof value !== 'object') return value;
+  // A container this deep is replaced wholesale rather than passed through
+  // unredacted: returning it as-is would let a sensitive field nested past
+  // the cap leak in full, silently defeating the "any field, wherever it
+  // appears" claim for anything below MAX_DEPTH.
+  if (depth > MAX_DEPTH) return TRUNCATED;
   if (seen.has(value)) return '[Circular]';
   seen.add(value);
   if (Array.isArray(value)) return value.map((item) => redactDeep(item, depth + 1, seen));
   const out: Record<string, unknown> = {};
   for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = SENSITIVE_KEY.test(key) ? REDACTED : redactDeep(v, depth + 1, seen);
+    out[key] = isSensitiveKey(key) ? REDACTED : redactDeep(v, depth + 1, seen);
   }
   return out;
 }

@@ -4,7 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { z } from 'zod';
-import { config } from './config.ts';
+import { config, loadConfig } from './config.ts';
 import { log } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
@@ -611,6 +611,21 @@ async function runStdio(): Promise<void> {
 }
 
 function main(): void {
+  // Explicit, first thing: registry.ts, dispatcher.ts, and the rest of
+  // config's ~50 consumers all read it lazily (see config.ts's module
+  // comment), so an invalid env (a bad TRANSPORT, a non-numeric PORT)
+  // would otherwise only surface on whatever config field the FIRST
+  // registered source's first guarded call happens to touch - a confusing
+  // place to learn startup failed. console.error, not log.error: log.ts's
+  // own level()/destination() read config too, and would throw the exact
+  // same way trying to report this failure.
+  try {
+    loadConfig();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
   // Before the transport starts: every source's fetchWithRetry() call picks
   // up the composed dispatcher (connection pooling, dns cache, RFC 9111
   // http cache) with no per-call change, since it's installed as undici's

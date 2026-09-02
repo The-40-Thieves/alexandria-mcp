@@ -13,11 +13,22 @@ import {
 
 export class ResultCache<T> {
   private store: StateStore;
-  private ttlMs: number;
+  // A plain number for direct callers/tests (unchanged); a thunk for
+  // searchCache below, so resolving it - and with it, the one
+  // config.ALEXANDRIA_CACHE_TTL_MS read behind parseTtlMs() - is deferred
+  // to the first actual set() call instead of running at module load. See
+  // config.ts's module comment: a single config field access runs the full
+  // schema.safeParse(process.env), and resultCache.ts is imported by
+  // registry.ts, which is imported by nearly everything.
+  private ttlMs: number | (() => number);
 
-  constructor(ttlMs: number, store: StateStore = new MemoryStateStore()) {
+  constructor(ttlMs: number | (() => number), store: StateStore = new MemoryStateStore()) {
     this.ttlMs = ttlMs;
     this.store = store;
+  }
+
+  private resolveTtlMs(): number {
+    return typeof this.ttlMs === 'function' ? this.ttlMs() : this.ttlMs;
   }
 
   get(key: string, now = Date.now()): T | undefined {
@@ -25,8 +36,9 @@ export class ResultCache<T> {
   }
 
   set(key: string, value: T, now = Date.now()): void {
-    if (this.ttlMs <= 0) return; // 0 disables caching
-    this.store.setCache(key, value, now + this.ttlMs);
+    const ttlMs = this.resolveTtlMs();
+    if (ttlMs <= 0) return; // 0 disables caching
+    this.store.setCache(key, value, now + ttlMs);
   }
 }
 
@@ -42,8 +54,11 @@ export function parseTtlMs(raw: string | undefined, fallback = DEFAULT_CACHE_TTL
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-const CACHE_TTL_MS = parseTtlMs(config.ALEXANDRIA_CACHE_TTL_MS);
-export const searchCache = new ResultCache<LibraryResult[]>(CACHE_TTL_MS, defaultStateStore);
+// A thunk, not a resolved number: see ResultCache's ttlMs comment above.
+export const searchCache = new ResultCache<LibraryResult[]>(
+  () => parseTtlMs(config.ALEXANDRIA_CACHE_TTL_MS),
+  defaultStateStore,
+);
 
 export function cacheKey(source: string, query: string, limit: number): string {
   return `${source}|${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${limit}`;

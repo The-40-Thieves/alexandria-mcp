@@ -85,7 +85,23 @@ const DEFAULTS = {
 
 const REGISTRY = new Map<string, RegisteredEntry>();
 const WRAPPED = new Map<string, SourceAdapter>();
-const ledger: LedgerStore = createLedger();
+
+// Deferred to the first guarded call rather than built here at module load:
+// createLedger() reads config.ALEXANDRIA_LEDGER/SUPABASE_URL/
+// SUPABASE_SERVICE_ROLE_KEY, and a single config field access runs the
+// full schema.safeParse(process.env) (see config.ts's module comment).
+// registry.ts is imported by nearly everything (gen-docs, probe,
+// eval-routing, every registry test), so building the ledger eagerly here
+// meant an unrelated malformed ambient var (a bad TRANSPORT or PORT)
+// threw at the least diagnosable point: merely importing this module,
+// before main() ever ran. See index.ts's main(), which now calls
+// loadConfig() explicitly as its first statement so that failure still
+// surfaces immediately and readably at real startup.
+let ledgerInstance: LedgerStore | undefined;
+function getLedger(): LedgerStore {
+  if (!ledgerInstance) ledgerInstance = createLedger();
+  return ledgerInstance;
+}
 
 // True when a source needs no key (auth undefined or type 'none'), or its
 // configured env var is present.
@@ -236,15 +252,23 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       const controller = new AbortController();
       const unchain = chainAbort(controller);
       metrics.calls++;
-      const start = Date.now();
       try {
         const result = await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
-          await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
-          return withTimeout(
-            runGuarded(controller, () => adapter.search(query, limit)),
-            adapter.timeoutMs,
-            controller,
-          );
+          await reserveQuota(name, adapter.pacing?.dailyCap, getLedger());
+          // Timed from here, not from the top of search(): rateLimited()'s
+          // wait for a pacing slot and reserveQuota() both happen above
+          // this line, so a paced source (ghsa at 60s, nvd at 6.5s, ...)
+          // no longer shows its queue wait as provider latency.
+          const start = Date.now();
+          try {
+            return await withTimeout(
+              runGuarded(controller, () => adapter.search(query, limit)),
+              adapter.timeoutMs,
+              controller,
+            );
+          } finally {
+            metrics.latencyMsTotal += Date.now() - start;
+          }
         });
         searchCache.set(key, result);
         return result;
@@ -252,7 +276,6 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
         recordFailure(metrics, err);
         throw err;
       } finally {
-        metrics.latencyMsTotal += Date.now() - start;
         unchain();
       }
     },
@@ -261,21 +284,24 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       const unchain = chainAbort(controller);
       const metrics = sourceMetrics(name);
       metrics.calls++;
-      const start = Date.now();
       try {
         return await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
-          await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
-          return withTimeout(
-            runGuarded(controller, () => adapter.read(id)),
-            adapter.timeoutMs,
-            controller,
-          );
+          await reserveQuota(name, adapter.pacing?.dailyCap, getLedger());
+          const start = Date.now();
+          try {
+            return await withTimeout(
+              runGuarded(controller, () => adapter.read(id)),
+              adapter.timeoutMs,
+              controller,
+            );
+          } finally {
+            metrics.latencyMsTotal += Date.now() - start;
+          }
         });
       } catch (err) {
         recordFailure(metrics, err);
         throw err;
       } finally {
-        metrics.latencyMsTotal += Date.now() - start;
         unchain();
       }
     },
