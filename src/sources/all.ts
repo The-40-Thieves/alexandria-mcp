@@ -97,3 +97,4 @@ import './comtrade.js';
 import './census.js';
 import './openfda.js';
 import './epatri.js';
+import './hud.js';

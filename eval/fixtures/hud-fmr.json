@@ -1,0 +1,16 @@
+{
+  "data": {
+    "year": "2024",
+    "counties": [],
+    "basicdata": {
+      "zip_code": "75001",
+      "town_name": "Addison",
+      "metro_name": "Dallas-Plano-Irving, TX HUD Metro FMR Area",
+      "Efficiency": 1180,
+      "One-Bedroom": 1300,
+      "Two-Bedroom": 1560,
+      "Three-Bedroom": 2020,
+      "Four-Bedroom": 2340
+    }
+  }
+}
