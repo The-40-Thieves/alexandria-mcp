@@ -12,6 +12,7 @@ import {
   type CatalogEntry,
   candidates,
   resetCatalogCacheForTests,
+  withClusterFloor,
 } from './catalogIndex.js';
 
 function synthetic(overrides: Partial<CatalogEntry> & Pick<CatalogEntry, 'name'>): CatalogEntry {
@@ -118,6 +119,48 @@ test('bm25Candidates', async (t) => {
   });
 });
 
+test('withClusterFloor', async (t) => {
+  // Three same-cluster entries with distinct, deliberately non-catalog-order
+  // scores (best score last in the input array), plus one lower-scored
+  // entry from a different cluster. Regression test for the bug where the
+  // top cluster's slots were filled by iterating the raw pool (catalog/file
+  // order) instead of the ranked (score order) list, which silently
+  // reordered same-cluster results by wherever they happened to be
+  // registered.
+  const worst = synthetic({ name: 'worst', cluster: 'developer' });
+  const middle = synthetic({ name: 'middle', cluster: 'developer' });
+  const best = synthetic({ name: 'best', cluster: 'developer' });
+  const otherCluster = synthetic({ name: 'other', cluster: 'literature' });
+  // `ranked` is already in score order (best first); nothing here is sorted
+  // by name or by any incidental catalog/registration order.
+  const ranked = [best, middle, worst, otherCluster];
+
+  await t.test('preserves score order within the top-scoring cluster', () => {
+    const result = withClusterFloor(ranked, 4);
+    assert.deepEqual(
+      result.map((e) => e.name),
+      ['best', 'middle', 'worst', 'other'],
+    );
+  });
+
+  await t.test('still guarantees every top-cluster entry is included, up to k', () => {
+    const result = withClusterFloor(ranked, 3);
+    assert.deepEqual(
+      result.map((e) => e.name),
+      ['best', 'middle', 'worst'],
+      'all three same-cluster entries fit within k=3 and are included, in score order',
+    );
+  });
+
+  await t.test('caps the total at k even when the cluster is larger than k', () => {
+    const result = withClusterFloor(ranked, 2);
+    assert.deepEqual(
+      result.map((e) => e.name),
+      ['best', 'middle'],
+    );
+  });
+});
+
 test('candidates', async (t) => {
   const originalEnv = { ...process.env };
   t.after(() => {
@@ -171,6 +214,48 @@ test('candidates', async (t) => {
       'every top-cluster entry should appear, capped at k',
     );
   });
+
+  await t.test(
+    'preserves BM25 score order within the top cluster (reviewer repro: left-pad)',
+    async () => {
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+      delete process.env.ALEXANDRIA_API_KEY;
+      resetCatalogCacheForTests();
+
+      const query = 'npm package left-pad maintainers';
+      const catalogEntries = await buildCatalog();
+      // The full BM25 ranking (not just its own top-5, which mixes clusters:
+      // security sources like osv/ghsa also score well for this query), so
+      // the assertion below can isolate just the top cluster's internal
+      // order the way withClusterFloor itself does.
+      const fullRanking = bm25Candidates(query, catalogEntries, catalogEntries.length);
+      assert.equal(fullRanking[0].name, 'depsdev', 'depsdev must be #1 in raw BM25 for this query');
+
+      const topCluster = fullRanking[0].cluster;
+      const expectedOrderWithinCluster = fullRanking
+        .filter((e) => e.cluster === topCluster)
+        .slice(0, 5)
+        .map((e) => e.name);
+
+      const result = await candidates(query, 5);
+      assert.ok(
+        result.every((e) => e.cluster === topCluster),
+        'the whole top-5 should be the top cluster here (it has more than 5 members)',
+      );
+      // This is the bug the reviewer reproduced: filling the top cluster's
+      // slots by iterating the raw catalog/file-registration order instead
+      // of the ranked (score order) list silently reordered same-cluster
+      // results by wherever each source happened to be registered - here,
+      // pushing depsdev from #1 to #3, behind codewiki and lobsters.
+      assert.deepEqual(
+        result.map((e) => e.name),
+        expectedOrderWithinCluster,
+        'candidates() must preserve BM25 score order within the top cluster',
+      );
+      assert.equal(result[0].name, 'depsdev', 'depsdev must stay #1 after the cluster floor');
+    },
+  );
 
   await t.test(
     'falls back to bm25 with no network calls when no embeddings are configured',

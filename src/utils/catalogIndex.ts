@@ -298,13 +298,21 @@ async function rankCosine(
 
 // Every entry of the rank-0 cluster is guaranteed a slot (up to k total),
 // then the remaining slots are filled in rank order from every cluster.
-function withClusterFloor(ranked: CatalogEntry[], pool: CatalogEntry[], k: number): CatalogEntry[] {
+// Both passes iterate `ranked` (score order), never the pre-ranking pool
+// (catalog/file order): filling the top cluster's slots from the raw pool
+// would scramble that cluster's own internal ordering by wherever each
+// source happens to be registered, undoing the ranker's actual score order
+// within the one cluster stage 2 is about to see the most of.
+// Exported so a test can exercise it directly against a synthetic ranked
+// list, instead of only indirectly through candidates() (which always
+// goes through buildCatalog()'s registry-backed catalog).
+export function withClusterFloor(ranked: CatalogEntry[], k: number): CatalogEntry[] {
   const topCluster = ranked[0]?.cluster;
   const result: CatalogEntry[] = [];
   const have = new Set<string>();
 
   if (topCluster) {
-    for (const entry of pool) {
+    for (const entry of ranked) {
       if (entry.cluster !== topCluster) continue;
       if (result.length >= k) break;
       result.push(entry);
@@ -334,5 +342,5 @@ export async function candidates(
     ? await rankCosine(query, pool, opts?.freshness)
     : rankBm25(query, pool, opts?.freshness);
 
-  return withClusterFloor(ranked, pool, k);
+  return withClusterFloor(ranked, k);
 }
