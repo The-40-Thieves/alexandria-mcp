@@ -112,3 +112,8 @@ import './regulations.js';
 import './ukparliament.js';
 import './hfpapers.js';
 import './paperswithcode.js';
+import './mcp/huggingface.js';
+import './mcp/context7mcp.js';
+import './mcp/jina.js';
+import './mcp/mdnmcp.js';
+import './mcp/githubmcp.js';

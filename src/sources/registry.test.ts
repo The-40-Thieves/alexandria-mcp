@@ -219,4 +219,78 @@ test('registry v2', async (t) => {
       }
     },
   );
+
+  await t.test(
+    'a nested guarded call (outer adapter calling getAdapter(inner).search()) chains the outer abort to the inner: the outer times out at ~100ms and the inner fetch is aborted along with it, never retried',
+    async () => {
+      const originalFetch = globalThis.fetch;
+      let innerFetchCalls = 0;
+      let innerSignal: AbortSignal | undefined;
+      // Never settles on its own; only rejects once its own (inner)
+      // signal aborts. Without chaining, that signal is the inner call's
+      // own controller, which nothing ever aborts within the 100ms the
+      // outer allows (the inner's own default timeout is 15000ms) - so
+      // this would hang until this test's own timeout without the fix.
+      globalThis.fetch = (async (_url: string, init?: RequestInit) => {
+        innerFetchCalls++;
+        innerSignal = init?.signal ?? undefined;
+        return new Promise<Response>((_resolve, reject) => {
+          if (!innerSignal) return;
+          const onAbort = () => reject(new DOMException('Aborted', 'AbortError'));
+          if (innerSignal.aborted) onAbort();
+          else innerSignal.addEventListener('abort', onAbort, { once: true });
+        });
+      }) as typeof fetch;
+
+      try {
+        register('t_nested_inner', {
+          description: 'x',
+          supportsIngest: false,
+          // No timeoutMs override: defaults to 15000ms, far longer than
+          // the outer's 100ms below, so the inner call only stops early
+          // if the outer's abort is actually chained through to it.
+          async search() {
+            await fetchJSON('https://example.invalid/t-nested-inner');
+            return [];
+          },
+          async read() {
+            return { title: '', authors: [] };
+          },
+        });
+        register('t_nested_outer', {
+          description: 'x',
+          supportsIngest: false,
+          timeoutMs: 100,
+          async search(query, limit) {
+            return getAdapter('t_nested_inner').search(query, limit);
+          },
+          async read() {
+            return { title: '', authors: [] };
+          },
+        });
+
+        const start = Date.now();
+        await assert.rejects(
+          getAdapter('t_nested_outer').search('q', 1),
+          /This operation was aborted/,
+        );
+        const elapsed = Date.now() - start;
+        assert.ok(elapsed >= 80 && elapsed < 500, `expected a ~100ms timeout, got ${elapsed}ms`);
+        assert.equal(innerFetchCalls, 1);
+        assert.ok(
+          innerSignal?.aborted,
+          'the inner adapter call should have been aborted when the outer timed out',
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        assert.equal(
+          innerFetchCalls,
+          1,
+          'the inner call should not have started a retry after being aborted',
+        );
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  );
 });

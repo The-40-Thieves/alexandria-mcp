@@ -128,6 +128,29 @@ function withTimeout<T>(p: Promise<T>, ms: number, controller: AbortController):
 // reserveQuota() reserves the slot atomically before the call runs (see
 // quotaLedger.ts), so a failed or timed-out call still consumes it; there
 // is no separate finally-recorded-usage step to undo on failure.
+// Chains a fresh inner AbortController to whatever ambient signal is
+// already in requestContext's store, if any (a nested guarded call: one
+// adapter's search()/read() calling getAdapter(other).search()/read()
+// from inside its own withGuards() scope). AsyncLocalStorage.run() shadows
+// the outer store for the inner scope, so without this, code inside the
+// inner call only ever sees the inner controller's own signal and the
+// inner fetch is never cancelled when the outer caller times out or
+// aborts; the inner call just keeps running until its own (typically much
+// later) timeout, wasting the underlying request. Returns a cleanup
+// function that removes the listener once the inner call settles, so it
+// doesn't outlive the call it was attached to.
+function chainAbort(inner: AbortController): () => void {
+  const outer = requestContext.getStore()?.signal;
+  if (!outer) return () => {};
+  if (outer.aborted) {
+    inner.abort(outer.reason);
+    return () => {};
+  }
+  const onOuterAbort = () => inner.abort(outer.reason);
+  outer.addEventListener('abort', onOuterAbort, { once: true });
+  return () => outer.removeEventListener('abort', onOuterAbort);
+}
+
 function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
   return {
     ...adapter,
@@ -137,26 +160,38 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       if (cached) return cached;
       await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
       const controller = new AbortController();
-      const result = await withTimeout(
-        requestContext.run({ signal: controller.signal }, () =>
-          rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.search(query, limit)),
-        ),
-        adapter.timeoutMs,
-        controller,
-      );
-      searchCache.set(key, result);
-      return result;
+      const unchain = chainAbort(controller);
+      try {
+        const result = await withTimeout(
+          requestContext.run({ signal: controller.signal }, () =>
+            rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () =>
+              adapter.search(query, limit),
+            ),
+          ),
+          adapter.timeoutMs,
+          controller,
+        );
+        searchCache.set(key, result);
+        return result;
+      } finally {
+        unchain();
+      }
     },
     async read(id) {
       await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
       const controller = new AbortController();
-      return await withTimeout(
-        requestContext.run({ signal: controller.signal }, () =>
-          rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.read(id)),
-        ),
-        adapter.timeoutMs,
-        controller,
-      );
+      const unchain = chainAbort(controller);
+      try {
+        return await withTimeout(
+          requestContext.run({ signal: controller.signal }, () =>
+            rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.read(id)),
+          ),
+          adapter.timeoutMs,
+          controller,
+        );
+      } finally {
+        unchain();
+      }
     },
   };
 }
