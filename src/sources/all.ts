@@ -62,3 +62,5 @@ import './youtube.js';
 import './feeds/security.js';
 import './feeds/regional.js';
 import './feeds/standards.js';
+import './googlenews.js';
+import './nhk.js';
