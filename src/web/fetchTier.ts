@@ -265,11 +265,25 @@ function stripBrackets(hostname: string): string {
 // only need the guard (e.g. src/sources/mcp/jina.ts, which never performs
 // the fetch itself).
 export interface ResolvedFetchTarget {
-  // Set only when the target was an ordinary hostname (not a literal IP or
-  // 'localhost'): the exact address the SAME lookup that validated it also
-  // resolved to first, safe to pin the connection to.
+  // Set for every guarded, non-literal-IP target (an ordinary hostname, or
+  // 'localhost'): every address that lookup validated, in the same order,
+  // safe to pin the connection to - see guardedDispatcher's pinnedLookup in
+  // dispatcher.ts for why the connection needs the WHOLE set (Happy
+  // Eyeballs / connection failover within it), not just the first entry.
   pin?: AddressPin;
 }
+
+// 'localhost' is resolved locally (hosts file / the platform's own loopback
+// mapping) rather than through dnsResolver.lookup - see the comment at its
+// call site below for why - so its pin is these two well-known loopback
+// literals rather than a live lookup result. Both are always valid
+// addresses for 'localhost' on every platform this runs on; pinning both
+// (instead of guessing one) lets Happy Eyeballs pick whichever family the
+// target actually has a listener on.
+const LOCALHOST_PIN_ADDRESSES: Array<{ address: string; family: number }> = [
+  { address: '127.0.0.1', family: 4 },
+  { address: '::1', family: 6 },
+];
 
 async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> {
   let parsed: URL;
@@ -296,13 +310,20 @@ async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> 
   }
   if (hostname === 'localhost') {
     assertIpClassAllowed('loopback', rawUrl);
-    return {}; // resolved locally (hosts file/loopback), nothing to pin
+    // Deliberately NOT resolved via dnsResolver.lookup, unlike an ordinary
+    // hostname below: the allow/deny decision above already doesn't depend
+    // on resolution, and guardedDispatcher still needs a pin for 'localhost'
+    // (its connect.lookup hook runs for every hostname, this one included -
+    // see dispatcher.ts) or every guarded fetch to 'localhost' would fail
+    // closed with no pin in scope, which used to work before this task.
+    return { pin: { hostname, addresses: LOCALHOST_PIN_ADDRESSES } };
   }
 
   const literalClass = classifyIpLiteral(hostname);
   if (literalClass) {
     assertIpClassAllowed(literalClass, rawUrl);
-    return {}; // a literal IP host: nothing to resolve or pin
+    return {}; // a literal IP host: nothing to resolve or pin (undici's
+    // connector skips DNS/connect.lookup entirely for a literal IP target)
   }
 
   let addresses: Array<{ address: string; family: number }>;
@@ -316,8 +337,12 @@ async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> 
     const cls = classifyIpLiteral(address.toLowerCase());
     if (cls) assertIpClassAllowed(cls, rawUrl, `${hostname} resolves to ${address}`);
   }
-  const first = addresses[0];
-  return first ? { pin: { hostname, address: first.address, family: first.family } } : {};
+  // Every address in `addresses` was individually checked above (refused
+  // if any one of them is private/loopback-without-override), so the whole
+  // set - not just the first entry - is safe to hand to guardedDispatcher
+  // as the pin, preserving the failover across addresses the plain default
+  // connector this dispatcher replaces already had.
+  return addresses.length > 0 ? { pin: { hostname, addresses } } : {};
 }
 
 export async function assertFetchableUrl(rawUrl: string): Promise<void> {

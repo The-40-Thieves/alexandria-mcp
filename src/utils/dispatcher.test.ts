@@ -8,6 +8,7 @@ import { cacheStores, fetch as undiciFetch } from 'undici';
 import {
   buildCacheStore,
   buildSourceDispatcher,
+  guardedDispatcher,
   installDispatcher,
   resetHttpCacheWarningForTests,
 } from './dispatcher.ts';
@@ -165,15 +166,13 @@ test('installDispatcher', async (t) => {
   });
 
   await t.test(
-    'the global fetch honors a dispatcher installed via setGlobalDispatcher',
+    'the global fetch honors a dispatcher installed via setGlobalDispatcher, and caches through that exact path',
     async () => {
       // The two-line check from the brief's step 1, exercised as an assertion
       // rather than a throwaway script: Node's global fetch() picks up a
       // dispatcher set through the external `undici` package's
       // setGlobalDispatcher, with no explicit `dispatcher` option on the call
-      // itself. See src/utils/http.ts's module comment for why the OPPOSITE
-      // (an explicit `dispatcher` option passed to the global fetch) does not
-      // work on this Node/undici combination.
+      // itself.
       const server = await startFixtureServer();
       t.after(() => server.close());
       const originalCache = process.env.ALEXANDRIA_HTTP_CACHE;
@@ -184,9 +183,54 @@ test('installDispatcher', async (t) => {
       });
       installDispatcher();
 
-      const res = await fetch(`${server.url}/cacheable`);
+      const res1 = await fetch(`${server.url}/cacheable`);
+      assert.equal(res1.status, 200);
+      assert.equal(await res1.text(), 'cacheable-1');
+
+      // Production's actual call shape: the ambient global fetch(), no
+      // explicit `dispatcher` option, relying entirely on the
+      // setGlobalDispatcher() install above - not undiciFetch(url,
+      // {dispatcher}) (a different handler path; see buildSourceDispatcher's
+      // own tests above) and not header inspection (the `age` marker those
+      // tests use is non-null via undiciFetch but null via the global fetch
+      // for this exact same cache, a real behavioral difference between the
+      // two call shapes). Origin hit count is the one signal common to both.
+      const res2 = await fetch(`${server.url}/cacheable`);
+      assert.equal(res2.status, 200);
+      assert.equal(await res2.text(), 'cacheable-1', 'the cached response replays the same body');
+      assert.equal(
+        server.hits,
+        1,
+        'two identical GETs through the global fetch must hit the origin once',
+      );
+    },
+  );
+
+  await t.test(
+    'the global fetch honors an explicit dispatcher option (undici 7.x/legacy-handler compatibility)',
+    async () => {
+      // The constraint package.json's undici pin actually protects (see
+      // dispatcher.ts's module comment): Node's global fetch() is its OWN
+      // bundled undici build, a different copy from this package; passing
+      // it an explicit `dispatcher` built by THIS package must still work
+      // as long as this package stays on the 7.x line. guardedDispatcher is
+      // exactly what fetchTier.ts's guarded fetches pass as that option, so
+      // exercising it here - through the real global fetch, not undiciFetch
+      // - is what would fail loudly (a thrown "invalid onRequestStart
+      // method") the day a dependency bump moves this package to 8.x while
+      // Node 24 (bundled undici 7.x) is still supported. A literal-IP
+      // target, so guardedDispatcher's connect.lookup pin is never even
+      // consulted (undici's connector skips DNS/connect.lookup entirely for
+      // a literal IP) - this test is purely about whether the global fetch
+      // accepts the `dispatcher` option at all, decoupled from pinning.
+      const server = await startFixtureServer();
+      t.after(() => server.close());
+
+      const res = await fetch(`${server.url}/no-store`, {
+        dispatcher: guardedDispatcher,
+      } as RequestInit);
       assert.equal(res.status, 200);
-      assert.equal(await res.text(), 'cacheable-1');
+      assert.equal(await res.text(), 'no-store-1');
     },
   );
 });

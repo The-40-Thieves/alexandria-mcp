@@ -23,19 +23,29 @@
 // underneath it would double the effective retry count and reorder when
 // Retry-After is read.
 //
-// Version note: package.json pins the `undici` dependency to the EXACT
-// version Node 24 currently bundles internally (confirmed live:
-// process.versions.undici). Node's global fetch() is its own bundled undici
-// build; passing it an explicit `dispatcher` built by a DIFFERENT major from
-// this package throws ("invalid onRequestStart method" - the two builds'
-// internal request-handler protocols aren't cross-compatible), which is
-// exactly what fetchTier.ts's guarded fetches need to do (see
-// guardedDispatcher below). A dispatcher set globally via
-// setGlobalDispatcher() is unaffected by this - confirmed live, see the
-// report's two-line check - so sourceDispatcher below has no such
-// constraint; only the pinned version protects guardedDispatcher's explicit
-// `dispatcher:` fetch option. Re-verify this pin (`node -e
-// "console.log(process.versions.undici)"`) whenever Node's version changes.
+// Version note: package.json pins the `undici` dependency to ^7.29.0, NOT
+// to Node's own currently-bundled version. The real constraint (verified
+// against node_modules/undici/lib/core/util.js's assertRequestHandler,
+// and live on both Node 24 (bundled undici 7.x) and Node 26 (bundled undici
+// 8.x)): undici 7.x's request-handler assertion accepts BOTH the legacy
+// (onConnect/onHeaders/onData/onComplete) shape and the newer
+// (onRequestStart/onResponseStart/...) shape, so a 7.x Agent handed to
+// Node's OWN bundled global fetch() works regardless of which of those two
+// shapes that bundled fetch happens to construct. undici 8.x DROPPED the
+// legacy branch, so an 8.x Agent passed as an explicit `dispatcher` option
+// throws ("invalid onRequestStart method") against any Node whose bundled
+// fetch still constructs the legacy shape (Node 24, at minimum - the exact
+// range engines/mise.toml still permit for this package). The rule is
+// therefore one-directional and package-version-scoped, not tied to
+// matching Node's own version: stay on undici 7.x in this package for as
+// long as any Node version this repo supports bundles a 7.x fetch; do NOT
+// move to 8.x until Node 24 support is dropped. A dispatcher set globally
+// via setGlobalDispatcher() is unaffected either way (confirmed live, see
+// the report's two-line check), so sourceDispatcher below has no such
+// constraint; only guardedDispatcher's explicit `dispatcher:` fetch option
+// depends on it. dispatcher.test.ts's "global fetch honors an explicit
+// dispatcher option (undici 7.x/legacy-handler compatibility)" test fails
+// loudly the day this constraint is violated (e.g. a bump to undici 8.x).
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LookupAddress, LookupOptions } from 'node:dns';
 import fs from 'node:fs';
@@ -74,10 +84,20 @@ export function resetHttpCacheWarningForTests(): void {
   warnedFallback = false;
 }
 
-// SqliteCacheStore has no maxSize knob (only maxCount and maxEntrySize,
-// confirmed against undici's current CacheStore docs) so the 256 MB budget
-// from the brief applies to the in-memory fallback, which does support it;
-// maxEntrySize (5 MB) applies to both stores.
+// SqliteCacheStore has no maxSize (total-bytes) knob - only maxCount and
+// maxEntrySize (confirmed against undici's current CacheStore docs), so the
+// 256 MB budget from the brief can only be approximated there via maxCount.
+// SQLITE_MAX_COUNT is the worst-case bound: if every single cached entry
+// happened to be the full 5 MB maxEntrySize ceiling, this many entries is
+// the most that still fits inside 256 MB, so on-disk usage can never exceed
+// the budget regardless of what gets cached. Real responses (JSON API
+// payloads, RSS/HTML pages) are almost always far smaller than 5 MB, so
+// day-to-day capacity - the number of distinct URLs actually held before
+// eviction - is effectively much higher than this worst-case count.
+// MemoryCacheStore (the fallback below) gets the 256 MB budget directly via
+// its own maxSize option instead; maxEntrySize (5 MB) applies to both.
+const SQLITE_MAX_COUNT = Math.floor(CACHE_MAX_SIZE_BYTES / CACHE_MAX_ENTRY_SIZE_BYTES);
+
 export function buildCacheStore(
   location: string,
 ):
@@ -87,6 +107,7 @@ export function buildCacheStore(
     fs.mkdirSync(path.dirname(location), { recursive: true });
     return new cacheStores.SqliteCacheStore({
       location,
+      maxCount: SQLITE_MAX_COUNT,
       maxEntrySize: CACHE_MAX_ENTRY_SIZE_BYTES,
     });
   } catch (err) {
@@ -110,16 +131,22 @@ export function buildCacheStore(
 // the module comment above assertFetchableUrl in fetchTier.ts.
 //
 // withPinnedAddress() closes that gap: fetchTier.ts wraps its guarded fetch
-// in withPinnedAddress({hostname, address, family}, ...) using the exact
-// address assertFetchableUrl just validated, and guardedDispatcher's
-// connect.lookup hook answers ONLY from that pin - it never calls the
-// system resolver itself. A guarded fetch issued with no pin in scope fails
-// closed (connection refused) rather than silently falling back to a fresh,
-// unvalidated DNS lookup.
+// in withPinnedAddress({hostname, addresses}, ...) using the FULL set of
+// addresses assertFetchableUrl's successor (resolveFetchTarget) already
+// validated - every entry in that set individually passed the guard, so
+// none of them needs re-checking here. guardedDispatcher's connect.lookup
+// hook answers ONLY from that pin (never calls the system resolver itself),
+// and hands back the WHOLE set when Node asks for `{ all: true }` (which is
+// what Node's own Happy Eyeballs / autoSelectFamily connect path asks for),
+// so a dead or unreachable first address still lets Node fall through to a
+// later, validated address instead of failing the whole connection - the
+// same failover the plain default connector this dispatcher replaces
+// already had via a real dns.lookup(..., { all: true }). A guarded fetch
+// issued with no pin in scope fails closed (connection refused) rather
+// than silently falling back to a fresh, unvalidated DNS lookup.
 export interface AddressPin {
   hostname: string;
-  address: string;
-  family: number;
+  addresses: Array<{ address: string; family: number }>;
 }
 
 const pinStore = new AsyncLocalStorage<AddressPin>();
@@ -138,11 +165,12 @@ function pinnedLookup(
   ) => void,
 ): void {
   const pin = pinStore.getStore();
-  if (pin && pin.hostname === hostname.toLowerCase()) {
+  if (pin && pin.hostname === hostname.toLowerCase() && pin.addresses.length > 0) {
     if (options.all) {
-      callback(null, [{ address: pin.address, family: pin.family }]);
+      callback(null, pin.addresses);
     } else {
-      callback(null, pin.address, pin.family);
+      const first = pin.addresses[0];
+      callback(null, first.address, first.family);
     }
     return;
   }

@@ -41,15 +41,16 @@ export async function fetchWithRetry(
     try {
       // Node's global fetch is its OWN bundled undici build. The `undici`
       // package this repo installs for Agent/interceptors
-      // (src/utils/dispatcher.ts) is pinned in package.json to the EXACT
-      // version Node 24 currently bundles, specifically so that an explicit
-      // `dispatcher` option built by that package is accepted here by the
-      // ambient global fetch (a different major throws "invalid
-      // onRequestStart method" - see dispatcher.ts's module comment and the
-      // report for the confirming two-line check). Pinned rather than
-      // ranged: this coupling to Node's internal, undocumented bundled
-      // version is real and must be re-verified whenever Node's bundled
-      // undici moves.
+      // (src/utils/dispatcher.ts) is kept on the 7.x line (package.json:
+      // "^7.29.0") because 7.x's request-handler assertion accepts both the
+      // legacy and current handler shapes, so a 7.x Agent passed here as an
+      // explicit `dispatcher` option is accepted by the ambient global
+      // fetch's own (differently-versioned) bundled undici regardless of
+      // which shape that bundled fetch constructs. undici 8.x dropped the
+      // legacy branch and throws "invalid onRequestStart method" against a
+      // Node whose bundled fetch still constructs it (Node 24, at minimum).
+      // See dispatcher.ts's module comment for the full rule and the
+      // report for the confirming two-line check.
       const response = await fetch(url, {
         ...options,
         signal,
