@@ -98,6 +98,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   epatri: 'BASF',
   gdelt: 'ukraine',
   wikicurrent: '',
+  ukparliament: 'education',
 };
 const DEFAULT_QUERY = 'history of science';
 
