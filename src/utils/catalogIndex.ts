@@ -19,13 +19,18 @@ export interface CatalogEntry {
   vector?: number[];
 }
 
-// Overridable so tests can point persistence at a throwaway file instead of
-// this repo's real eval/catalog-embeddings.json.
+// Resolved from __dirname, not process.cwd(): the default used to depend on
+// where the process was started, so the same install read and wrote a
+// different cache file per working directory (and, run from anywhere but
+// the repo root, silently re-embedded the whole catalog every start).
+// __dirname is dist/utils/ after a build and src/utils/ under tsx, so
+// ../../eval lands at the package root either way.
+// ALEXANDRIA_CATALOG_CACHE overrides it, which is also how tests point
+// persistence at a throwaway file.
+const DEFAULT_CACHE_PATH = path.resolve(__dirname, '../../eval/catalog-embeddings.json');
+
 function cachePath(): string {
-  return (
-    process.env.ALEXANDRIA_CATALOG_CACHE_PATH ??
-    path.resolve(process.cwd(), 'eval/catalog-embeddings.json')
-  );
+  return process.env.ALEXANDRIA_CATALOG_CACHE ?? DEFAULT_CACHE_PATH;
 }
 
 function entryText(name: string, description: string, cluster: Cluster): string {
@@ -100,7 +105,7 @@ export async function buildCatalog(): Promise<CatalogEntry[]> {
 }
 
 // Test-only: clears the in-memory cache so a test can flip
-// hasEmbeddingsConfigured() / ALEXANDRIA_CATALOG_CACHE_PATH and rebuild.
+// hasEmbeddingsConfigured() / ALEXANDRIA_CATALOG_CACHE and rebuild.
 export function resetCatalogCacheForTests(): void {
   cachedCatalog = undefined;
 }

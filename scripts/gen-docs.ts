@@ -223,6 +223,11 @@ const FEATURE_ENVS: EnvVar[] = [
       'Set to "llm" to rerank fused results with a chat call; otherwise the fused order is kept.',
   },
   {
+    name: 'ALEXANDRIA_CATALOG_CACHE',
+    comment:
+      'Path to the routing catalog embedding cache. Defaults to eval/catalog-embeddings.json inside the package.',
+  },
+  {
     name: 'ALEXANDRIA_CACHE_TTL_MS',
     comment: 'Search result cache TTL in milliseconds. Unset uses the built-in default.',
   },
