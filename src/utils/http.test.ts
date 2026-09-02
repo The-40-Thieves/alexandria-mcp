@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { retryAfterMs } from './http.js';
+import { fetchWithRetry, retryAfterMs } from './http.js';
 
 test('retryAfterMs', async (t) => {
   await t.test('missing header falls back to 1000ms', () => {
@@ -47,4 +47,36 @@ test('retryAfterMs', async (t) => {
     assert.equal(retryAfterMs('3', 2000), null);
     assert.equal(retryAfterMs('1', 2000), 1000);
   });
+});
+
+test('fetchWithRetry', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await t.test(
+    'passes redirect and other custom RequestInit fields through to fetch()',
+    async () => {
+      // fetchTier.ts's SSRF-guarded redirect loop depends on fetchWithRetry
+      // forwarding `redirect: 'manual'` (and arbitrary other init fields)
+      // straight through to the underlying fetch() call, not defaulting or
+      // stripping it.
+      let capturedInit: RequestInit | undefined;
+      globalThis.fetch = (async (_url: string, init: RequestInit = {}) => {
+        capturedInit = init;
+        return new Response('ok', { status: 200 });
+      }) as typeof fetch;
+
+      await fetchWithRetry('https://example.org/x', {
+        redirect: 'manual',
+        method: 'POST',
+        headers: { 'X-Test': 'yes' },
+      });
+
+      assert.equal(capturedInit?.redirect, 'manual');
+      assert.equal(capturedInit?.method, 'POST');
+      assert.equal((capturedInit?.headers as Record<string, string>)?.['X-Test'], 'yes');
+    },
+  );
 });

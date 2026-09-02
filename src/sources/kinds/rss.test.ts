@@ -110,18 +110,44 @@ test('defineRssSource', async (t) => {
     assert.equal(results[0].title, 'New critical remote code execution flaw');
   });
 
-  await t.test('read returns metadataOnly with externalUrl set to the id', async () => {
+  await t.test('read fetches and extracts the article body via the fetch tier', async () => {
+    const articleHtml = `<!doctype html><html><head><title>Full Article</title></head><body><article><p>${'Full text content sentence. '.repeat(40)}</p></article></body></html>`;
+    globalThis.fetch = (async () =>
+      new Response(articleHtml, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      })) as typeof fetch;
     defineRssSource({
-      name: 'test-rss-read',
+      name: 'test-rss-read-success',
       url: 'https://example.org/feed.xml',
       description: 'Test feed',
       cluster: 'security',
       homepage: 'https://example.org',
     });
-    const result = await getAdapter('test-rss-read').read('https://example.org/advisory/2');
-    assert.equal(result.metadataOnly, true);
+    const result = await getAdapter('test-rss-read-success').read('https://example.org/advisory/2');
+    assert.equal(result.metadataOnly, undefined);
     assert.equal(result.externalUrl, 'https://example.org/advisory/2');
+    assert.match(result.text ?? '', /Full text content sentence/);
   });
+
+  await t.test(
+    'read falls back to metadataOnly with the fetch error in note when every tier fails',
+    async () => {
+      globalThis.fetch = (async () =>
+        new Response('server error', { status: 500 })) as typeof fetch;
+      defineRssSource({
+        name: 'test-rss-read-fail',
+        url: 'https://example.org/feed.xml',
+        description: 'Test feed',
+        cluster: 'security',
+        homepage: 'https://example.org',
+      });
+      const result = await getAdapter('test-rss-read-fail').read('https://example.org/advisory/3');
+      assert.equal(result.metadataOnly, true);
+      assert.equal(result.externalUrl, 'https://example.org/advisory/3');
+      assert.match(result.note ?? '', /defuddle/);
+    },
+  );
 
   await t.test(
     'search matches a token inside HTML markup and returns a tag-free description',

@@ -38,9 +38,15 @@ export async function googlenewsSearch(query: string, limit: number): Promise<Li
   });
 }
 
-// Google News RSS links are Google redirect URLs, not the publisher's own
-// article URL, so there is nothing stable to fetch full text from yet.
-// TODO(stage-6): fetchTier
+// Google News RSS links (news.google.com/rss/articles/...) do not resolve
+// to the publisher's article via an ordinary HTTP redirect: a plain GET
+// with redirects followed returns HTTP 200 with an empty body at the same
+// news.google.com URL (verified live 2026-09-02). The actual publisher URL
+// is embedded in an opaque token that Google's client-side JS decodes
+// through an undocumented batchexecute RPC call; every third-party
+// decoder for this works by reverse-engineering that call. That's a
+// meaningfully different (and fragile) integration than the fetch tier
+// this stage adds, so googlenews stays metadata-only rather than adding it.
 export async function googlenewsRead(id: string): Promise<ReadResult> {
   return {
     title: id,
