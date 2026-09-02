@@ -112,3 +112,4 @@ import './regulations.js';
 import './ukparliament.js';
 import './hfpapers.js';
 import './paperswithcode.js';
+import './mcp/huggingface.js';
