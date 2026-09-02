@@ -66,6 +66,7 @@ import './feeds/developer.js';
 import './ecosystems.js';
 import './depsdev.js';
 import './stackexchange.js';
+import './hn.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';
