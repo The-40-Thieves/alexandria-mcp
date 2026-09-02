@@ -417,10 +417,10 @@ export function createServer(): McpServer {
     'library_research',
     {
       title: 'Recursive Cited Research',
-      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Writes a final cited report over the union of every round's sources, then removes any unsupported claims.
+      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Writes a final cited report over the union of every round's sources, then removes unsupported claims it can excise unambiguously, listing any it left standing in warnings[].
 
   Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY).
-  Returns: { report, citations[], rounds[], elapsedMs }`,
+  Returns: { report, citations[], rounds[], elapsedMs, warnings[] }`,
       inputSchema: {
         query: z.string().min(1).max(1000).describe('Research topic or question'),
         depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),

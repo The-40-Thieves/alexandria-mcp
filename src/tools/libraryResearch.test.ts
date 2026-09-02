@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import test from 'node:test';
-import type { LibraryAnswerResult } from './libraryAnswer.js';
-import { libraryResearch } from './libraryResearch.js';
+import type { Citation, LibraryAnswerResult } from './libraryAnswer.js';
+import { checkCitations, libraryResearch } from './libraryResearch.js';
 
 interface FakeServer {
   url: string;
@@ -279,5 +279,72 @@ test('libraryResearch', async (t) => {
 
     assert.ok(progressEvents.length > 0);
     assert.equal(progressEvents[0].round, 1);
+  });
+});
+
+// checkCitations removes flagged sentences from the report itself rather
+// than trusting the model to self-edit. Doing that with split/join on
+// whatever string the model returned shredded the report when the model
+// answered with a one-word "sentence": every incidental occurrence of that
+// word vanished. Removal is now bounded by a length floor and an
+// exactly-once match, with anything else kept and warned about.
+test('checkCitations', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+
+  const citations: Citation[] = [
+    { n: 1, source: 'zzr_a', id: 'a1', title: 'Source A', url: undefined },
+  ];
+
+  async function runWith(report: string, unsupported: string[]) {
+    const synth = await startFakeChatServer(() => ({ unsupported }));
+    try {
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+      return await checkCitations(report, citations);
+    } finally {
+      await synth.close();
+    }
+  }
+
+  await t.test('removes a long claim that occurs exactly once', async () => {
+    const report = 'The API added rate limiting in 2025 [1]. Latency fell by half [1].';
+    const out = await runWith(report, ['Latency fell by half [1].']);
+    assert.equal(out.report, 'The API added rate limiting in 2025 [1].');
+    assert.deepEqual(out.warnings, []);
+  });
+
+  await t.test('keeps a one-word claim instead of shredding the report', async () => {
+    const report = 'Yes. The API added rate limiting in 2025 [1]. Yes, latency fell [1].';
+    const out = await runWith(report, ['Yes.']);
+    assert.equal(out.report, report, 'the report must come back untouched');
+    assert.equal(out.warnings.length, 1);
+    assert.match(out.warnings[0], /too short to remove safely \(4 chars\)/);
+  });
+
+  await t.test('keeps a claim that matches more than once', async () => {
+    const repeated = 'This claim is repeated verbatim in the report.';
+    const report = `${repeated} Something else [1]. ${repeated}`;
+    const out = await runWith(report, [repeated]);
+    assert.equal(out.report, report);
+    assert.equal(out.warnings.length, 1);
+    assert.match(out.warnings[0], /matched 2 times/);
+  });
+
+  await t.test('keeps a claim that matches zero times', async () => {
+    const report = 'The API added rate limiting in 2025 [1].';
+    const out = await runWith(report, ['A sentence that is not in the report at all.']);
+    assert.equal(out.report, report);
+    assert.equal(out.warnings.length, 1);
+    assert.match(out.warnings[0], /matched 0 times/);
+  });
+
+  await t.test('an empty unsupported list returns the report and no warnings', async () => {
+    const report = 'The API added rate limiting in 2025 [1].';
+    const out = await runWith(report, []);
+    assert.equal(out.report, report);
+    assert.deepEqual(out.warnings, []);
   });
 });

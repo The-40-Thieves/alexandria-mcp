@@ -35,6 +35,9 @@ export interface LibraryResearchResult {
   citations: Citation[];
   rounds: ResearchRound[];
   elapsedMs: number;
+  // Unsupported claims the fact-check flagged but that were left standing
+  // because removing them was not safe (see checkCitations).
+  warnings: string[];
 }
 
 export interface ProgressInfo {
@@ -119,10 +122,32 @@ Return JSON: { "report": "the full report text" }`;
 
 const CitationCheckSchema = z.object({ unsupported: z.array(z.string()) });
 
+// The shortest "sentence" this will cut out of a report. A model asked for
+// verbatim sentences sometimes answers with a fragment ("Yes.", "None", a
+// single word), and split/join on a short string shreds the report by
+// deleting every incidental occurrence of it. Below this length the claim
+// is kept and a warning is raised instead.
+const MIN_REMOVABLE_CLAIM_CHARS = 20;
+
+export interface CitationCheckResult {
+  report: string;
+  warnings: string[];
+}
+
 // Asks the `synth` role to list any sentences whose claim isn't actually
 // supported by the given sources, then removes those exact sentences from
 // the report (an in-code removal, not trusting the model to self-edit).
-async function checkCitations(report: string, citations: Citation[]): Promise<string> {
+//
+// Removal is deliberately conservative: a claim is cut only when it is at
+// least MIN_REMOVABLE_CLAIM_CHARS long AND occurs exactly once in the
+// report. Anything else is left in place with a warning, because the
+// failure mode of a loose match (silently shredding unrelated prose) is far
+// worse than leaving one flagged sentence standing where the caller can see
+// the warning.
+export async function checkCitations(
+  report: string,
+  citations: Citation[],
+): Promise<CitationCheckResult> {
   const system = `You fact-check a research report against its numbered sources. List every sentence in the report whose claim is not adequately supported by the cited source(s), verbatim as it appears in the report.
 
 Return JSON: { "unsupported": ["exact sentence 1", ...] }
@@ -130,16 +155,35 @@ Return an empty array if every sentence is adequately supported.`;
   const sourcesBlock = citations.map((c) => `[${c.n}] ${c.title} (${c.source}:${c.id})`).join('\n');
   const user = `Report:\n${report}\n\nSources:\n${sourcesBlock}`;
   const result = await chatJSON('synth', system, user, CitationCheckSchema);
-  if (result.unsupported.length === 0) return report;
+  if (result.unsupported.length === 0) return { report, warnings: [] };
 
+  const warnings: string[] = [];
   let cleaned = report;
-  for (const sentence of result.unsupported) {
-    if (sentence) cleaned = cleaned.split(sentence).join('');
+  for (const raw of result.unsupported) {
+    const sentence = raw?.trim();
+    if (!sentence) continue;
+    const shown = JSON.stringify(sentence.length > 80 ? `${sentence.slice(0, 77)}...` : sentence);
+    if (sentence.length < MIN_REMOVABLE_CLAIM_CHARS) {
+      warnings.push(
+        `kept an unsupported claim too short to remove safely (${sentence.length} chars): ${shown}`,
+      );
+      continue;
+    }
+    const occurrences = cleaned.split(sentence).length - 1;
+    if (occurrences !== 1) {
+      warnings.push(
+        `kept an unsupported claim that matched ${occurrences} times in the report: ${shown}`,
+      );
+      continue;
+    }
+    cleaned = cleaned.split(sentence).join('');
   }
-  return cleaned
+
+  const tidied = cleaned
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+  return { report: tidied, warnings };
 }
 
 function citationKey(c: Citation): string {
@@ -247,11 +291,14 @@ export async function libraryResearch(
 
   const finalCitations = renumber(unionCitations);
   let report: string;
+  let warnings: string[] = [];
   if (finalCitations.length === 0) {
     report = 'No sources were found for this topic; not found in the sources.';
   } else {
     const draft = await writeReport(query, learnings, finalCitations);
-    report = await checkCitations(draft, finalCitations);
+    const checked = await checkCitations(draft, finalCitations);
+    report = checked.report;
+    warnings = checked.warnings;
   }
 
   return {
@@ -259,5 +306,6 @@ export async function libraryResearch(
     citations: finalCitations,
     rounds,
     elapsedMs: Date.now() - startedAt,
+    warnings,
   };
 }
