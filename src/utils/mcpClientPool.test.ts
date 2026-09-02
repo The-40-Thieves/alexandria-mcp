@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { McpClientPool, type RemoteServerConfig } from './mcpClientPool.js';
+import { isTransportTrouble, McpClientPool, type RemoteServerConfig } from './mcpClientPool.js';
 import { startTestMcpServer, type TestMcpServerHandle } from './mcpTestServer.js';
 
 function cfg(handle: TestMcpServerHandle, name = 'test-server'): RemoteServerConfig {
@@ -260,5 +260,34 @@ test('McpClientPool', async (t) => {
     // retry attempt (creating a second client): 2 requests total, not a
     // third.
     assert.equal(handle.requestCount(), 2);
+  });
+});
+
+test('isTransportTrouble', async (t) => {
+  await t.test('matches a genuinely broken transport', () => {
+    assert.equal(isTransportTrouble(new Error('fetch failed')), true);
+    assert.equal(isTransportTrouble(new Error('read ECONNRESET')), true);
+    assert.equal(isTransportTrouble(new Error('connect ECONNREFUSED 127.0.0.1:1')), true);
+    assert.equal(isTransportTrouble(new Error('write EPIPE')), true);
+    assert.equal(isTransportTrouble(new Error('session expired')), true);
+    const withCause = new Error('fetch failed');
+    (withCause as Error & { cause?: unknown }).cause = new Error('ECONNREFUSED');
+    assert.equal(isTransportTrouble(withCause), true);
+    const httpError = new Error('request failed');
+    (httpError as Error & { code?: unknown }).code = 404;
+    assert.equal(isTransportTrouble(httpError), true);
+  });
+
+  await t.test('does NOT match a timeout, so an aborted call is not retried', () => {
+    // The caller's own guard (registry.ts's withTimeout) is what aborts
+    // these. Retrying issues a second request against a deadline that has
+    // already passed.
+    assert.equal(isTransportTrouble(new Error('Request timed out')), false);
+    assert.equal(isTransportTrouble(new Error('MCP request timeout')), false);
+    assert.equal(isTransportTrouble(new Error('This operation was aborted')), false);
+  });
+
+  await t.test('does not match an ordinary tool-level failure', () => {
+    assert.equal(isTransportTrouble(new Error('tool error: bad argument')), false);
   });
 });
