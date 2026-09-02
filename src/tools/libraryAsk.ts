@@ -1,12 +1,13 @@
 /**
  * Natural language library search router.
- * Uses gpt-4o-mini to parse intent, select relevant sources,
+ * Uses the `router` provider role to parse intent, select relevant sources,
  * and generate optimized per-source queries. Then searches in parallel.
  */
 
-import OpenAI from 'openai';
+import { z } from 'zod';
 import { getAdapter, listSources } from '../sources/registry.js';
 import type { LibraryResult, LibrarySource } from '../types.js';
+import { chatJSON } from '../utils/providers.js';
 
 interface RouteItem {
   source: string;
@@ -14,10 +15,18 @@ interface RouteItem {
   reason: string;
 }
 
-interface RoutingDecision {
-  intent: string;
-  routes: RouteItem[];
-}
+const RoutingDecisionSchema = z.object({
+  intent: z.string().min(1),
+  routes: z.array(
+    z.object({
+      source: z.string().min(1),
+      query: z.string().min(1),
+      reason: z.string().default(''),
+    }),
+  ),
+});
+
+type RoutingDecision = z.infer<typeof RoutingDecisionSchema>;
 
 export interface AskResult {
   query: string;
@@ -65,10 +74,6 @@ Rules:
 - For youtube, the query should be phrased like a natural YouTube search (video title keywords, not a research query)`;
 
 async function routeQuery(query: string, maxSources: number): Promise<RoutingDecision> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is required for library_ask');
-
-  const client = new OpenAI({ apiKey });
   const sources = listSources();
   // Include name + first sentence of description to keep the prompt compact
   const sourceList = sources
@@ -78,34 +83,8 @@ async function routeQuery(query: string, maxSources: number): Promise<RoutingDec
     )
     .join('\n');
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
-    max_tokens: 700,
-    response_format: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content: `${SYSTEM_PROMPT}\n\nSelect at most ${maxSources} sources ordered by relevance.\n\nAvailable sources:\n${sourceList}`,
-      },
-      { role: 'user', content: query },
-    ],
-  });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error('Empty routing response from OpenAI');
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new Error(`Invalid JSON from router: ${content.substring(0, 200)}`);
-  }
-
-  const decision = parsed as RoutingDecision;
-  if (!decision.intent || !Array.isArray(decision.routes)) {
-    throw new Error('Router returned unexpected shape');
-  }
-  return decision;
+  const system = `${SYSTEM_PROMPT}\n\nSelect at most ${maxSources} sources ordered by relevance.\n\nAvailable sources:\n${sourceList}`;
+  return chatJSON('router', system, query, RoutingDecisionSchema);
 }
 
 export async function libraryAsk(
@@ -115,7 +94,7 @@ export async function libraryAsk(
 ): Promise<AskResult> {
   const routing = await routeQuery(query, maxSources);
 
-  // Validate — only keep routes whose source names actually exist
+  // Validate: only keep routes whose source names actually exist
   const validNames = new Set(listSources().map((s) => s.name));
   const validRoutes = routing.routes.filter(
     (r) => typeof r.source === 'string' && validNames.has(r.source),
