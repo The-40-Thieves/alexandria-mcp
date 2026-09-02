@@ -1,0 +1,18 @@
+{
+  "bills": [
+    {
+      "congress": 119,
+      "introducedDate": "2025-07-16",
+      "latestAction": {
+        "actionDate": "2026-08-31",
+        "text": "Motion to reconsider laid on the table Agreed to without objection."
+      },
+      "number": "4465",
+      "originChamber": "House",
+      "originChamberCode": "H",
+      "title": "To amend chapters 4, 10, and 131 of title 5, United States Code.",
+      "type": "HR",
+      "updateDate": "2026-09-02"
+    }
+  ]
+}
