@@ -1,7 +1,7 @@
 {
   "name": "@the-40-thieves/alexandria-mcp",
   "version": "9.2.0",
-  "description": "60-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
+  "description": "138-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -11,6 +11,7 @@
     "probe": "npx tsx scripts/probe.ts",
     "probe:baseline": "npx tsx scripts/probe.ts --baseline",
     "eval:routing": "npx tsx scripts/eval-routing.ts",
+    "docs": "npx tsx scripts/gen-docs.ts",
     "lint": "biome check .",
     "gate": "npm run build && npm test && npm run lint"
   },

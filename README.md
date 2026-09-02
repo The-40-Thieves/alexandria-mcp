@@ -1,12 +1,12 @@
 # Alexandria
 
-A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 60 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
+A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 138 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
 
 ## Tools
 
 | Tool | Description |
 |---|---|
-| `library_list_sources` | List all 60 sources with descriptions and full-text capabilities |
+| `library_list_sources` | List all 138 sources with descriptions and full-text capabilities |
 | `library_ask(query, max_sources?, results_per_source?)` | **Natural language search** — routes your query to the best sources, searches in parallel, returns unified deduplicated results |
 | `library_search(query, source, limit?)` | Search a specific source by title, author, or keywords |
 | `library_read(id, source)` | Fetch full text or metadata for an item (200k char limit) |
@@ -18,107 +18,35 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 `library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results.
 
-## Sources (60)
+<!-- sources:start -->
+## Sources (138)
 
-### Public Domain Literature (28)
+138 sources across 19 clusters (28 hidden pending a key or config not present in this deployment). Full per-source detail, including auth env vars and last-verified dates, is generated in [docs/sources.md](docs/sources.md).
 
-| Source | Coverage | Full Text |
+| Cluster | Sources | Hidden |
 |---|---|---|
-| `gutenberg` | 76k+ public domain books | Yes |
-| `openlibrary` | 30M+ records | Metadata only |
-| `archive` | 41M+ texts, newspapers, scanned books | Yes |
-| `sacredtexts` | Curated registry: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism | Yes (scraped) |
-| `wikisource` | Free-content library: historical documents, literary works | Yes |
-| `standardebooks` | Carefully formatted, public domain ebooks | Yes |
-| `perseus` | Classical Greek and Latin texts with translations | Yes |
-| `ctext` | Chinese Text Project — pre-modern Chinese literature | Yes |
-| `gallica` | Bibliothèque nationale de France — French heritage texts | Yes |
-| `loc` | Library of Congress — US historical collections | Metadata only |
-| `hathitrust` | 17M+ volumes from research libraries | Metadata only |
-| `dpla` | Digital Public Library of America — US cultural heritage | Metadata only |
-| `ndl` | National Diet Library Japan | Metadata only |
-| `europeana` | European cultural heritage — 50M+ objects | Metadata only |
-| `trove` | National Library of Australia — newspapers, books, images | Yes |
-| `bhl` | Biodiversity Heritage Library — natural history literature | Yes |
-| `digitalnz` | National Library of New Zealand | Metadata only |
-| `internetclassics` | Internet Classics Archive — 441 classical works | Yes |
-| `marxists` | Marxists Internet Archive — political theory, philosophy | Yes |
-| `projectruneberg` | Nordic literature and history | Yes |
-| `cervantes` | Biblioteca Virtual Miguel de Cervantes — Spanish literature | Yes |
-| `doab` | Directory of Open Access Books — 70k+ peer-reviewed OA books | Metadata only |
-| `googlebooks` | Google Books — metadata and preview snippets | Metadata only |
-| `chroniclingamerica` | Library of Congress — US historic newspapers 1770–1963 | Yes |
-| `ccel` | Christian Classics Ethereal Library | Yes |
-| `feedbooks` | Public domain and self-published ebooks | Yes |
-| `wdl` | World Digital Library — international manuscripts and maps | Metadata only |
-| `datagov` | Data.gov — US government open data catalog | Metadata only |
+| academic | 16 | 2 |
+| ai_research | 3 | 0 |
+| archives | 4 | 2 |
+| culture | 8 | 2 |
+| developer | 16 | 3 |
+| economics | 8 | 2 |
+| geopolitical | 3 | 3 |
+| government | 6 | 3 |
+| law | 3 | 1 |
+| literature | 17 | 2 |
+| markets | 2 | 1 |
+| news_global | 5 | 2 |
+| news_regional | 15 | 0 |
+| real_estate | 2 | 2 |
+| science | 7 | 0 |
+| security | 14 | 0 |
+| standards | 3 | 0 |
+| video | 1 | 0 |
+| web | 5 | 3 |
+| **Total** | 138 | 28 |
 
-### Academic & Science (11)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `arxiv` | 2M+ preprints: physics, math, CS, biology, economics | Yes |
-| `core` | 57M+ open access research papers across all disciplines | Yes |
-| `europmc` | Europe PubMed Central — life sciences literature | Yes |
-| `nasa` | NASA Technical Reports Server | Yes |
-| `osti` | DOE Office of Scientific and Technical Information | Yes |
-| `eric` | Education Resources Information Center | Yes |
-| `nsf` | NSF Award Search — funded research abstracts | Yes |
-| `courtlistener` | US federal and state court opinions (Free Law Project). 125 req/day. | Yes |
-| `biorxiv` | bioRxiv preprints — biology | Yes |
-| `zenodo` | CERN open repository — papers, datasets, software. 2M+ records. | Yes |
-| `semanticscholar` | Semantic Scholar — 200M+ papers with AI-powered metadata | Yes |
-
-### Government, Law & International (5)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `govinfo` | US Government Publishing Office — laws, regulations, congressional records | Yes |
-| `nih` | NIH Office of Portfolio Analysis | Yes |
-| `nbnorway` | National Library of Norway | Metadata only |
-| `legislation` | legislation.gov.uk — UK Acts and Statutory Instruments | Yes |
-| `osf` | Open Science Framework — preprints and research data | Yes |
-
-### Specialized Corpora (3)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `earlyprint` | Early English print 1473–1700 | Yes |
-| `openiti` | OpenITI — Arabic/Persian Islamic texts (GitHub-based) | Yes |
-| `legislationscot` | Scottish legislation | Yes |
-
-### Research Aggregators (7)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `openalex` | OpenAlex — 240M+ scholarly works, open catalog | Metadata only |
-| `plos` | PLOS journals — open access science | Yes |
-| `nasaads` | NASA Astrophysics Data System | Yes |
-| `smithsonian` | Smithsonian Institution — collections and research | Metadata only |
-| `doaj` | Directory of Open Access Journals — 20k+ journals | Metadata only |
-| `nara` | National Archives — US federal records | Metadata only |
-| `springer` | SpringerNature — OA and metadata | Metadata only |
-
-### Institutional Repositories (4)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `harvardlib` | Harvard Library Digital Collections | Metadata only |
-| `apollo` | Cambridge University repository | Yes |
-| `ora` | Oxford Research Archive | Yes |
-| `base` | Bielefeld Academic Search Engine — 300M+ documents (pending IP whitelist) | Metadata only |
-
-### Software Documentation (1)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `codewiki` | Google Code Wiki — open source project documentation | Yes |
-
-### Video & Lectures (1)
-
-| Source | Coverage | Full Text |
-|---|---|---|
-| `youtube` | YouTube — video search (Data API v3, needs `YOUTUBE_API_KEY`); transcripts via captions, no quota | Yes (transcript) |
+<!-- sources:end -->
 
 ## Credentials
 
@@ -310,7 +238,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", sources: 60 }`.
+Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: 138, visible: 110, hidden: 28, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, tools: 9 }`.
 
 ## Adding Custom Providers
 
