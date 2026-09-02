@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "location_code": "UKR",
+      "location_name": "Ukraine",
+      "admin1_name": "Donetska",
+      "event_type": "Battles",
+      "events": 142,
+      "fatalities": 87,
+      "reference_period_start": "2026-08-01"
+    }
+  ]
+}
