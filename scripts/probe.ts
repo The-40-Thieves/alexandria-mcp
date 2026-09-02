@@ -93,6 +93,8 @@ export const PROBE_QUERIES: Record<string, string> = {
   // free-text query isn't one and would return [] by design.
   comtrade: '0101',
   census: 'population',
+  // openFDA returns HTTP 404 (not an empty array) for a zero-result query.
+  openfda: 'tylenol',
 };
 const DEFAULT_QUERY = 'history of science';
 

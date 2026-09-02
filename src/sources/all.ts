@@ -95,3 +95,4 @@ import './fred.js';
 import './dbnomics.js';
 import './comtrade.js';
 import './census.js';
+import './openfda.js';

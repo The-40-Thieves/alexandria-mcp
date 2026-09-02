@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "status": "Ongoing",
+      "city": "Minneapolis",
+      "state": "MN",
+      "country": "United States",
+      "classification": "Class II",
+      "product_type": "Drugs",
+      "event_id": "98239",
+      "recalling_firm": "GOLD STAR DISTRIBUTION INC",
+      "recall_number": "D-0277-2026",
+      "product_description": "TYLENOL a) 500 MG., 2'S DISPLAY, 50CT",
+      "reason_for_recall": "CGMP Deviations: Insanitary conditions including rodent exposure/activity in their distribution center.",
+      "recall_initiation_date": "20251226",
+      "report_date": "20260121"
+    }
+  ]
+}
