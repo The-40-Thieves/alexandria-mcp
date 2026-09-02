@@ -68,6 +68,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // match; an empty query skips the filter and returns the first entries,
   // a reliable live probe (like the RSS-kind sources above).
   kev: '',
+  euvd: 'openssl',
 };
 const DEFAULT_QUERY = 'history of science';
 
