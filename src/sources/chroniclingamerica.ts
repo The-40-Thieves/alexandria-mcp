@@ -53,7 +53,7 @@ export async function chroniclingAmericaSearch(
     fo: 'json',
     c: String(limit),
   });
-  // loc.gov's collections search is slow (observed 15-33s) — give it a
+  // loc.gov's collections search is slow (observed 15-33s); give it a
   // longer per-attempt budget than the shared default and only one retry.
   const data = await fetchJSON<CASearchResponse>(
     `${BASE}/collections/chronicling-america/?${params}`,
@@ -94,6 +94,13 @@ export async function chroniclingAmericaRead(id: string): Promise<{
   // Fall back to the LoC text-services overlay when the item JSON itself
   // did not carry a full_text field (common for newspaper page records,
   // which serve OCR through a separate ALTO/word-coordinates service).
+  // Kept as `st=text` appended to the item URL rather than switching to
+  // the brief's https://www.loc.gov/resource/{resourceId}/?fo=json&st=text
+  // form: verified live on 2026-09-01 that neither form returns item.full_text
+  // for a real NDNP newspaper page (e.g. sn96075050/1917-09-06/ed-1); both
+  // resolve to the same resource.fulltext_file ALTO/word-coordinates link, so
+  // this fallback throws for real chroniclingamerica ids either way; the two
+  // forms are equivalent here and the item-URL one is simpler to construct.
   const fallback = await fetchJSON<CAReadResponse>(withParam(id, 'st', 'text'), {}, 40000, 1).catch(
     () => undefined,
   );
@@ -118,7 +125,7 @@ export async function chroniclingAmericaRead(id: string): Promise<{
 
 register('chroniclingamerica', {
   description:
-    'Chronicling America (LOC) — full OCR text of US newspapers 1770–1963, now served via the unified loc.gov search/item API.',
+    'Chronicling America (LOC): full OCR text of US newspapers 1770-1963, now served via the unified loc.gov search/item API.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'archives',
