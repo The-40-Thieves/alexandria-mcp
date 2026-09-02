@@ -30,10 +30,7 @@ function pickTextUrl(formats: Record<string, string>): string | undefined {
   );
 }
 
-export async function gutenbergSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const url = `${GUTENDEX_BASE}/books/?search=${encodeURIComponent(query)}&page_size=${limit}`;
-  const data = await fetchJSON<GutendexResponse>(url);
-
+export function normalizeGutenberg(data: GutendexResponse): LibraryResult[] {
   return data.results.map((book) => ({
     id: String(book.id),
     source: 'gutenberg' as const,
@@ -44,6 +41,12 @@ export async function gutenbergSearch(query: string, limit = 10): Promise<Librar
     hasFullText: Boolean(pickTextUrl(book.formats)),
     downloadUrl: pickTextUrl(book.formats),
   }));
+}
+
+export async function gutenbergSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const url = `${GUTENDEX_BASE}/books/?search=${encodeURIComponent(query)}&page_size=${limit}`;
+  const data = await fetchJSON<GutendexResponse>(url);
+  return normalizeGutenberg(data);
 }
 
 export async function gutenbergRead(id: string): Promise<{
@@ -86,6 +89,10 @@ export async function gutenbergRead(id: string): Promise<{
 register('gutenberg', {
   description: 'Project Gutenberg — 76k+ public domain books, best for pre-1928 literature.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'literature',
+  freshness: 'static',
+  homepage: 'https://www.gutenberg.org',
   search: gutenbergSearch,
   async read(id) {
     const raw = await gutenbergRead(id);

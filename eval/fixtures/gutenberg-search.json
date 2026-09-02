@@ -1,0 +1,106 @@
+{
+  "count": 8,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 84,
+      "title": "Frankenstein; or, the modern prometheus",
+      "authors": [
+        {
+          "name": "Shelley, Mary Wollstonecraft",
+          "birth_year": 1797,
+          "death_year": 1851
+        }
+      ],
+      "summaries": [
+        "\"Frankenstein; Or, The Modern Prometheus\" by Mary Wollstonecraft Shelley is a Gothic novel published in 1818. It tells the story of Victor Frankenstein, a young scientist who creates a living creature from assembled body parts in an unorthodox experiment. When the creature awakens, Victor flees in horror, abandoning his creation. The conscious being must navigate a world that fears him, learning language and seeking connection, only to face repeated rejection. Embittered and alone, the creature confronts his creator with a desperate request that will set both on a dark path of vengeance and tragedy. (This is an automatically generated summary.)"
+      ],
+      "editors": [],
+      "translators": [],
+      "subjects": [
+        "Frankenstein's monster (Fictitious character) -- Fiction",
+        "Frankenstein, Victor (Fictitious character) -- Fiction",
+        "Gothic fiction",
+        "Horror tales",
+        "Monsters -- Fiction",
+        "Science fiction",
+        "Scientists -- Fiction"
+      ],
+      "bookshelves": [
+        "Category: British Literature",
+        "Category: Classics of Literature",
+        "Category: Novels",
+        "Category: Science-Fiction & Fantasy",
+        "Gothic Fiction",
+        "Movie Books",
+        "Precursors of Science Fiction",
+        "Science Fiction by Women"
+      ],
+      "languages": [
+        "en"
+      ],
+      "copyright": false,
+      "media_type": "Text",
+      "formats": {
+        "text/html": "https://www.gutenberg.org/ebooks/84.html.images",
+        "application/epub+zip": "https://www.gutenberg.org/ebooks/84.epub3.images",
+        "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/84.kf8.images",
+        "application/rdf+xml": "https://www.gutenberg.org/ebooks/84.rdf",
+        "image/jpeg": "https://www.gutenberg.org/cache/epub/84/pg84.cover.medium.jpg",
+        "application/octet-stream": "https://www.gutenberg.org/cache/epub/84/pg84-h.zip",
+        "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/84.txt.utf-8"
+      },
+      "download_count": 58824
+    },
+    {
+      "id": 41445,
+      "title": "Frankenstein; Or, The Modern Prometheus",
+      "authors": [
+        {
+          "name": "Shelley, Mary Wollstonecraft",
+          "birth_year": 1797,
+          "death_year": 1851
+        }
+      ],
+      "summaries": [
+        "\"Frankenstein; Or, The Modern Prometheus\" by Mary Wollstonecraft Shelley is a Gothic novel written in 1818. It tells the story of Victor Frankenstein, a young scientist who creates a living creature from assembled body parts in an unorthodox experiment. When the creature awakens, Victor flees in horror, setting in motion a tragic tale of creation, abandonment, and revenge. This pioneering work has become one of English literature's most influential stories, spawning an entire genre of horror and forever changing popular culture. (This is an automatically generated summary.)"
+      ],
+      "editors": [],
+      "translators": [],
+      "subjects": [
+        "Frankenstein's monster (Fictitious character) -- Fiction",
+        "Frankenstein, Victor (Fictitious character) -- Fiction",
+        "Gothic fiction",
+        "Horror tales",
+        "Monsters -- Fiction",
+        "Science fiction",
+        "Scientists -- Fiction"
+      ],
+      "bookshelves": [
+        "Category: British Literature",
+        "Category: Classics of Literature",
+        "Category: Novels",
+        "Category: Science-Fiction & Fantasy",
+        "Precursors of Science Fiction",
+        "Science Fiction by Women"
+      ],
+      "languages": [
+        "en"
+      ],
+      "copyright": false,
+      "media_type": "Text",
+      "formats": {
+        "text/plain; charset=utf-8": "https://www.gutenberg.org/ebooks/41445.txt.utf-8",
+        "text/plain; charset=us-ascii": "https://www.gutenberg.org/files/41445/41445-0.txt",
+        "text/html": "https://www.gutenberg.org/ebooks/41445.html.images",
+        "application/epub+zip": "https://www.gutenberg.org/ebooks/41445.epub3.images",
+        "application/x-mobipocket-ebook": "https://www.gutenberg.org/ebooks/41445.kf8.images",
+        "application/rdf+xml": "https://www.gutenberg.org/ebooks/41445.rdf",
+        "image/jpeg": "https://www.gutenberg.org/cache/epub/41445/pg41445.cover.medium.jpg",
+        "application/octet-stream": "https://www.gutenberg.org/cache/epub/41445/pg41445-h.zip"
+      },
+      "download_count": 9039
+    }
+  ]
+}
