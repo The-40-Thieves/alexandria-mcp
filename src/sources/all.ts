@@ -115,3 +115,4 @@ import './paperswithcode.js';
 import './mcp/huggingface.js';
 import './mcp/context7mcp.js';
 import './mcp/jina.js';
+import './mcp/mdnmcp.js';
