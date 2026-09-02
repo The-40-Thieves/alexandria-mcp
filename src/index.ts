@@ -10,6 +10,7 @@ import { libraryAnswer } from './tools/libraryAnswer.js';
 import { libraryAsk } from './tools/libraryAsk.js';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.js';
 import type { LibrarySource } from './types.js';
+import { VERSION } from './version.js';
 
 import './sources/all.js';
 
@@ -38,7 +39,7 @@ function toStructured(val: unknown): Record<string, unknown> {
  * stateless pattern. stdio keeps one long-lived server for its single session.
  */
 export function createServer(): McpServer {
-  const server = new McpServer({ name: 'alexandria', version: '10.0.0' });
+  const server = new McpServer({ name: 'alexandria', version: VERSION });
 
   // ── library_list_sources ─────────────────────────────────────────────────────
   server.registerTool(
@@ -544,7 +545,7 @@ export function createHttpApp(): express.Express {
     const { sources, visible, hidden, byKind } = healthSummary();
     res.json({
       status: 'ok',
-      version: '10.0.0',
+      version: VERSION,
       sources,
       visible,
       hidden,

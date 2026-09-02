@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import '../src/sources/all.js';
 import { type Cluster, listSources, type SourceKind } from '../src/sources/registry.js';
+import { VERSION } from '../src/version.js';
 
 const README_PATH = 'README.md';
 const ENV_EXAMPLE_PATH = '.env.example';
@@ -125,7 +126,7 @@ function buildHealthExample(sources: Source[]): string {
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of sources) byKind[s.kind]++;
   const kindStr = `{ rest: ${byKind.rest}, hub: ${byKind.hub}, rss: ${byKind.rss}, mcp: ${byKind.mcp}, scrape: ${byKind.scrape} }`;
-  return `{ status: "ok", version: "10.0.0", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, tools: 9 }`;
+  return `{ status: "ok", version: "${VERSION}", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, tools: 9 }`;
 }
 
 function applyReadmeSubstitutions(content: string, sources: Source[]): string {
