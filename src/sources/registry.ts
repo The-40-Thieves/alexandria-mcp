@@ -287,20 +287,21 @@ export function healthSummary(): {
   // go to Supabase instead and never touch this store, so these numbers
   // read as zero in that deployment mode; that mode has its own quota
   // visibility via the quota_ledger table.
+  //
+  // One bulk read (quotaForDay), not one getQuota() round trip per
+  // registered source (~138 of them): a row only exists once something
+  // reserved against it, so the map's size is already "sources with any
+  // usage today" and its values sum to the day's total.
   const day = utcDay();
+  const perSource = stateStore.quotaForDay(day);
   let reserved = 0;
-  let sourcesWithUsage = 0;
-  for (const name of REGISTRY.keys()) {
-    const n = stateStore.getQuota(name, day);
-    reserved += n;
-    if (n > 0) sourcesWithUsage++;
-  }
+  for (const n of perSource.values()) reserved += n;
   return {
     sources: all.length,
     visible: all.length - hidden,
     hidden,
     byKind,
-    quota: { day, reserved, sources: sourcesWithUsage },
+    quota: { day, reserved, sources: perSource.size },
     cache: { entries: stateStore.cacheSize() },
   };
 }

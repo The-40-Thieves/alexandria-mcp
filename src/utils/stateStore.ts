@@ -21,16 +21,20 @@
 // captured separately is empty), so no suppression is needed to keep test
 // output pristine.
 //
-// Selection happens once, at module load, in createStateStore() below -
-// "in one place at startup" per the brief. That is the same timing
-// quotaLedger.ts's old module-scope `const ledger = createLedger()` and
-// resultCache.ts's old module-scope `export const searchCache = new
-// ResultCache(...)` already used, so this is not a new eager-init
-// pattern for this pair of modules. The test suite pins the selection to
-// MemoryStateStore by setting ALEXANDRIA_STATE_DB=:memory: in the `test`
-// npm script (package.json) rather than in every test file, so importing
-// registry.ts (which every source adapter test does, transitively) never
-// touches data/alexandria.db.
+// Selection happens once, at the *first store method call*, in
+// createStateStore() below via the LazyStateStore wrapper further down -
+// "in one place at startup" per the brief, but deferred rather than run at
+// module load. It was eager at module load in the first version of this
+// file; review caught that merely IMPORTING stateStore.ts (which
+// registry.ts, quotaLedger.ts, and resultCache.ts all do at their own
+// module scope) constructed a SqliteStateStore and so created
+// data/alexandria.db as a side effect of import alone - hit by
+// `npm run docs` (gen-docs.ts imports registry.ts), `npm run probe`,
+// `npm run eval:routing`, and any test file run directly with
+// `node --test <file>` instead of through the `npm test` script that sets
+// ALEXANDRIA_STATE_DB=:memory:. The exported `stateStore` singleton below
+// is now a thin proxy: no disk access, no DatabaseSync, until something
+// actually calls one of its methods.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,11 +43,16 @@ import { DatabaseSync } from 'node:sqlite';
 export interface StateStore {
   /** Current reserved count for `source` on `day` (0 if never reserved). */
   getQuota(source: string, day: string): number;
-  // Atomically increments the source's count for `day` and reports whether
-  // the *new* count is still within `cap`. The increment always happens,
-  // matching quotaLedger.ts's existing reserveQuota(): a rejected
-  // reservation still consumes its slot (see that file's module comment).
-  reserveQuota(source: string, day: string, cap: number): boolean;
+  // Atomically increments the source's count for `day` and returns the new
+  // count, or null once that count exceeds `cap`. The increment always
+  // happens either way, matching quotaLedger.ts's existing reserveQuota():
+  // a rejected reservation still consumes its slot (see that file's module
+  // comment).
+  reserveQuota(source: string, day: string, cap: number): number | null;
+  // Every source with a nonzero reservation on `day`, in one read - used by
+  // /health so it does not do one getQuota() round trip per registered
+  // source (there are 138+).
+  quotaForDay(day: string): Map<string, number>;
   /** The cached value for `key`, or undefined if absent or expired. */
   getCache<T = unknown>(key: string, now?: number): T | undefined;
   /** Stores `value` under `key`, replacing any prior TTL cap enforcement. */
@@ -65,7 +74,9 @@ interface CacheEntry {
 }
 
 export class MemoryStateStore implements StateStore {
-  private quota = new Map<string, number>();
+  // day -> source -> count, so quotaForDay() is a plain Map lookup instead
+  // of a scan-and-parse over composite `${source}:${day}` keys.
+  private quota = new Map<string, Map<string, number>>();
   private cache = new Map<string, CacheEntry>();
   private cacheMax: number;
 
@@ -74,14 +85,22 @@ export class MemoryStateStore implements StateStore {
   }
 
   getQuota(source: string, day: string): number {
-    return this.quota.get(`${source}:${day}`) ?? 0;
+    return this.quota.get(day)?.get(source) ?? 0;
   }
 
-  reserveQuota(source: string, day: string, cap: number): boolean {
-    const key = `${source}:${day}`;
-    const next = (this.quota.get(key) ?? 0) + 1;
-    this.quota.set(key, next);
-    return next <= cap;
+  reserveQuota(source: string, day: string, cap: number): number | null {
+    let sources = this.quota.get(day);
+    if (!sources) {
+      sources = new Map();
+      this.quota.set(day, sources);
+    }
+    const next = (sources.get(source) ?? 0) + 1;
+    sources.set(source, next);
+    return next <= cap ? next : null;
+  }
+
+  quotaForDay(day: string): Map<string, number> {
+    return new Map(this.quota.get(day) ?? []);
   }
 
   getCache<T>(key: string, now = Date.now()): T | undefined {
@@ -163,7 +182,7 @@ export class SqliteStateStore implements StateStore {
     return row?.count ?? 0;
   }
 
-  reserveQuota(source: string, day: string, cap: number): boolean {
+  reserveQuota(source: string, day: string, cap: number): number | null {
     // INSERT ... ON CONFLICT DO UPDATE ... RETURNING is one statement, so
     // it is atomic with respect to any other synchronous call on this same
     // DatabaseSync connection - and DatabaseSync is synchronous end to
@@ -177,7 +196,15 @@ export class SqliteStateStore implements StateStore {
          RETURNING count`,
       )
       .get(source, day) as { count: number };
-    return row.count <= cap;
+    return row.count <= cap ? row.count : null;
+  }
+
+  quotaForDay(day: string): Map<string, number> {
+    const rows = this.db.prepare('SELECT source, count FROM quota WHERE day = ?').all(day) as {
+      source: string;
+      count: number;
+    }[];
+    return new Map(rows.map((r) => [r.source, r.count]));
   }
 
   getCache<T>(key: string, now = Date.now()): T | undefined {
@@ -265,4 +292,56 @@ export function createStateStore(env: NodeJS.ProcessEnv = process.env): StateSto
   }
 }
 
-export const stateStore: StateStore = createStateStore();
+// Defers createStateStore() to the first method call instead of running it
+// at module load, so importing stateStore.ts (or anything that imports it
+// transitively - registry.ts, quotaLedger.ts, resultCache.ts, gen-docs.ts,
+// probe.ts, eval-routing.ts) never touches disk on its own. Every method
+// below just forwards to a lazily-built underlying store.
+class LazyStateStore implements StateStore {
+  private instance: StateStore | undefined;
+
+  private target(): StateStore {
+    if (!this.instance) this.instance = createStateStore();
+    return this.instance;
+  }
+
+  getQuota(source: string, day: string): number {
+    return this.target().getQuota(source, day);
+  }
+
+  reserveQuota(source: string, day: string, cap: number): number | null {
+    return this.target().reserveQuota(source, day, cap);
+  }
+
+  quotaForDay(day: string): Map<string, number> {
+    return this.target().quotaForDay(day);
+  }
+
+  getCache<T = unknown>(key: string, now?: number): T | undefined {
+    return this.target().getCache<T>(key, now);
+  }
+
+  setCache<T = unknown>(key: string, value: T, expiresAt: number): void {
+    this.target().setCache(key, value, expiresAt);
+  }
+
+  evictExpired(now?: number): number {
+    return this.target().evictExpired(now);
+  }
+
+  cacheSize(): number {
+    return this.target().cacheSize();
+  }
+
+  close(): void {
+    // Only close what was actually opened - calling close() without ever
+    // calling another method must not itself construct (and then
+    // immediately close) a store.
+    if (this.instance) {
+      this.instance.close();
+      this.instance = undefined;
+    }
+  }
+}
+
+export const stateStore: StateStore = new LazyStateStore();

@@ -39,10 +39,11 @@ export class MemoryLedgerStore implements LedgerStore {
 
 // Adapts a Task 4 StateStore to LedgerStore: increments unconditionally
 // (Number.MAX_SAFE_INTEGER as the store's own cap, so it never rejects
-// here) and reads the count back, leaving the cap check to reserveQuota()
-// below exactly as MemoryLedgerStore always has. This is what
-// createLedger() returns by default, so the ledger now persists across
-// restarts via whichever store stateStore.ts selected (sqlite or memory).
+// here) and uses the count StateStore#reserveQuota already hands back,
+// leaving the actual cap check to reserveQuota() below exactly as
+// MemoryLedgerStore always has. This is what createLedger() returns by
+// default, so the ledger now persists across restarts via whichever store
+// stateStore.ts selected (sqlite or memory).
 export class StateLedgerStore implements LedgerStore {
   private store: StateStore;
 
@@ -55,8 +56,12 @@ export class StateLedgerStore implements LedgerStore {
   }
 
   async increment(source: string, day: string): Promise<number> {
-    this.store.reserveQuota(source, day, Number.MAX_SAFE_INTEGER);
-    return this.store.getQuota(source, day);
+    // A cap of Number.MAX_SAFE_INTEGER never actually gets exceeded (no
+    // real daily count reaches it), so this is always a number in
+    // practice; the ?? fallback only exists to satisfy the return type
+    // without silently coercing a genuine null to a wrong count.
+    const count = this.store.reserveQuota(source, day, Number.MAX_SAFE_INTEGER);
+    return count ?? this.store.getQuota(source, day);
   }
 }
 

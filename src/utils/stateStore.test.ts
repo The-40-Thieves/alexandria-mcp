@@ -24,19 +24,19 @@ function sharedContract(label: string, makeStore: () => StateStore) {
       store.close();
     });
 
-    await t.test('reservations up to the cap return true', () => {
+    await t.test('reservations up to the cap return the new count', () => {
       const store = makeStore();
-      assert.equal(store.reserveQuota('src', '2026-09-01', 2), true);
-      assert.equal(store.reserveQuota('src', '2026-09-01', 2), true);
+      assert.equal(store.reserveQuota('src', '2026-09-01', 2), 1);
+      assert.equal(store.reserveQuota('src', '2026-09-01', 2), 2);
       assert.equal(store.getQuota('src', '2026-09-01'), 2);
       store.close();
     });
 
-    await t.test('a reservation beyond the cap returns false but still increments', () => {
+    await t.test('a reservation beyond the cap returns null but still increments', () => {
       const store = makeStore();
       store.reserveQuota('src', '2026-09-01', 2);
       store.reserveQuota('src', '2026-09-01', 2);
-      assert.equal(store.reserveQuota('src', '2026-09-01', 2), false);
+      assert.equal(store.reserveQuota('src', '2026-09-01', 2), null);
       assert.equal(store.getQuota('src', '2026-09-01'), 3);
       store.close();
     });
@@ -47,6 +47,29 @@ function sharedContract(label: string, makeStore: () => StateStore) {
       assert.equal(store.getQuota('a', '2026-09-01'), 1);
       assert.equal(store.getQuota('b', '2026-09-01'), 0);
       assert.equal(store.getQuota('a', '2026-09-02'), 0);
+      store.close();
+    });
+
+    await t.test('quotaForDay returns every source with usage on that day, not others', () => {
+      const store = makeStore();
+      store.reserveQuota('a', '2026-09-01', 10);
+      store.reserveQuota('a', '2026-09-01', 10);
+      store.reserveQuota('b', '2026-09-01', 10);
+      store.reserveQuota('c', '2026-09-02', 10); // different day, excluded
+      const perSource = store.quotaForDay('2026-09-01');
+      assert.deepEqual(
+        new Map([...perSource].sort()),
+        new Map([
+          ['a', 2],
+          ['b', 1],
+        ]),
+      );
+      store.close();
+    });
+
+    await t.test('quotaForDay on a day with no reservations returns an empty map', () => {
+      const store = makeStore();
+      assert.deepEqual(store.quotaForDay('2026-09-01'), new Map());
       store.close();
     });
 
@@ -197,4 +220,34 @@ test('createStateStore selection', async (t) => {
       console.error = originalError;
     }
   });
+});
+
+// Regression test for the eager-singleton bug caught in review: the first
+// version of this module's `export const stateStore = createStateStore()`
+// ran at module load, so merely IMPORTING stateStore.ts (which
+// registry.ts, quotaLedger.ts, and resultCache.ts all do at their own
+// module scope) created data/alexandria.db as a side effect - hit by
+// `npm run docs`, `npm run probe`, `npm run eval:routing`, and any test
+// file run directly instead of through `npm test`'s ALEXANDRIA_STATE_DB=
+// :memory:. A fresh module instance (via a cache-busting query string, the
+// only way to re-run this module's top-level code within one process) is
+// imported with a real temp path so this asserts against the actual
+// `stateStore` export, not a stand-in.
+test('the stateStore singleton is lazy: importing the module never touches disk', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'alexandria-lazy-'));
+  const dbPath = path.join(dir, 'alexandria.db');
+  const originalEnv = process.env.ALEXANDRIA_STATE_DB;
+  process.env.ALEXANDRIA_STATE_DB = dbPath;
+  try {
+    const mod = (await import(`./stateStore.ts?lazy-test=${Date.now()}`)) as {
+      stateStore: StateStore;
+    };
+    assert.ok(!fs.existsSync(dbPath), 'importing the module must not create the db file');
+    mod.stateStore.getQuota('src', '2026-09-01'); // first real call
+    assert.ok(fs.existsSync(dbPath), 'the first store method call should create the db file');
+    mod.stateStore.close();
+  } finally {
+    if (originalEnv === undefined) delete process.env.ALEXANDRIA_STATE_DB;
+    else process.env.ALEXANDRIA_STATE_DB = originalEnv;
+  }
 });
