@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import '../src/sources/all.js';
+import { mcpProbeEntries } from '../src/sources/kinds/mcp.js';
 import { getAdapter, listSources } from '../src/sources/registry.js';
+import { pool } from '../src/utils/mcpClientPool.js';
 
 export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT' | 'KEY_MISSING';
 export interface ProbeResult {
@@ -155,10 +157,56 @@ async function probeOne(name: string): Promise<ProbeResult> {
   }
 }
 
+export const MCP_SNAPSHOT_DIR = path.join('eval', 'mcp-tools');
+
+// --mcp-snapshot writes eval/mcp-tools/<name>.json (sorted live tool
+// names) for every configured mcp source; a normal run instead compares
+// the live list against whatever snapshot is on disk and warns on
+// stderr (never an exit code - a server adding or renaming a tool isn't
+// a probe failure) when they differ. A source with no resolved server
+// (hidden, e.g. githubmcp without GITHUB_TOKEN here) can't be probed
+// either way and is skipped silently.
+export async function mcpToolsSnapshotOrDrift(
+  writeSnapshot: boolean,
+  only?: string,
+): Promise<void> {
+  const entries = mcpProbeEntries.filter((e) => !only || e.name === only);
+  for (const entry of entries) {
+    const server = entry.resolveServer();
+    if (!server) continue;
+    let live: string[];
+    try {
+      live = await pool.tools(server);
+    } catch (err) {
+      console.error(
+        `mcp-tools ${entry.name}: could not list tools (${err instanceof Error ? err.message : String(err)})`,
+      );
+      continue;
+    }
+    const file = path.join(MCP_SNAPSHOT_DIR, `${entry.name}.json`);
+    if (writeSnapshot) {
+      fs.mkdirSync(MCP_SNAPSHOT_DIR, { recursive: true });
+      fs.writeFileSync(file, `${JSON.stringify(live, null, 2)}\n`);
+      console.error(`mcp-tools ${entry.name}: wrote snapshot (${live.length} tools)`);
+      continue;
+    }
+    if (!fs.existsSync(file)) continue;
+    const snapshot: string[] = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const added = live.filter((t) => !snapshot.includes(t));
+    const removed = snapshot.filter((t) => !live.includes(t));
+    if (added.length || removed.length) {
+      console.error(
+        `mcp-tools DRIFT ${entry.name}: added=[${added.join(', ')}] removed=[${removed.join(', ')}]`,
+      );
+    }
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const only = args.find((a) => a.startsWith('--source='))?.slice(9);
   const writeBaseline = args.includes('--baseline');
+  const mcpSnapshot = args.includes('--mcp-snapshot');
   const names = listSources()
     .map((s) => s.name)
     .filter((n) => !only || n === only);
@@ -169,6 +217,7 @@ async function main() {
       `${n.padEnd(20)} ${results[n].status.padEnd(8)} ${String(results[n].ms).padStart(6)}ms ${results[n].message ?? ''}`,
     );
   }
+  await mcpToolsSnapshotOrDrift(mcpSnapshot, only);
   const out = { generatedAt: new Date().toISOString(), results };
   fs.mkdirSync('eval', { recursive: true });
   fs.writeFileSync(

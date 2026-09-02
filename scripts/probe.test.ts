@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
-import { classify, EXPECTED_EMPTY, regressions } from './probe.js';
+import { mcpProbeEntries } from '../src/sources/kinds/mcp.js';
+import { startTestMcpServer, type TestMcpServerHandle } from '../src/utils/mcpTestServer.js';
+import {
+  classify,
+  EXPECTED_EMPTY,
+  MCP_SNAPSHOT_DIR,
+  mcpToolsSnapshotOrDrift,
+  regressions,
+} from './probe.js';
 
 test('probe classification', async (t) => {
   await t.test('OK when results present', () => {
@@ -105,5 +115,72 @@ test('probe classification', async (t) => {
     const base = { other: { status: 'OK' } } as any;
     const now = { other: { status: 'EMPTY' } } as any;
     assert.deepEqual(regressions(base, now), ['other']);
+  });
+});
+
+test('mcpToolsSnapshotOrDrift', async (t) => {
+  const NAME = 'mcp_test_probe_snapshot_tools';
+  const file = path.join(MCP_SNAPSHOT_DIR, `${NAME}.json`);
+  let handle: TestMcpServerHandle | undefined;
+
+  function removeEntry(name: string) {
+    const idx = mcpProbeEntries.findIndex((e) => e.name === name);
+    if (idx !== -1) mcpProbeEntries.splice(idx, 1);
+  }
+
+  t.after(async () => {
+    if (handle) await handle.close();
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    removeEntry(NAME);
+  });
+
+  await t.test('writes a sorted snapshot file for a configured server', async () => {
+    handle = await startTestMcpServer({});
+    const serverHandle = handle;
+    mcpProbeEntries.push({
+      name: NAME,
+      resolveServer: () => ({ name: NAME, url: serverHandle.url, timeoutMs: 5000 }),
+    });
+
+    await mcpToolsSnapshotOrDrift(true, NAME);
+
+    assert.ok(fs.existsSync(file));
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), ['read', 'search']);
+  });
+
+  await t.test(
+    'warns on stderr (no throw) when the live list differs from the recorded snapshot',
+    async () => {
+      // The previous test recorded ['read', 'search']; overwrite the
+      // snapshot on disk to simulate a server that has since dropped a
+      // tool, without needing a second live server exposing a different
+      // tool set.
+      fs.writeFileSync(file, `${JSON.stringify(['search'], null, 2)}\n`);
+
+      const originalError = console.error;
+      const lines: string[] = [];
+      console.error = ((...args: unknown[]) => {
+        lines.push(args.map(String).join(' '));
+      }) as typeof console.error;
+      try {
+        await assert.doesNotReject(mcpToolsSnapshotOrDrift(false, NAME));
+      } finally {
+        console.error = originalError;
+      }
+
+      assert.ok(
+        lines.some((l) => l.includes('DRIFT') && l.includes(NAME) && l.includes('read')),
+        `expected a DRIFT warning naming ${NAME} and the added "read" tool, got: ${lines.join(' | ')}`,
+      );
+    },
+  );
+
+  await t.test('skips a source with no resolved server (hidden)', async () => {
+    const HIDDEN = 'mcp_test_probe_snapshot_hidden';
+    mcpProbeEntries.push({ name: HIDDEN, resolveServer: () => null });
+    t.after(() => removeEntry(HIDDEN));
+
+    await assert.doesNotReject(mcpToolsSnapshotOrDrift(false, HIDDEN));
+    assert.ok(!fs.existsSync(path.join(MCP_SNAPSHOT_DIR, `${HIDDEN}.json`)));
   });
 });
