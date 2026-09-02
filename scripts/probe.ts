@@ -3,13 +3,19 @@ import path from 'node:path';
 import '../src/sources/all.js';
 import { getAdapter, listSources } from '../src/sources/registry.js';
 
-export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT';
+export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT' | 'KEY_MISSING';
 export interface ProbeResult {
   status: ProbeStatus;
   ms: number;
   count: number;
   message?: string;
 }
+
+// Sources whose search() is expected to return [] by design (not a live
+// failure) — e.g. hathitrust, whose only remaining public endpoint is a
+// lookup-by-identifier, not a keyword search. An OK -> EMPTY transition for
+// one of these is not a regression.
+export const EXPECTED_EMPTY = new Set<string>(['hathitrust']);
 
 export const PROBE_QUERIES: Record<string, string> = {
   gallica: 'histoire des sciences',
@@ -29,19 +35,33 @@ export const PROBE_QUERIES: Record<string, string> = {
 const DEFAULT_QUERY = 'history of science';
 
 export function classify(x: { results: unknown[] | null; error: Error | null }): ProbeStatus {
-  if (x.error) return /abort/i.test(x.error.message) ? 'TIMEOUT' : 'ERROR';
+  if (x.error) {
+    if (/requires .*(key|token|env)/i.test(x.error.message)) return 'KEY_MISSING';
+    return /abort/i.test(x.error.message) ? 'TIMEOUT' : 'ERROR';
+  }
   return (x.results?.length ?? 0) > 0 ? 'OK' : 'EMPTY';
 }
 
 export function regressions(
   base: Record<string, { status: string }>,
   now: Record<string, { status: string }>,
+  hasAuth: (source: string) => boolean = () => false,
 ): string[] {
   // A source absent from `now` (e.g. deleted from the registry) is a
   // deliberate removal, not a regression, only a source still present but
   // no longer OK counts.
   return Object.keys(base)
-    .filter((s) => base[s].status === 'OK' && now[s] !== undefined && now[s].status !== 'OK')
+    .filter((s) => {
+      if (base[s].status !== 'OK') return false;
+      const now_ = now[s];
+      if (now_ === undefined || now_.status === 'OK') return false;
+      // An unconfigured key (no env var set in this environment) is expected
+      // for a source that declares auth — only a source with no auth
+      // declared going from OK to KEY_MISSING is a real regression.
+      if (now_.status === 'KEY_MISSING' && hasAuth(s)) return false;
+      if (now_.status === 'EMPTY' && EXPECTED_EMPTY.has(s)) return false;
+      return true;
+    })
     .sort();
 }
 
@@ -96,7 +116,8 @@ async function main() {
   console.error(JSON.stringify(counts));
   if (!writeBaseline && fs.existsSync('eval/probe-baseline.json') && !only) {
     const base = JSON.parse(fs.readFileSync('eval/probe-baseline.json', 'utf8')).results;
-    const bad = regressions(base, results);
+    const authBySource = new Map(listSources().map((s) => [s.name, Boolean(s.auth)]));
+    const bad = regressions(base, results, (s) => authBySource.get(s) ?? false);
     if (bad.length) {
       console.error(`REGRESSION: ${bad.join(', ')}`);
       process.exit(1);
