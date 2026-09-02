@@ -45,6 +45,12 @@ export interface SourceMeta {
   pacing?: { minIntervalMs?: number; dailyCap?: number };
   verifiedAt?: string; // ISO date the adapter was last probed OK by a human/CI
   hidden?: boolean; // registered but excluded from routing (e.g., needs a key not present)
+  // Env vars the source reads but does not require: the source works
+  // without them, they only raise a quota, unlock a better backend, or
+  // add an optional capability. Unlike `auth` these never hide a source.
+  // scripts/gen-docs.ts emits them into .env.example so a reader can find
+  // every key the code looks at, not just the mandatory ones.
+  optionalEnv?: string[];
 }
 
 export interface SourceAdapter extends Partial<SourceMeta> {
@@ -78,6 +84,16 @@ const ledger: LedgerStore = createLedger();
 export function isConfigured(auth?: AuthSpec): boolean {
   if (!auth || auth.type === 'none') return true;
   return Boolean(auth.env && process.env[auth.env]);
+}
+
+// Throws the standard "<name> requires <ENV>" message when an env var a
+// source cannot work without is absent. scripts/probe.ts's classify()
+// matches that exact wording to report KEY_MISSING instead of ERROR, so
+// hand-written adapters must use this rather than their own phrasing.
+export function requireKey(name: string, env: string): string {
+  const value = process.env[env];
+  if (!value) throw new Error(`${name} requires ${env}`);
+  return value;
 }
 
 export function register(name: string, adapter: SourceAdapter): void {
@@ -123,7 +139,27 @@ function withTimeout<T>(p: Promise<T>, ms: number, controller: AbortController):
 
 // Wraps a registered adapter with the guards every source inherits: a
 // result cache ahead of everything else (cache hits skip quota and
-// pacing), a daily quota ledger, per-source pacing, and a call timeout.
+// pacing), per-source pacing, a daily quota ledger, and a call timeout.
+//
+// Order matters. Pacing is the OUTERMOST guard, and both the quota
+// reservation and the timeout live inside the paced callback:
+//
+//   rateLimited(...) -> reserveQuota(...) -> withTimeout(adapter.call())
+//
+// Reserving quota or starting the timer before the pacing wait made every
+// slow-paced source (ghsa at 60s without a key, nvd at 6.5s,
+// courtlistener at 12s) fail with "This operation was aborted" while it
+// was still sitting in the queue, and burn a quota unit for a call that
+// never reached the provider. With this order the timeout measures only
+// the provider call, and a request that is abandoned in the queue costs
+// no quota.
+//
+// The tradeoff, stated plainly: the queue wait itself is UNCAPPED. A
+// caller behind a long pacing queue can wait far longer than timeoutMs
+// before its call starts. Callers that need a hard wall-clock ceiling
+// must impose it themselves (the fan-out in the tools layer does, via its
+// own budget); timeoutMs is deliberately a per-call budget, not an
+// end-to-end one.
 //
 // reserveQuota() reserves the slot atomically before the call runs (see
 // quotaLedger.ts), so a failed or timed-out call still consumes it; there
@@ -158,19 +194,17 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       const key = cacheKey(name, query, limit);
       const cached = searchCache.get(key);
       if (cached) return cached;
-      await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
       const controller = new AbortController();
       const unchain = chainAbort(controller);
       try {
-        const result = await withTimeout(
-          requestContext.run({ signal: controller.signal }, () =>
-            rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () =>
-              adapter.search(query, limit),
-            ),
-          ),
-          adapter.timeoutMs,
-          controller,
-        );
+        const result = await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
+          await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
+          return withTimeout(
+            requestContext.run({ signal: controller.signal }, () => adapter.search(query, limit)),
+            adapter.timeoutMs,
+            controller,
+          );
+        });
         searchCache.set(key, result);
         return result;
       } finally {
@@ -178,17 +212,17 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       }
     },
     async read(id) {
-      await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
       const controller = new AbortController();
       const unchain = chainAbort(controller);
       try {
-        return await withTimeout(
-          requestContext.run({ signal: controller.signal }, () =>
-            rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, () => adapter.read(id)),
-          ),
-          adapter.timeoutMs,
-          controller,
-        );
+        return await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
+          await reserveQuota(name, adapter.pacing?.dailyCap, ledger);
+          return withTimeout(
+            requestContext.run({ signal: controller.signal }, () => adapter.read(id)),
+            adapter.timeoutMs,
+            controller,
+          );
+        });
       } finally {
         unchain();
       }
@@ -227,6 +261,7 @@ export function listSources(): Array<
     pacing: adapter.pacing,
     verifiedAt: adapter.verifiedAt,
     hidden: adapter.hidden,
+    optionalEnv: adapter.optionalEnv,
   }));
 }
 

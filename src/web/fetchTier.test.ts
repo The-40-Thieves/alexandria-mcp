@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
-import { assertFetchableUrl, type DnsLookupAll, dnsResolver, fetchAsText } from './fetchTier.js';
+import {
+  assertConfiguredServiceUrl,
+  assertFetchableUrl,
+  type DnsLookupAll,
+  dnsResolver,
+  fetchAsText,
+} from './fetchTier.js';
 
 function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/web', name), 'utf8');
@@ -236,16 +242,62 @@ test('assertFetchableUrl', async (t) => {
   });
 
   await t.test(
-    'allows a configured CRAWL4AI_URL/SEARXNG_URL host regardless of range',
+    'a caller-supplied target on a configured service host is still refused',
     async () => {
+      // The old allowlist matched on hostname alone, so any URL naming the
+      // crawl4ai or SearXNG host got through the private-network guard on
+      // any port and any scheme. These hosts are tailnet/private addresses:
+      // as fetch TARGETS they must be rejected like any other private
+      // address, including at the service's own port.
       process.env.CRAWL4AI_URL = 'http://100.78.123.100:11235';
       process.env.SEARXNG_URL = 'http://192.168.1.50:8888';
-      await assert.doesNotReject(() => assertFetchableUrl('http://100.78.123.100:11235/health'));
-      await assert.doesNotReject(() => assertFetchableUrl('http://192.168.1.50:8888/search'));
+      await assert.rejects(
+        () => assertFetchableUrl('http://100.78.123.100:22/'),
+        /private-network/,
+        'another port on the crawl4ai host',
+      );
+      await assert.rejects(
+        () => assertFetchableUrl('https://100.78.123.100:11235/health'),
+        /private-network/,
+        'another scheme on the crawl4ai origin',
+      );
+      await assert.rejects(
+        () => assertFetchableUrl('http://100.78.123.100:11235/health'),
+        /private-network/,
+        'even the exact service origin, as a caller-supplied target',
+      );
+      await assert.rejects(
+        () => assertFetchableUrl('http://192.168.1.50:9999/'),
+        /private-network/,
+        'another port on the SearXNG host',
+      );
       delete process.env.CRAWL4AI_URL;
       delete process.env.SEARXNG_URL;
     },
   );
+
+  await t.test('assertConfiguredServiceUrl matches the whole origin, not the host', () => {
+    process.env.CRAWL4AI_URL = 'http://100.78.123.100:11235';
+    process.env.SEARXNG_URL = 'http://192.168.1.50:8888';
+    // The server's own outbound calls to the configured endpoints pass.
+    assert.doesNotThrow(() => assertConfiguredServiceUrl('http://100.78.123.100:11235/crawl'));
+    assert.doesNotThrow(() => assertConfiguredServiceUrl('http://192.168.1.50:8888/search'));
+    // A different port, scheme, or host on the same box does not.
+    assert.throws(
+      () => assertConfiguredServiceUrl('http://100.78.123.100:22/'),
+      /outside the configured origins/,
+    );
+    assert.throws(
+      () => assertConfiguredServiceUrl('https://100.78.123.100:11235/crawl'),
+      /outside the configured origins/,
+    );
+    assert.throws(
+      () => assertConfiguredServiceUrl('http://100.78.123.101:11235/crawl'),
+      /outside the configured origins/,
+    );
+    delete process.env.CRAWL4AI_URL;
+    delete process.env.SEARXNG_URL;
+  });
 
   await t.test('rejects a hostname that resolves to a private address', async () => {
     dnsResolver.lookup = (async () => [{ address: '10.9.9.9', family: 4 }]) satisfies DnsLookupAll;

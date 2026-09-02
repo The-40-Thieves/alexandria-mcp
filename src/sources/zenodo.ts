@@ -110,6 +110,8 @@ register('zenodo', {
   freshness: 'daily',
   homepage: 'https://zenodo.org',
   verifiedAt: '2026-09-01',
+  // Raises the Zenodo rate limit; the source works without one.
+  optionalEnv: ['ZENODO_API_KEY'],
   pacing: { minIntervalMs: 2100 },
   search: zenodoSearch,
   async read(id) {

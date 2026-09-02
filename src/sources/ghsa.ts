@@ -43,6 +43,8 @@ defineRest<GhsaAdvisory[]>({
   homepage: 'https://github.com/advisories',
   supportsIngest: true,
   verifiedAt: '2026-09-01',
+  // Without it the GitHub advisories endpoint is paced at 60s between calls instead of 750ms.
+  optionalEnv: ['GITHUB_TOKEN'],
   headers: authHeaders(),
   pacing: { minIntervalMs: process.env.GITHUB_TOKEN ? 750 : 60_000 },
   search: {

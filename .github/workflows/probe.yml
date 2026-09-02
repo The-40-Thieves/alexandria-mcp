@@ -33,14 +33,37 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const baseline = JSON.parse(fs.readFileSync('eval/probe-baseline.json', 'utf8')).results;
-            const latest = JSON.parse(fs.readFileSync('eval/probe-latest.json', 'utf8')).results;
-            const regressed = Object.keys(baseline)
-              .filter((name) => baseline[name].status === 'OK')
-              .filter((name) => latest[name] && latest[name].status !== 'OK')
-              .sort();
+            // A probe that crashed writes no eval/probe-latest.json (and a
+            // corrupt one parses no better), which used to throw here and
+            // lose the failure entirely: the job went red with no issue
+            // filed. Read both files defensively and still report.
+            function readResults(file) {
+              try {
+                return JSON.parse(fs.readFileSync(file, 'utf8')).results ?? null;
+              } catch (err) {
+                core.warning(`could not read ${file}: ${err.message}`);
+                return null;
+              }
+            }
+            const baseline = readResults('eval/probe-baseline.json');
+            const latest = readResults('eval/probe-latest.json');
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = regressed.length
+            const regressed = baseline && latest
+              ? Object.keys(baseline)
+                  .filter((name) => baseline[name].status === 'OK')
+                  .filter((name) => latest[name] && latest[name].status !== 'OK')
+                  .sort()
+              : [];
+            const crashed = !baseline || !latest;
+            const body = crashed
+              ? [
+                  'The probe crashed before writing a comparable result; see logs.',
+                  '',
+                  `Missing or unreadable: ${[!baseline && 'eval/probe-baseline.json', !latest && 'eval/probe-latest.json'].filter(Boolean).join(', ')}`,
+                  '',
+                  `Run: ${runUrl}`,
+                ].join('\n')
+              : regressed.length
               ? [
                   `${regressed.length} source(s) regressed from OK in the baseline probe:`,
                   '',

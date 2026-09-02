@@ -338,3 +338,58 @@ describe('healthSummary', () => {
     assert.equal(after.byKind.mcp, before.byKind.mcp + 1);
   });
 });
+
+// Regression test for the guard ordering bug: quota was reserved and the
+// timeout timer started before the pacing wait, so every paced source failed
+// with "This operation was aborted" while it was still queued and burned a
+// quota unit for a call that never reached the provider.
+describe('withGuards guard ordering', () => {
+  it('paces outside the timeout so queued calls are not aborted', async () => {
+    let calls = 0;
+    register('t_pacing_order', {
+      description: 'synthetic paced source',
+      supportsIngest: false,
+      kind: 'rest',
+      hidden: true,
+      timeoutMs: 200,
+      pacing: { minIntervalMs: 300, dailyCap: 3 },
+      async search(query: string) {
+        calls += 1;
+        return [
+          {
+            id: query,
+            source: 't_pacing_order',
+            title: query,
+            authors: [],
+            hasFullText: false,
+          },
+        ];
+      },
+      async read() {
+        return { title: '', authors: [] };
+      },
+    });
+    const adapter = getAdapter('t_pacing_order');
+
+    // Three concurrent searches. Serialized by the 300ms pacing interval they
+    // span ~600ms in total, well past each call's own 200ms timeout.
+    const results = await Promise.all(['a', 'b', 'c'].map((q) => adapter.search(q, 1)));
+
+    assert.equal(results.length, 3);
+    for (const [i, r] of results.entries()) {
+      assert.equal(r.length, 1, `search ${i} returned no results`);
+    }
+    assert.deepEqual(
+      results.map((r) => r[0].id),
+      ['a', 'b', 'c'],
+    );
+    assert.equal(calls, 3, 'the adapter should have been reached three times');
+
+    // The cap is 3, so a fourth call proves the first three reserved exactly
+    // three units between them: it is the fourth reservation that trips.
+    await assert.rejects(
+      () => adapter.search('d', 1),
+      /Daily quota for t_pacing_order reached \(4\/3\)/,
+    );
+  });
+});

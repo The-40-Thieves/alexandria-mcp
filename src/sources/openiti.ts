@@ -166,6 +166,8 @@ register('openiti', {
   freshness: 'static',
   homepage: 'https://openiti.org',
   verifiedAt: '2026-09-01',
+  // Enables GitHub code search; without it the source falls back to an unauthenticated path.
+  optionalEnv: ['GITHUB_TOKEN'],
   search: openitiSearch,
   async read(id) {
     const raw = await openitiRead(id);

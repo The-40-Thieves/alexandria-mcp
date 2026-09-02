@@ -49,6 +49,8 @@ register('digitalnz', {
   freshness: 'daily',
   homepage: 'https://digitalnz.org',
   verifiedAt: '2026-09-01',
+  // Raises the anonymous rate limit; the source works without one.
+  optionalEnv: ['DIGITALNZ_API_KEY'],
   search: digitalnzSearch,
   async read(id) {
     return {

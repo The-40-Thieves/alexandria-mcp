@@ -3,8 +3,17 @@
   "version": "10.0.0",
   "description": "138-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
   "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs/sources.md",
+    "docs/sql"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "dev": "npx tsx src/index.ts",
     "test": "npx tsx --test --test-reporter=spec 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
@@ -13,7 +22,8 @@
     "eval:routing": "npx tsx scripts/eval-routing.ts",
     "docs": "npx tsx scripts/gen-docs.ts",
     "lint": "biome check .",
-    "gate": "npm run build && npm test && npm run lint"
+    "gate": "npm run typecheck && npm run build && npm test && npm run lint",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",

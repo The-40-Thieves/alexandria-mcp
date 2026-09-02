@@ -1,16 +1,11 @@
 import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import { register, requireKey, truncateText } from './registry.js';
 
 const BASE = 'https://api.si.edu/openaccess/api/v1.0';
 
 function key(): string {
-  const k = process.env.SMITHSONIAN_API_KEY;
-  if (!k)
-    throw new Error(
-      'SMITHSONIAN_API_KEY is not set. Register free at https://api.data.gov/signup/',
-    );
-  return k;
+  return requireKey('smithsonian', 'SMITHSONIAN_API_KEY');
 }
 
 interface SIRow {
@@ -102,6 +97,10 @@ register('smithsonian', {
   freshness: 'daily',
   homepage: 'https://www.si.edu',
   verifiedAt: '2026-09-01',
+  // Free key from https://api.data.gov/signup/. This is its own key, not
+  // GOVINFO_API_KEY: api.data.gov issues one key per registration and the
+  // Smithsonian deployment does not accept the govinfo one.
+  auth: { type: 'query', env: 'SMITHSONIAN_API_KEY', param: 'api_key' },
   search: smithsonianSearch,
   async read(id) {
     const raw = await smithsonianRead(id);

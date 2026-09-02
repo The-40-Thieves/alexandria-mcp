@@ -87,6 +87,8 @@ register('openfda', {
   freshness: 'daily',
   homepage: 'https://open.fda.gov',
   verifiedAt: '2026-09-01',
+  // Raises the openFDA rate limit; the source works without one.
+  optionalEnv: ['OPENFDA_API_KEY'],
   pacing: { minIntervalMs: 300 },
   search: openfdaSearch,
   read: openfdaRead,

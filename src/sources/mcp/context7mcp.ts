@@ -82,5 +82,7 @@ defineMcpSource({
     normalize: (text, _structured, id) => normalizeContext7McpRead(text, id),
   },
   expectTools: ['resolve-library-id', 'query-docs'],
+  // Raises the anonymous rate limit; the server works without one.
+  optionalEnv: ['CONTEXT7_API_KEY'],
   verifiedAt: '2026-09-02',
 });

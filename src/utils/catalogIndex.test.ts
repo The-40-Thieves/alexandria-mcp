@@ -281,7 +281,7 @@ test('candidates', async (t) => {
 
     process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL = server.url;
     process.env.ALEXANDRIA_EMBEDDINGS_API_KEY = 'test-key';
-    process.env.ALEXANDRIA_CATALOG_CACHE_PATH = cachePath;
+    process.env.ALEXANDRIA_CATALOG_CACHE = cachePath;
     resetCatalogCacheForTests();
 
     const first = await buildCatalog();
@@ -315,7 +315,7 @@ test('candidates', async (t) => {
 
     delete process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL;
     delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
-    delete process.env.ALEXANDRIA_CATALOG_CACHE_PATH;
+    delete process.env.ALEXANDRIA_CATALOG_CACHE;
   });
 });
 

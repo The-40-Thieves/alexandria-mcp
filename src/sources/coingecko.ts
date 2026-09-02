@@ -76,6 +76,8 @@ register('coingecko', {
   freshness: 'realtime',
   homepage: 'https://www.coingecko.com',
   verifiedAt: '2026-09-01',
+  // Demo key raises the shared public rate limit; the source works without one.
+  optionalEnv: ['COINGECKO_API_KEY'],
   pacing: { minIntervalMs: 700 },
   search: coingeckoSearch,
   read: coingeckoRead,

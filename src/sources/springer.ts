@@ -1,24 +1,20 @@
 import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
-import { register, truncateText } from './registry.js';
+import { register, requireKey, truncateText } from './registry.js';
 
 const META_BASE = 'https://api.springernature.com/meta/v2';
 const OA_BASE = 'https://api.springernature.com/openaccess';
 
+// Both keys come from https://dev.springernature.com/. The Meta key is
+// required (it backs search and the read fallback); the OA key is optional
+// and only unlocks open-access full text in read(), which already falls
+// back to Meta when it is absent.
 function metaKey(): string {
-  const k = process.env.SPRINGER_META_API_KEY;
-  if (!k)
-    throw new Error(
-      'SPRINGER_META_API_KEY is not set. Register at https://dev.springernature.com/',
-    );
-  return k;
+  return requireKey('springer', 'SPRINGER_META_API_KEY');
 }
 
 function oaKey(): string {
-  const k = process.env.SPRINGER_OA_API_KEY;
-  if (!k)
-    throw new Error('SPRINGER_OA_API_KEY is not set. Register at https://dev.springernature.com/');
-  return k;
+  return requireKey('springer', 'SPRINGER_OA_API_KEY');
 }
 
 interface SpringerCreator {
@@ -142,6 +138,8 @@ register('springer', {
   freshness: 'daily',
   homepage: 'https://www.springernature.com',
   verifiedAt: '2026-09-01',
+  auth: { type: 'query', env: 'SPRINGER_META_API_KEY', param: 'api_key' },
+  optionalEnv: ['SPRINGER_OA_API_KEY'],
   search: springerSearch,
   async read(id) {
     const raw = await springerRead(id);

@@ -6,7 +6,8 @@
 // convention used by nhk.ts and kinds/rss.ts.
 import type { LibraryResult, ReadResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import { fetchAsText } from '../web/fetchTier.js';
+import { register, truncateText } from './registry.js';
 
 const URL = 'https://peps.python.org/api/peps.json';
 const TIMEOUT_MS = 20000;
@@ -75,14 +76,29 @@ export async function pepsRead(id: string): Promise<ReadResult> {
   const peps = await download();
   const pep = peps.find((p) => `PEP ${p.number}` === id || String(p.number) === id);
   if (!pep) throw new Error(`peps: ${id} not found`);
-  return {
-    title: pep.title,
-    authors: pep.author_names ?? (pep.authors ? [pep.authors] : []),
-    year: yearOf(pep.created),
-    metadataOnly: true,
-    externalUrl: pep.url,
-    note: 'Full-text fetch for PEPs arrives in a later stage; this is metadata only.',
-  };
+  const authors = pep.author_names ?? (pep.authors ? [pep.authors] : []);
+  // See kinds/rss.ts: a fetch-tier failure degrades to metadata rather
+  // than throwing, since the PEP page is ordinary third-party web content.
+  try {
+    const page = await fetchAsText(pep.url);
+    return {
+      title: pep.title,
+      authors,
+      year: yearOf(pep.created),
+      externalUrl: pep.url,
+      ...truncateText(page.text),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      title: pep.title,
+      authors,
+      year: yearOf(pep.created),
+      metadataOnly: true,
+      externalUrl: pep.url,
+      note: `Full-text fetch failed; showing metadata only: ${message}`,
+    };
+  }
 }
 
 register('peps', {

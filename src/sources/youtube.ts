@@ -71,8 +71,10 @@ interface YTSearchResponse {
 }
 
 export async function youtubeSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  // Deliberately the standard "<name> requires <ENV>" wording, not a
+  // registry `auth` declaration: see the register() call below.
   const apiKey = process.env.YOUTUBE_API_KEY;
-  if (!apiKey) throw new Error('youtube requires YOUTUBE_API_KEY for search');
+  if (!apiKey) throw new Error('youtube requires YOUTUBE_API_KEY');
 
   const params = new URLSearchParams({
     part: 'snippet',
@@ -289,6 +291,17 @@ register('youtube', {
   freshness: 'realtime',
   homepage: 'https://www.youtube.com',
   verifiedAt: '2026-09-01',
+  // No `auth` declared on purpose: read() needs no Data API key at all
+  // (Supadata when SUPADATA_API_KEY is set, otherwise the keyless
+  // Innertube path), so library_read(source='youtube') must keep working
+  // without YOUTUBE_API_KEY. Only search() needs the key. `hidden` is the
+  // right lever for that half: a hidden source is excluded from routing
+  // (so library_ask never fans out to a search that would throw) but stays
+  // callable by name, exactly like the REST context7/mdn sources. search()
+  // still throws the standard "<name> requires <ENV>" text when called by
+  // name without the key, so scripts/probe.ts classifies it KEY_MISSING.
+  hidden: !process.env.YOUTUBE_API_KEY,
+  optionalEnv: ['YOUTUBE_API_KEY', 'SUPADATA_API_KEY'],
   pacing: { dailyCap: 90 },
   search: youtubeSearch,
   async read(id) {

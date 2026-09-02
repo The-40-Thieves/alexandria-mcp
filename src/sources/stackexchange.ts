@@ -67,6 +67,8 @@ defineRest<SeSearchResponse>({
   homepage: 'https://stackoverflow.com',
   supportsIngest: true,
   verifiedAt: '2026-09-01',
+  // Raises the daily quota from 300 to 10000; the source works without one.
+  optionalEnv: ['STACKEXCHANGE_KEY'],
   search: {
     url: searchUrl,
     pick: (raw) => raw.items ?? [],

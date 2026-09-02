@@ -37,7 +37,15 @@ const TOOLS_CACHE_MS = 60 * 60 * 1000; // 1 hour, per the task-5.1 brief
 // connection failure (server killed) surfaces as `fetch failed` with the
 // real reason (e.g. ECONNREFUSED) on `.cause`, so both are checked
 // alongside the message text.
-function isTransportTrouble(err: unknown): boolean {
+//
+// Deliberately NOT matched: /timeout/ and /timed out/. An aborted call is
+// usually the CALLER's guard firing (registry.ts's withTimeout aborts the
+// ambient signal once timeoutMs elapses), and retrying then issues a
+// second request against a deadline that has already passed, doubling the
+// load for a result nobody is waiting for. A genuinely dead transport
+// still matches on ECONNRESET/ECONNREFUSED/EPIPE/`fetch failed`/a 4xx
+// code, so dropping the timeout patterns costs no real detection.
+export function isTransportTrouble(err: unknown): boolean {
   const parts: string[] = [];
   let current: unknown = err;
   for (let depth = 0; current && depth < 3; depth++) {
@@ -52,9 +60,7 @@ function isTransportTrouble(err: unknown): boolean {
     }
   }
   const haystack = parts.join(' | ');
-  return /\b4\d\d\b|ECONNRESET|ECONNREFUSED|EPIPE|fetch failed|session|not found|timeout|timed out/i.test(
-    haystack,
-  );
+  return /\b4\d\d\b|ECONNRESET|ECONNREFUSED|EPIPE|fetch failed|session|not found/i.test(haystack);
 }
 
 // The SDK's StreamableHTTPClientTransport opens a second, standalone GET

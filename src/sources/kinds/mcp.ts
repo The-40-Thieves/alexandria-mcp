@@ -7,7 +7,7 @@
 // kind's).
 import type { LibraryResult, ReadResult } from '../../types.js';
 import { pool, type RemoteServerConfig, TOOL_ERROR_PREFIX } from '../../utils/mcpClientPool.js';
-import type { Cluster, Freshness } from '../registry.js';
+import type { AuthSpec, Cluster, Freshness } from '../registry.js';
 import { getAdapter, register } from '../registry.js';
 
 export interface McpSourceSpec {
@@ -27,6 +27,12 @@ export interface McpSourceSpec {
     tool: string;
     args: (id: string) => Record<string, unknown>;
     normalize: (text: string, structured: unknown, id: string) => ReadResult;
+    // Optional validation of the caller-supplied id, run before the server
+    // is resolved and outside the fallback catch below, so a rejected id
+    // reaches neither the remote MCP server nor a fallback adapter. Used by
+    // sources whose read() id is a URL the remote server will fetch on our
+    // behalf (jina's read_url), where the SSRF guard has to happen here.
+    guard?: (id: string) => Promise<void>;
   };
   // The name of another registered source to delegate to when the MCP
   // server is unreachable: `server` resolves to null, or pool.call()
@@ -37,6 +43,12 @@ export interface McpSourceSpec {
   // failure, not a reason to route around it.
   fallback?: string;
   expectTools?: string[];
+  // Informational only for this kind: visibility is already decided by
+  // whether `server` resolves (a spec whose server() returns null without
+  // its token is hidden). Declaring it keeps the generated docs and
+  // .env.example honest about which env var gates the source.
+  auth?: AuthSpec;
+  optionalEnv?: string[];
   timeoutMs?: number;
   verifiedAt?: string;
 }
@@ -137,6 +149,7 @@ export function defineMcpSource(spec: McpSourceSpec): void {
 
   async function read(id: string): Promise<ReadResult> {
     if (!spec.read) throw new Error(`${spec.name} does not support read()`);
+    if (spec.read.guard) await spec.read.guard(id);
     const server = resolveServer(spec);
     if (!server) {
       const notConfigured = notConfiguredError(spec.name);
@@ -173,6 +186,8 @@ export function defineMcpSource(spec: McpSourceSpec): void {
     homepage: spec.homepage,
     timeoutMs,
     verifiedAt: spec.verifiedAt,
+    auth: spec.auth,
+    optionalEnv: spec.optionalEnv,
     hidden: resolveServer(spec) === null,
     search,
     read,
@@ -209,6 +224,8 @@ export function defineMcpSourceWithDelegatedRead(
     homepage: spec.homepage,
     timeoutMs,
     verifiedAt: spec.verifiedAt,
+    auth: spec.auth,
+    optionalEnv: spec.optionalEnv,
     hidden: resolveServer(spec as McpSourceSpec) === null,
     search: buildSearch(spec, timeoutMs),
     read,

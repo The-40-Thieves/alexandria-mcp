@@ -31,6 +31,7 @@ const FIXTURES: Source[] = [
     kind: 'mcp',
     hidden: true,
     auth: { type: 'bearer', env: 'BETA_API_KEY' },
+    optionalEnv: ['BETA_EXTRA_KEY'],
     verifiedAt: '2026-01-01',
     description: 'Beta: an academic source. Requires BETA_API_KEY.',
   }),
@@ -51,9 +52,10 @@ test('buildSourcesDoc', async (t) => {
     assert.ok(doc.indexOf('## academic') < doc.indexOf('## literature'));
     assert.match(
       doc,
-      /beta \*\(hidden\)\* \| mcp \| academic \| static \| BETA_API_KEY \| 2026-01-01/,
+      /beta \*\(hidden\)\* \| mcp \| academic \| static \| BETA_API_KEY \| BETA_EXTRA_KEY \| 2026-01-01/,
     );
-    assert.match(doc, /alpha \| rest \| literature \| static \| none \| - \|/);
+    // A source with no optional envs gets a dash in that column.
+    assert.match(doc, /alpha \| rest \| literature \| static \| none \| - \| - \|/);
     assert.match(doc, /\| \*\*Total\*\* \| 3 \| 1 \|/);
   });
 
@@ -103,6 +105,33 @@ test('buildEnvBlock', async (t) => {
     const block = buildEnvBlock(withOverlap);
     const occurrences = block.split('\nJINA_API_KEY=').length - 1;
     assert.equal(occurrences, 1);
+  });
+
+  await t.test('an optionalEnv gets its own section, separate from the required keys', () => {
+    const withOptional = [
+      ...FIXTURES,
+      source({ name: 'epsilon', optionalEnv: ['EPSILON_OPTIONAL_KEY'] }),
+    ];
+    const block = buildEnvBlock(withOptional);
+    assert.match(block, /# .. Optional source keys/);
+    assert.match(block, /^# epsilon$/m);
+    assert.match(block, /^EPSILON_OPTIONAL_KEY=$/m);
+    // It must land in the optional section, after the required keys.
+    assert.ok(
+      block.indexOf('EPSILON_OPTIONAL_KEY=') > block.indexOf('Optional source keys'),
+      'optional key listed outside the optional section',
+    );
+  });
+
+  await t.test('a required env also read optionally names both sets of sources', () => {
+    const withBoth = [
+      source({ name: 'zeta', auth: { type: 'bearer', env: 'SHARED_TOKEN' } }),
+      source({ name: 'eta', optionalEnv: ['SHARED_TOKEN'] }),
+    ];
+    const block = buildEnvBlock(withBoth);
+    assert.match(block, /# Also read, but not required, by: eta\./);
+    // Listed once, under the required keys, not twice.
+    assert.equal(block.split('\nSHARED_TOKEN=').length - 1, 1);
   });
 
   await t.test('is wrapped in the env markers', () => {

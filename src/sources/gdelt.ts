@@ -4,7 +4,8 @@
 // because the doc API itself can be slow to answer.
 import type { LibraryResult, ReadResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
-import { register } from './registry.js';
+import { fetchAsText } from '../web/fetchTier.js';
+import { register, truncateText } from './registry.js';
 
 const BASE = 'https://api.gdeltproject.org/api/v2/doc/doc';
 const TIMEOUT_MS = 45000;
@@ -56,17 +57,27 @@ export async function gdeltSearch(query: string, limit: number): Promise<Library
   return results;
 }
 
-// TODO(stage-6): fetchTier. Once the web fetch tier lands, read(id) should
-// retrieve and extract the article body at the url instead of metadata
-// only, the same convention as kinds/rss.ts and nhk.ts.
+// Retrieves and extracts the article body at the id via the fetch tier
+// (defuddle, then jina, then crawl4ai, whichever is configured). The id is
+// arbitrary third-party web content that fetchAsText can fail on for all
+// sorts of reasons (paywall, robots block, the whole chain unconfigured)
+// that aren't a bug in this source, so a failure falls back to
+// metadata-only with the error in `note`, the same convention as
+// kinds/rss.ts.
 export async function gdeltRead(id: string): Promise<ReadResult> {
-  return {
-    title: id,
-    authors: [],
-    metadataOnly: true,
-    externalUrl: id,
-    note: 'Full-text fetch for GDELT arrives in a later stage; this is metadata only.',
-  };
+  try {
+    const page = await fetchAsText(id);
+    return { title: page.title || id, authors: [], externalUrl: id, ...truncateText(page.text) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      title: id,
+      authors: [],
+      metadataOnly: true,
+      externalUrl: id,
+      note: `Full-text fetch failed; showing metadata only: ${message}`,
+    };
+  }
 }
 
 register('gdelt', {

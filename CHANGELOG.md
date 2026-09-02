@@ -12,14 +12,14 @@ landed across ten staged PRs. Nine public tools, 138 sources.
 - **33 repaired sources, new baseline** (Stage 2): audited and fixed every
   source carried over from v1, with keys and pacing recorded honestly in the
   registry instead of assumed.
-- **RSS kind** (Stage 3): a `defineRest` helper and 17 RSS feeds, plus Google
-  News search and NHK.
-- **50 new adapters** (Stage 4A/4B): security, developer, and standards
+- **RSS kind** (Stage 3): a `defineRssSource` helper and 17 RSS feeds, plus
+  Google News search and NHK.
+- **49 new adapters** (Stage 4A/4B): security, developer, and standards
   clusters (25 sources), then markets, economics, real estate, news,
   geopolitical, government, and AI research (24 sources).
-- **MCP delegation kind** (Stage 5): sources that proxy a call through another
-  MCP server instead of a direct HTTP request (huggingface, context7, jina,
-  github, mdn).
+- **MCP delegation kind** (Stage 5): six sources that proxy a call through
+  another MCP server instead of a direct HTTP request (huggingface,
+  context7mcp, jina, jinaarxiv, githubmcp, mdnmcp).
 - **Web tier with SSRF hardening** (Stage 6): a fetch chain (defuddle, then
   jina reader, then crawl4ai, whichever is configured) behind an SSRF guard,
   plus searxng, jina search, tavily, and a read-only `webfetch` source.

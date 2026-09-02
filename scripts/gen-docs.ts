@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import '../src/sources/all.js';
 import { type Cluster, listSources, type SourceKind } from '../src/sources/registry.js';
+import { VERSION } from '../src/version.js';
 
 const README_PATH = 'README.md';
 const ENV_EXAMPLE_PATH = '.env.example';
@@ -65,14 +66,17 @@ function buildSourcesDoc(sources: Source[]): string {
   for (const cluster of clusterNames) {
     const list = clusters.get(cluster) ?? [];
     lines.push(`## ${cluster} (${list.length})`, '');
-    lines.push('| Name | Kind | Cluster | Freshness | Auth env | Verified | Description |');
-    lines.push('|---|---|---|---|---|---|---|');
+    lines.push(
+      '| Name | Kind | Cluster | Freshness | Auth env | Optional env | Verified | Description |',
+    );
+    lines.push('|---|---|---|---|---|---|---|---|');
     for (const s of list) {
       const name = s.hidden ? `${s.name} *(hidden)*` : s.name;
       const authEnv = s.auth?.env ?? 'none';
+      const optionalEnv = s.optionalEnv?.length ? s.optionalEnv.join(', ') : '-';
       const verified = s.verifiedAt ?? '-';
       lines.push(
-        `| ${name} | ${s.kind} | ${s.cluster} | ${s.freshness} | ${authEnv} | ${verified} | ${escapeCell(s.description)} |`,
+        `| ${name} | ${s.kind} | ${s.cluster} | ${s.freshness} | ${authEnv} | ${optionalEnv} | ${verified} | ${escapeCell(s.description)} |`,
       );
     }
     lines.push('');
@@ -122,7 +126,7 @@ function buildHealthExample(sources: Source[]): string {
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of sources) byKind[s.kind]++;
   const kindStr = `{ rest: ${byKind.rest}, hub: ${byKind.hub}, rss: ${byKind.rss}, mcp: ${byKind.mcp}, scrape: ${byKind.scrape} }`;
-  return `{ status: "ok", version: "10.0.0", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, tools: 9 }`;
+  return `{ status: "ok", version: "${VERSION}", sources: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, byKind: ${kindStr}, tools: 9 }`;
 }
 
 function applyReadmeSubstitutions(content: string, sources: Source[]): string {
@@ -217,6 +221,11 @@ const FEATURE_ENVS: EnvVar[] = [
     name: 'ALEXANDRIA_RERANK',
     comment:
       'Set to "llm" to rerank fused results with a chat call; otherwise the fused order is kept.',
+  },
+  {
+    name: 'ALEXANDRIA_CATALOG_CACHE',
+    comment:
+      'Path to the routing catalog embedding cache. Defaults to eval/catalog-embeddings.json inside the package.',
   },
   {
     name: 'ALEXANDRIA_CACHE_TTL_MS',
@@ -322,12 +331,51 @@ function buildEnvBlock(sources: Source[]): string {
     '# without any credentials.',
     '',
   ];
+  // A required key is often ALSO read optionally by other sources
+  // (GITHUB_TOKEN gates githubsearch/githubmcp but merely lifts ghsa's
+  // pacing and openiti's search path). Name those too, so the entry does
+  // not read as if only the gated sources touch it.
+  const optionalUsers = new Map<string, string[]>(); // env name -> source names
+  for (const s of sources) {
+    for (const env of s.optionalEnv ?? []) {
+      const list = optionalUsers.get(env) ?? [];
+      list.push(s.name);
+      optionalUsers.set(env, list);
+    }
+  }
+
   for (const env of [...authVars.keys()].sort()) {
     const usedBy = (authVars.get(env) ?? []).sort().join(', ');
     const desc = descByEnv.get(env) ?? '';
     lines.push(`# ${usedBy}: ${oneLineSummary(desc)}`);
+    const alsoOptional = (optionalUsers.get(env) ?? []).sort();
+    if (alsoOptional.length > 0) {
+      lines.push(`# Also read, but not required, by: ${alsoOptional.join(', ')}.`);
+    }
     lines.push(`${env}=`);
     lines.push('');
+  }
+
+  // Optional source keys: read by a source but never required by it. Kept
+  // in their own section so a reader can tell at a glance which keys unhide
+  // a source and which only raise a quota. A name already covered by the
+  // required section or by FEATURE_ENVS is not repeated here.
+  const optionalVars = new Map<string, string[]>(); // env name -> source names
+  for (const [env, names] of optionalUsers) {
+    if (FEATURE_ENV_NAMES.has(env) || authVars.has(env)) continue;
+    optionalVars.set(env, names);
+  }
+  if (optionalVars.size > 0) {
+    lines.push('# ── Optional source keys ────────────────────────────────────────────────');
+    lines.push('# Read by the sources named below but never required by them: each only');
+    lines.push('# raises a quota, lifts a rate limit, or unlocks a better backend. Leaving');
+    lines.push('# one unset never hides a source.', '');
+    for (const env of [...optionalVars.keys()].sort()) {
+      const usedBy = (optionalVars.get(env) ?? []).sort().join(', ');
+      lines.push(`# ${usedBy}`);
+      lines.push(`${env}=`);
+      lines.push('');
+    }
   }
 
   lines.push('# ── Feature envs ────────────────────────────────────────────────────────');
