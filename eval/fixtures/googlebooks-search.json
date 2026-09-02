@@ -1,0 +1,30 @@
+{
+  "_source_note": "The keyless shared quota is exhausted (confirmed live: every unauthenticated request to googleapis.com/books/v1/volumes returns 429 'Quota exceeded for quota metric Queries'), GOOGLE_BOOKS_API_KEY is required, and this environment has none — so this fixture matches the Google Books API's documented volumes response shape (the same shape the pre-Stage-2 adapter's GBVolume/GBResponse types already assumed) rather than being freshly recorded.",
+  "totalItems": 2,
+  "items": [
+    {
+      "id": "wrOQLV6xB-wC",
+      "volumeInfo": {
+        "title": "The Origin of Species",
+        "authors": ["Charles Darwin"],
+        "publishedDate": "1859",
+        "language": "en",
+        "categories": ["Science"],
+        "description": "On the Origin of Species, published on 24 November 1859, is a work of scientific literature by Charles Darwin.",
+        "previewLink": "https://books.google.com/books?id=wrOQLV6xB-wC"
+      },
+      "accessInfo": { "viewability": "ALL_PAGES", "publicDomain": true }
+    },
+    {
+      "id": "ZVDGpXtWlvUC",
+      "volumeInfo": {
+        "title": "A Brief History of Time",
+        "authors": ["Stephen Hawking"],
+        "publishedDate": "1988",
+        "language": "en",
+        "categories": ["Science"]
+      },
+      "accessInfo": { "viewability": "PARTIAL", "publicDomain": false }
+    }
+  ]
+}
