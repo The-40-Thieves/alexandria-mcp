@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>A Long Enough Article About Testing</title>
+</head>
+<body>
+  <header><nav><a href="/">Home</a> <a href="/about">About</a></nav></header>
+  <aside>Sidebar promo content that should be stripped by the extractor.</aside>
+  <article>
+    <h1>A Long Enough Article About Testing</h1>
+    <p>This fixture exists to give the readability tier something real to chew on: a full
+    paragraph of prose, not a stub. It needs to run past the five hundred character success
+    threshold once the boilerplate around it has been stripped out by the extractor, so this
+    paragraph keeps going for a while longer than feels strictly necessary for a test fixture.</p>
+    <p>A second paragraph adds more body text. Local HTTP fixture servers are the standard way
+    to exercise a fetch chain without depending on the live network: spin one up on an ephemeral
+    port, serve canned HTML, and tear it down when the test finishes. That is exactly what the
+    fetchTier test suite does with this file.</p>
+    <p>A third paragraph, mostly to pad the extracted text comfortably past the threshold so the
+    test is not sitting right on the boundary and flaking on a rounding difference between
+    extractor versions.</p>
+  </article>
+  <footer>Copyright notice and footer links that should also be stripped.</footer>
+</body>
+</html>
