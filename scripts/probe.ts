@@ -77,6 +77,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // isn't a CWE number.
   cwe: 'CWE-79',
   attack: 'injection',
+  depsdev: 'npm:lodash',
 };
 const DEFAULT_QUERY = 'history of science';
 

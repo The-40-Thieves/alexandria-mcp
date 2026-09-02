@@ -64,6 +64,7 @@ import './feeds/regional.js';
 import './feeds/standards.js';
 import './feeds/developer.js';
 import './ecosystems.js';
+import './depsdev.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';
