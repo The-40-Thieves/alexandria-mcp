@@ -116,12 +116,18 @@ async function selectRoutes(
   return chatJSON('router', system, query, RoutingDecisionSchema);
 }
 
-// Stage 1 + stage 2 + fan-out, without the flattened/deduped shape the
-// library_ask tool returns. Stage 9's library_answer/library_research call
-// this directly to get per-source results before fusion.
-export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunAskResult> {
+export interface PlannedRoute {
+  intent: string;
+  routes: RouteItem[];
+  clusterBySource: Map<string, string>;
+}
+
+// Stage 1 + stage 2 only: no fan-out. Exported so callers that only need
+// routing quality (scripts/eval-routing.ts's stage-1+2 scoring) don't have
+// to pay for a live search against every selected source just to see which
+// sources the router picked.
+export async function planRoute(query: string, opts: AskOptions = {}): Promise<PlannedRoute> {
   const maxSources = opts.maxSources ?? 5;
-  const resultsPerSource = opts.resultsPerSource ?? 5;
 
   const freshness = detectFreshnessPreference(query);
   const pool = await candidates(query, CANDIDATE_POOL_SIZE, { freshness });
@@ -135,6 +141,16 @@ export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunA
   const validRoutes = decision.routes
     .slice(0, maxSources)
     .filter((r) => clusterBySource.has(r.source));
+
+  return { intent: decision.intent, routes: validRoutes, clusterBySource };
+}
+
+// Stage 1 + stage 2 + fan-out, without the flattened/deduped shape the
+// library_ask tool returns. Stage 9's library_answer/library_research call
+// this directly to get per-source results before fusion.
+export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunAskResult> {
+  const resultsPerSource = opts.resultsPerSource ?? 5;
+  const { intent, routes: validRoutes, clusterBySource } = await planRoute(query, opts);
 
   const searches = validRoutes.map(async (route) => {
     try {
@@ -170,7 +186,7 @@ export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunA
     }
   }
 
-  return { intent: decision.intent, routing: validRoutes, perSource, errors };
+  return { intent, routing: validRoutes, perSource, errors };
 }
 
 export async function libraryAsk(
