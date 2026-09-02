@@ -1,0 +1,14 @@
+{
+  "_meta": { "args": { "limit": 2, "offset": 0, "q": "unemployment" } },
+  "results": {
+    "docs": [
+      {
+        "provider_code": "OECD",
+        "code": "DSD_EAG_LSO_EA@DF_LSO_NEAC_ALL",
+        "name": "National Educational Attainment Classification (NEAC) and labour market status",
+        "provider_name": "Organisation for Economic Co-operation and Development",
+        "nb_series": 893103
+      }
+    ]
+  }
+}
