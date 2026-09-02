@@ -72,3 +72,4 @@ import './euvd.js';
 import './epss.js';
 import './nvd.js';
 import './cwe.js';
+import './attack.js';

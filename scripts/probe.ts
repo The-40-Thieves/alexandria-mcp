@@ -75,6 +75,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   // cwe is a single-id lookup with no keyword search; the default query
   // isn't a CWE number.
   cwe: 'CWE-79',
+  attack: 'injection',
 };
 const DEFAULT_QUERY = 'history of science';
 
