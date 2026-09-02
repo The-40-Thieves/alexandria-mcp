@@ -73,7 +73,7 @@ export function normalizeMdnMcpRead(text: string, id: string): ReadResult {
 defineMcpSource({
   name: 'mdnmcp',
   description:
-    "MDN Web Docs's own MCP server: web platform reference and guides, with full document text via get-doc. No API key required. Additive to the existing mdn REST source.",
+    "MDN Web Docs's own MCP server: web platform reference and guides, with full document text via get-doc. No API key required. Additive to the existing mdn REST source, which it falls back to when the MCP server is unreachable.",
   cluster: 'developer',
   freshness: 'daily',
   homepage: 'https://developer.mozilla.org',
@@ -89,6 +89,10 @@ defineMcpSource({
     args: (id) => ({ path: id }),
     normalize: (text, _structured, id) => normalizeMdnMcpRead(text, id),
   },
+  // The REST mdn source hits MDN's own public search API directly; when
+  // this MCP server is down, fall back to it rather than surface an
+  // error for what search-wise is the same underlying content.
+  fallback: 'mdn',
   expectTools: ['search', 'get-doc', 'get-compat'],
   verifiedAt: '2026-09-02',
 });

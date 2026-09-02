@@ -6,9 +6,9 @@
 // surface (registry.ts's SourceAdapter shape is identical to every other
 // kind's).
 import type { LibraryResult, ReadResult } from '../../types.js';
-import { pool, type RemoteServerConfig } from '../../utils/mcpClientPool.js';
+import { pool, type RemoteServerConfig, TOOL_ERROR_PREFIX } from '../../utils/mcpClientPool.js';
 import type { Cluster, Freshness } from '../registry.js';
-import { register } from '../registry.js';
+import { getAdapter, register } from '../registry.js';
 
 export interface McpSourceSpec {
   name: string;
@@ -28,9 +28,21 @@ export interface McpSourceSpec {
     args: (id: string) => Record<string, unknown>;
     normalize: (text: string, structured: unknown, id: string) => ReadResult;
   };
+  // The name of another registered source to delegate to when the MCP
+  // server is unreachable: `server` resolves to null, or pool.call()
+  // fails with a transport-class error (after its own single retry).
+  // A tool-level error (pool.call() throwing because the tool's own
+  // result had isError: true, prefixed TOOL_ERROR_PREFIX) does NOT fall
+  // back - that's the server working correctly and reporting a real
+  // failure, not a reason to route around it.
+  fallback?: string;
   expectTools?: string[];
   timeoutMs?: number;
   verifiedAt?: string;
+}
+
+function isToolLevelError(err: unknown): boolean {
+  return err instanceof Error && err.message.startsWith(TOOL_ERROR_PREFIX);
 }
 
 // probe.ts's --mcp-snapshot flag and its live-drift warning both need
@@ -62,18 +74,27 @@ function notConfiguredError(name: string): Error {
 // builds the search() closure that resolves the server, calls the
 // configured tool through the pool, and normalizes the result.
 function buildSearch(
-  spec: Pick<McpSourceSpec, 'name' | 'server' | 'search'>,
+  spec: Pick<McpSourceSpec, 'name' | 'server' | 'search' | 'fallback'>,
   timeoutMs: number,
 ): (query: string, limit: number) => Promise<LibraryResult[]> {
   return async (query, limit) => {
     const server = resolveServer(spec as McpSourceSpec);
-    if (!server) throw notConfiguredError(spec.name);
-    const { text, structured } = await pool.call(
-      { ...server, timeoutMs: server.timeoutMs ?? timeoutMs },
-      spec.search.tool,
-      spec.search.args(query, limit),
-    );
-    return spec.search.normalize(text, structured, query).slice(0, limit);
+    if (!server) {
+      if (spec.fallback) return getAdapter(spec.fallback).search(query, limit);
+      throw notConfiguredError(spec.name);
+    }
+    try {
+      const { text, structured } = await pool.call(
+        { ...server, timeoutMs: server.timeoutMs ?? timeoutMs },
+        spec.search.tool,
+        spec.search.args(query, limit),
+      );
+      return spec.search.normalize(text, structured, query).slice(0, limit);
+    } catch (err) {
+      if (spec.fallback && !isToolLevelError(err))
+        return getAdapter(spec.fallback).search(query, limit);
+      throw err;
+    }
   };
 }
 
@@ -84,13 +105,21 @@ export function defineMcpSource(spec: McpSourceSpec): void {
   async function read(id: string): Promise<ReadResult> {
     if (!spec.read) throw new Error(`${spec.name} does not support read()`);
     const server = resolveServer(spec);
-    if (!server) throw notConfiguredError(spec.name);
-    const { text, structured } = await pool.call(
-      { ...server, timeoutMs: server.timeoutMs ?? timeoutMs },
-      spec.read.tool,
-      spec.read.args(id),
-    );
-    return spec.read.normalize(text, structured, id);
+    if (!server) {
+      if (spec.fallback) return getAdapter(spec.fallback).read(id);
+      throw notConfiguredError(spec.name);
+    }
+    try {
+      const { text, structured } = await pool.call(
+        { ...server, timeoutMs: server.timeoutMs ?? timeoutMs },
+        spec.read.tool,
+        spec.read.args(id),
+      );
+      return spec.read.normalize(text, structured, id);
+    } catch (err) {
+      if (spec.fallback && !isToolLevelError(err)) return getAdapter(spec.fallback).read(id);
+      throw err;
+    }
   }
 
   register(spec.name, {

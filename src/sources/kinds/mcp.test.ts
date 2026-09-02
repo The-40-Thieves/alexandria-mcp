@@ -174,4 +174,125 @@ test('defineMcpSource', async (t) => {
       assert.equal(delegateReadCalls, 1);
     },
   );
+
+  await t.test(
+    'falls back to the configured adapter when the MCP server is unreachable (stopped)',
+    async () => {
+      let fallbackCalls = 0;
+      register('mcp_test_fallback_target', {
+        description: 'fallback stand-in for e.g. mdn',
+        supportsIngest: false,
+        async search(query) {
+          fallbackCalls++;
+          return [
+            {
+              id: 'fallback-1',
+              source: 'mcp_test_fallback_target',
+              title: `fallback result for ${query}`,
+              authors: [],
+              hasFullText: false,
+            },
+          ];
+        },
+        async read(id) {
+          return { title: `fallback read ${id}`, authors: [] };
+        },
+      });
+
+      const handle = await startTestMcpServer({
+        search: () => ({ content: [{ type: 'text', text: 'ignored' }] }),
+      });
+      // Stop the server before the source ever connects, so search()'s
+      // pool.call() fails with a real transport-class error (after its
+      // own single retry) rather than a mocked one.
+      await handle.close();
+
+      defineMcpSource({
+        ...baseSpec(handle, 'mcp_test_fallback_search'),
+        search: { tool: 'search', args: (q) => ({ query: q }), normalize: () => [] },
+        fallback: 'mcp_test_fallback_target',
+      });
+
+      const results = await getAdapter('mcp_test_fallback_search').search('quantum computing', 5);
+      assert.equal(results.length, 1);
+      assert.equal(results[0].source, 'mcp_test_fallback_target');
+      assert.equal(results[0].title, 'fallback result for quantum computing');
+      assert.equal(fallbackCalls, 1, 'the fallback adapter should be invoked exactly once');
+    },
+  );
+
+  await t.test('falls back to the configured adapter when server() resolves to null', async () => {
+    let fallbackCalls = 0;
+    register('mcp_test_fallback_target_null', {
+      description: 'fallback stand-in',
+      supportsIngest: false,
+      async search() {
+        fallbackCalls++;
+        return [
+          {
+            id: 'x',
+            source: 'mcp_test_fallback_target_null',
+            title: 'from fallback',
+            authors: [],
+            hasFullText: false,
+          },
+        ];
+      },
+      async read(id) {
+        return { title: id, authors: [] };
+      },
+    });
+
+    defineMcpSource({
+      name: 'mcp_test_fallback_null_server',
+      description: 'needs a token, none configured',
+      cluster: 'developer',
+      freshness: 'daily',
+      homepage: 'https://example.invalid',
+      supportsIngest: true,
+      server: () => null,
+      search: { tool: 'search', args: (q) => ({ query: q }), normalize: () => [] },
+      fallback: 'mcp_test_fallback_target_null',
+    });
+
+    const results = await getAdapter('mcp_test_fallback_null_server').search('x', 3);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].source, 'mcp_test_fallback_target_null');
+    assert.equal(fallbackCalls, 1);
+  });
+
+  await t.test('does not fall back on a tool-level error (isError: true)', async () => {
+    let fallbackCalls = 0;
+    register('mcp_test_fallback_target_toolerr', {
+      description: 'fallback stand-in',
+      supportsIngest: false,
+      async search() {
+        fallbackCalls++;
+        return [];
+      },
+      async read(id) {
+        return { title: id, authors: [] };
+      },
+    });
+
+    const handle = await startTestMcpServer({
+      search: () => ({
+        content: [{ type: 'text', text: 'bad request: q too short' }],
+        isError: true,
+      }),
+    });
+    t.after(() => handle.close());
+
+    defineMcpSource({
+      ...baseSpec(handle, 'mcp_test_fallback_toolerror'),
+      search: { tool: 'search', args: (q) => ({ query: q }), normalize: () => [] },
+      fallback: 'mcp_test_fallback_target_toolerr',
+    });
+
+    await assert.rejects(
+      getAdapter('mcp_test_fallback_toolerror').search('x', 3),
+      /tool error: bad request: q too short/,
+    );
+    assert.equal(fallbackCalls, 0, 'a tool-level error must not trigger the fallback');
+  });
 });

@@ -65,7 +65,7 @@ export function normalizeContext7McpRead(text: string, id: string): ReadResult {
 defineMcpSource({
   name: 'context7mcp',
   description:
-    'Context7 documentation search via its own MCP server (resolve-library-id then query-docs). Works keyless; set CONTEXT7_API_KEY for a higher rate. Additive to the existing context7 REST source.',
+    'Context7 documentation search via its own MCP server (resolve-library-id then query-docs). Works keyless; set CONTEXT7_API_KEY for a higher rate. Additive to the existing context7 REST source. read() cannot target a specific topic (query-docs needs one but read(id) carries no query), so it uses a generic default query; search() again with a specific topic for targeted docs.',
   cluster: 'developer',
   freshness: 'daily',
   homepage: 'https://context7.com',

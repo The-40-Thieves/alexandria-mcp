@@ -146,6 +146,105 @@ test('McpClientPool', async (t) => {
     },
   );
 
+  await t.test(
+    'throws an Error prefixed "tool error:" when the result has isError, without reconnecting',
+    async () => {
+      const handle = await startTestMcpServer({
+        read: () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        search: () => ({
+          content: [{ type: 'text', text: 'bad query: missing field' }],
+          isError: true,
+        }),
+      });
+      t.after(() => handle.close());
+
+      const pool = new McpClientPool();
+      const server = cfg(handle);
+      // Prime a connection via a *different* tool (read) that succeeds,
+      // so the isError call below reuses an existing client instead of
+      // its own initialize+notify being indistinguishable from a
+      // wrongful reconnect.
+      await pool.call(server, 'read', { id: 'x' });
+      const beforeError = handle.requestCount();
+
+      await assert.rejects(
+        pool.call(server, 'search', { query: 'x' }),
+        /^Error: tool error: bad query: missing field$/,
+      );
+
+      assert.equal(
+        handle.requestCount() - beforeError,
+        1,
+        'a tool-level error should not reconnect (no extra initialize/notify requests), just the one failed tools/call',
+      );
+    },
+  );
+
+  await t.test(
+    'two RemoteServerConfigs with different names but the same URL share one client',
+    async () => {
+      let calls = 0;
+      const handle = await startTestMcpServer({
+        search: () => {
+          calls++;
+          return { content: [{ type: 'text', text: 'ok' }] };
+        },
+      });
+      t.after(() => handle.close());
+
+      const pool = new McpClientPool();
+      const serverA: RemoteServerConfig = { name: 'jina', url: handle.url, timeoutMs: 5000 };
+      const serverB: RemoteServerConfig = { name: 'jinaarxiv', url: handle.url, timeoutMs: 5000 };
+
+      await pool.call(serverA, 'search', { query: 'a' });
+      const afterFirst = handle.requestCount();
+      await pool.call(serverB, 'search', { query: 'b' });
+      const afterSecond = handle.requestCount();
+
+      assert.equal(calls, 2);
+      assert.equal(
+        afterSecond - afterFirst,
+        1,
+        'the second source (different name, same URL) should reuse the connection, not reconnect',
+      );
+    },
+  );
+
+  await t.test(
+    'two RemoteServerConfigs with the same URL but different headers do NOT share a client',
+    async () => {
+      const handle = await startTestMcpServer({
+        search: () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      });
+      t.after(() => handle.close());
+
+      const pool = new McpClientPool();
+      const serverA: RemoteServerConfig = {
+        name: 'a',
+        url: handle.url,
+        headers: { Authorization: 'Bearer one' },
+        timeoutMs: 5000,
+      };
+      const serverB: RemoteServerConfig = {
+        name: 'b',
+        url: handle.url,
+        headers: { Authorization: 'Bearer two' },
+        timeoutMs: 5000,
+      };
+
+      await pool.call(serverA, 'search', { query: 'a' });
+      const afterFirst = handle.requestCount();
+      await pool.call(serverB, 'search', { query: 'b' });
+      const afterSecond = handle.requestCount();
+
+      assert.equal(
+        afterSecond - afterFirst,
+        3,
+        'different headers (different auth) should get their own client: a full initialize + notify + tools/call, not just the tools/call',
+      );
+    },
+  );
+
   await t.test('does not retry a second time after the retry also fails', async () => {
     const handle = await startTestMcpServer({
       failAlways: true,

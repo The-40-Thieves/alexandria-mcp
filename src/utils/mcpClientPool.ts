@@ -3,6 +3,7 @@
 // SSE dial every time). Used by src/sources/kinds/mcp.ts's
 // defineMcpSource() to delegate a source's search()/read() to a remote
 // MCP server's tools/call.
+import { createHash } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { requestContext } from './http.js';
@@ -20,6 +21,11 @@ export interface McpCallResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+// Prefix on the Error call() throws for a tool-level failure
+// (CallToolResult.isError: true). Exported so kinds/mcp.ts's fallback
+// logic can distinguish "the tool ran and reported an error" (never
+// falls back) from a transport-class failure (does).
+export const TOOL_ERROR_PREFIX = 'tool error:';
 const TOOLS_CACHE_MS = 60 * 60 * 1000; // 1 hour, per the task-5.1 brief
 
 // Matches an error whose message, HTTP status code, or cause suggests the
@@ -72,6 +78,20 @@ interface PooledClient {
   client: Client;
 }
 
+// Two RemoteServerConfigs that point at the same URL with the same
+// headers (e.g. `jina` and `jinaarxiv`, which both call
+// https://mcp.jina.ai/v1) share one Client/connection rather than each
+// opening its own, since `server.name` - which used to key the cache -
+// is a per-source label, not a per-connection one. Different headers
+// (e.g. different auth) still get their own client. The header
+// component is hashed rather than embedded raw so a bearer token never
+// sits in a Map key in plaintext.
+function connectionKey(server: RemoteServerConfig): string {
+  const headerPairs = Object.entries(server.headers ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  const headerHash = createHash('sha256').update(JSON.stringify(headerPairs)).digest('hex');
+  return `${server.url}#${headerHash}`;
+}
+
 export class McpClientPool {
   private clients = new Map<string, PooledClient>();
   private toolsCache = new Map<string, { names: string[]; expiresAt: number }>();
@@ -87,17 +107,19 @@ export class McpClientPool {
   }
 
   private async getClient(server: RemoteServerConfig): Promise<PooledClient> {
-    const existing = this.clients.get(server.name);
+    const key = connectionKey(server);
+    const existing = this.clients.get(key);
     if (existing) return existing;
     const created = await this.createClient(server);
-    this.clients.set(server.name, created);
+    this.clients.set(key, created);
     return created;
   }
 
-  private dropClient(name: string): void {
-    const existing = this.clients.get(name);
+  private dropClient(server: RemoteServerConfig): void {
+    const key = connectionKey(server);
+    const existing = this.clients.get(key);
     if (!existing) return;
-    this.clients.delete(name);
+    this.clients.delete(key);
     existing.client.close().catch(() => {});
   }
 
@@ -115,10 +137,41 @@ export class McpClientPool {
       return await fn(pooled.client);
     } catch (err) {
       if (!isTransportTrouble(err)) throw err;
-      this.dropClient(server.name);
+      this.dropClient(server);
       const fresh = await this.getClient(server);
       return await fn(fresh.client);
     }
+  }
+
+  // callTool()'s result type is a union: the ordinary tool-call shape
+  // (content[] + optional structuredContent + optional isError) or a
+  // task-based toolResult shape (see the SDK's experimental task
+  // support, unused here). Narrows explicitly rather than assuming the
+  // former.
+  private extractCallResult(result: unknown): McpCallResult & { isError: boolean } {
+    const r = result as Record<string, unknown>;
+    const content: unknown = 'content' in r ? r.content : [];
+    const items = Array.isArray(content)
+      ? (content as Array<{ type?: string; text?: string; resource?: { text?: string } }>)
+      : [];
+    // Joined with a blank line: some servers (e.g. jina) return one text
+    // content item per hit rather than one item for the whole response,
+    // and a blank-line join lets a caller recover the individual items
+    // by splitting on blank lines without this pool needing to expose
+    // the raw content array itself. An embedded-text resource item (e.g.
+    // GitHub's get_file_contents, which returns a one-line text summary
+    // plus the actual file content as a `resource` item) contributes its
+    // resource.text alongside any plain text items, in content order.
+    const textParts: string[] = [];
+    for (const item of items) {
+      if (item.type === 'text' && typeof item.text === 'string') textParts.push(item.text);
+      else if (item.type === 'resource' && typeof item.resource?.text === 'string')
+        textParts.push(item.resource.text);
+    }
+    const text = textParts.join('\n\n');
+    const structured = 'structuredContent' in r ? r.structuredContent : undefined;
+    const isError = 'isError' in r ? Boolean(r.isError) : false;
+    return { text, structured, isError };
   }
 
   async call(
@@ -132,49 +185,28 @@ export class McpClientPool {
     // cancelled the moment the caller's guard timeout or abort fires,
     // same as fetchWithRetry() does for the plain REST/RSS kinds.
     const signal = requestContext.getStore()?.signal;
-    return this.withClient(server, async (client) => {
-      const result = await client.callTool({ name: tool, arguments: args }, undefined, {
-        timeout: timeoutMs,
-        signal,
-      });
-      // callTool()'s result type is a union: the ordinary tool-call shape
-      // (content[] + optional structuredContent) or a task-based
-      // toolResult shape (see the SDK's experimental task support, unused
-      // here). Narrow explicitly rather than assuming the former.
-      const content: unknown = 'content' in result ? result.content : [];
-      const items = Array.isArray(content)
-        ? (content as Array<{ type?: string; text?: string; resource?: { text?: string } }>)
-        : [];
-      // Joined with a blank line: some servers (e.g. jina) return one
-      // text content item per hit rather than one item for the whole
-      // response, and a blank-line join lets a caller recover the
-      // individual items by splitting on blank lines without this pool
-      // needing to expose the raw content array itself. An embedded-text
-      // resource item (e.g. GitHub's get_file_contents, which returns a
-      // one-line text summary plus the actual file content as a
-      // `resource` item) contributes its resource.text alongside any
-      // plain text items, in content order.
-      const textParts: string[] = [];
-      for (const item of items) {
-        if (item.type === 'text' && typeof item.text === 'string') textParts.push(item.text);
-        else if (item.type === 'resource' && typeof item.resource?.text === 'string')
-          textParts.push(item.resource.text);
-      }
-      const text = textParts.join('\n\n');
-      const structured = 'structuredContent' in result ? result.structuredContent : undefined;
-      return { text, structured };
-    });
+    // The RPC itself (a successful HTTP round trip that returns a
+    // CallToolResult, whether or not the tool reports isError) goes
+    // through withClient()'s transport-trouble retry. A tool-level error
+    // is thrown below, entirely outside that scope, so it never triggers
+    // a reconnect, a retry, or (per kinds/mcp.ts) a fallback.
+    const result = await this.withClient(server, (client) =>
+      client.callTool({ name: tool, arguments: args }, undefined, { timeout: timeoutMs, signal }),
+    );
+    const { text, structured, isError } = this.extractCallResult(result);
+    if (isError) throw new Error(`${TOOL_ERROR_PREFIX} ${text}`);
+    return { text, structured };
   }
 
   async tools(server: RemoteServerConfig): Promise<string[]> {
-    const cached = this.toolsCache.get(server.name);
+    const cached = this.toolsCache.get(connectionKey(server));
     const now = Date.now();
     if (cached && cached.expiresAt > now) return cached.names;
     const names = await this.withClient(server, async (client) => {
       const result = await client.listTools();
       return result.tools.map((t) => t.name).sort();
     });
-    this.toolsCache.set(server.name, { names, expiresAt: now + TOOLS_CACHE_MS });
+    this.toolsCache.set(connectionKey(server), { names, expiresAt: now + TOOLS_CACHE_MS });
     return names;
   }
 }
