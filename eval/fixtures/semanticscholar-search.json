@@ -1,5 +1,5 @@
 {
-  "_source_note": "api.semanticscholar.org's shared unauthenticated pool is persistently rate-limited from this sandbox's egress IP (every attempt across multiple retries and backoff windows returned 429 with no Retry-After header — confirmed live, matching the pre-Stage-2 probe baseline, which was already ERROR/429). This fixture matches the Graph API's documented /paper/search response shape (the same shape the pre-Stage-2 adapter's S2Paper/S2SearchResponse types already assumed) rather than being freshly recorded from the shell.",
+  "_source_note": "api.semanticscholar.org's shared unauthenticated pool is persistently rate-limited from this sandbox's egress IP (every attempt across multiple retries and backoff windows returned 429 with no Retry-After header (confirmed live), matching the pre-Stage-2 probe baseline, which was already ERROR/429). This fixture matches the Graph API's documented /paper/search response shape (the same shape the pre-Stage-2 adapter's S2Paper/S2SearchResponse types already assumed) rather than being freshly recorded from the shell.",
   "total": 2,
   "data": [
     {

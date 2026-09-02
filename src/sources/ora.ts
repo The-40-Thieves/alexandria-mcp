@@ -90,7 +90,7 @@ export async function oraRead(id: string): Promise<{
 
 register('ora', {
   description:
-    'Oxford ORA — Oxford University Research Archive. Oxford theses, preprints, working papers, and the Oxford Text Archive (classical texts, TEI/XML). No auth required.',
+    'Oxford ORA: Oxford University Research Archive. Oxford theses, preprints, working papers, and the Oxford Text Archive (classical texts, TEI/XML). No auth required.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'academic',

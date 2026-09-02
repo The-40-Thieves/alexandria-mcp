@@ -21,7 +21,7 @@ test('biorxivSearch pages the last 7 days and filters client-side (fixture-mocke
   globalThis.fetch = (async (url: string | URL | Request) => {
     calls += 1;
     assert.match(String(url), /\/details\/biorxiv\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}\/0/);
-    // Only one page's worth of data (5 entries) — collection.length < PAGE_SIZE
+    // Only one page's worth of data (5 entries): collection.length < PAGE_SIZE
     // (30) tells biorxivSearch there is no next page.
     return new Response(JSON.stringify(fixture), { status: 200 });
   }) as typeof fetch;

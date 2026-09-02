@@ -40,14 +40,14 @@ interface GHCodeResponse {
 // /search/code request returns 401 "Requires authentication"). Without
 // GITHUB_TOKEN, fall back to listing a small set of OpenITI's per-century
 // data repos via the unauthenticated git Trees API and filtering file
-// paths client-side — a real, keyless (if narrower) search over the same
+// paths client-side: a real, keyless (if narrower) search over the same
 // corpus rather than failing outright.
 const FALLBACK_REPOS = ['0500AH', '0600AH', '0700AH'];
 
 function pathToResult(repo: string, path: string, previewUrl?: string): LibraryResult {
   const name = path.split('/').pop() ?? '';
   const parts = name.split('.');
-  const authorWork = parts.slice(0, 2).join(' — ') || name;
+  const authorWork = parts.slice(0, 2).join(', ') || name;
   return {
     id: `${repo}||${path}`,
     source: 'openiti' as const,
@@ -159,7 +159,7 @@ export async function openitiRead(id: string): Promise<{
 
 register('openiti', {
   description:
-    'OpenITI — 10,000+ Islamicate texts in Arabic and Persian (OpenITI mARkdown). Set GITHUB_TOKEN for full-corpus code search; without it, search falls back to a small set of per-century data repos (GitHub code search now requires auth even for public repos).',
+    'OpenITI: 10,000+ Islamicate texts in Arabic and Persian (OpenITI mARkdown). Set GITHUB_TOKEN for full-corpus code search; without it, search falls back to a small set of per-century data repos (GitHub code search now requires auth even for public repos).',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'literature',

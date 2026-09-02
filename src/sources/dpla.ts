@@ -2,7 +2,7 @@ import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
-// DPLA's previously-available keyless allowance (500 req/day) is gone —
+// DPLA's previously-available keyless allowance (500 req/day) is gone;
 // unauthenticated calls now return 403 invalid_api_key (confirmed 2026-09).
 const DPLA = 'https://api.dp.la/v2';
 
@@ -14,7 +14,7 @@ interface DPLADoc {
     title?: string[];
     creator?: string[];
     // DPLA's schema documents `date` as a single object, but some
-    // harvested records carry an array — accept either.
+    // harvested records carry an array; accept either.
     date?: DPLADate;
     subject?: Array<{ name: string }>;
     language?: Array<{ name: string }>;
@@ -73,7 +73,7 @@ export async function dplaSearch(query: string, limit: number): Promise<LibraryR
 
 register('dpla', {
   description:
-    'Digital Public Library of America — 17M+ items from US libraries, archives, and museums. Metadata aggregator. Requires free DPLA_API_KEY.',
+    'Digital Public Library of America: 17M+ items from US libraries, archives, and museums. Metadata aggregator. Requires free DPLA_API_KEY.',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'culture',

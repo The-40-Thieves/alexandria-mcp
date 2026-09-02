@@ -111,7 +111,7 @@ export async function courtlistenerRead(id: string): Promise<{
 
 register('courtlistener', {
   description:
-    'CourtListener — US federal and state court opinions. Free Law Project. Requires free COURTLISTENER_API_KEY (125 req/day authenticated cap since 2026-05-07).',
+    'CourtListener: US federal and state court opinions. Free Law Project. Requires free COURTLISTENER_API_KEY (125 req/day authenticated cap since 2026-05-07).',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'law',

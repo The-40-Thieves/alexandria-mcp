@@ -42,7 +42,7 @@ export async function digitalnzSearch(query: string, limit: number): Promise<Lib
 
 register('digitalnz', {
   description:
-    'DigitalNZ — New Zealand digital heritage including Māori and Pacific content. Keyless (rate-limited); set DIGITALNZ_API_KEY for a higher limit.',
+    'DigitalNZ: New Zealand digital heritage including Māori and Pacific content. Keyless (rate-limited); set DIGITALNZ_API_KEY for a higher limit.',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'culture',

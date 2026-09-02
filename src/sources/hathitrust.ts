@@ -3,7 +3,7 @@ import { fetchJSON } from '../utils/http.js';
 import { register } from './registry.js';
 
 // HathiTrust's Data API (the old /api/v2/volumes/search) was retired.
-// There is no public keyword-search API left — catalog.hathitrust.org/api
+// There is no public keyword-search API left; catalog.hathitrust.org/api
 // only supports a brief lookup by a known identifier (OCLC number, ISBN,
 // or HathiTrust volume id). search() therefore always returns [] (see
 // hathitrustSearch below); read() is the only working entry point.
@@ -99,7 +99,7 @@ export async function hathitrustRead(id: string): Promise<{
 
 register('hathitrust', {
   description:
-    'HathiTrust — 18M+ volumes digitized from research libraries. The Data API keyword-search endpoint was retired; search() always returns []. Look up a known volume by OCLC number, ISBN, or HathiTrust id via read("oclc:<n>" | "isbn:<n>" | "htid:<id>").',
+    'HathiTrust: 18M+ volumes digitized from research libraries. The Data API keyword-search endpoint was retired; search() always returns []. Look up a known volume by OCLC number, ISBN, or HathiTrust id via read("oclc:<n>" | "isbn:<n>" | "htid:<id>").',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'literature',

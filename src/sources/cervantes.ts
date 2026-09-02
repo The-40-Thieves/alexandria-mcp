@@ -6,7 +6,7 @@ import { register, truncateText } from './registry.js';
 
 const BASE = 'https://www.cervantesvirtual.com';
 const SPARQL_ENDPOINT = 'https://data.cervantesvirtual.com/sparql';
-// The linked-data graph (data.cervantesvirtual.com) — confirmed live 2026-09
+// The linked-data graph (data.cervantesvirtual.com), confirmed live 2026-09
 // via a discovery query (`SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a ?t } }`).
 // It is a Virtuoso store cataloguing works with RDA/MADS ontologies, not the
 // dcterms:BibliographicResource class the original spec assumed (that class
@@ -69,7 +69,7 @@ export function normalizeCervantesSparql(
     language: 'es',
     subjects: ['Spanish literature'],
     // The SPARQL catalog carries bibliographic metadata, not confirmed
-    // scrapable full text — unlike the curated catalog below.
+    // scrapable full text, unlike the curated catalog below.
     hasFullText: false,
     previewUrl: b.work.value,
   }));
@@ -190,7 +190,7 @@ export async function cervantesRead(id: string): Promise<{
     // SPARQL catalog entries have no confirmed scrapable full-text page;
     // read() would need a documented text-download link this dataset
     // doesn't expose. Caller sees this as metadataOnly at the registry
-    // level once wrapped — surface a clear error instead of scraping a
+    // level once wrapped; surface a clear error instead of scraping a
     // BVMC.Labs metadata page and calling that "full text".
     throw new Error(
       `Cervantes Virtual work ${id} has bibliographic metadata only via the SPARQL catalog; ` +
@@ -227,7 +227,7 @@ export async function cervantesRead(id: string): Promise<{
 
 register('cervantes', {
   description:
-    'Cervantes Virtual Library — Spanish and Portuguese literature. Search via the SPARQL linked-data catalog (data.cervantesvirtual.com); full text available for a small curated set of well-known works (Quijote, Lorca, Neruda, Borges, Rulfo, Calderón, San Juan de la Cruz).',
+    'Cervantes Virtual Library: Spanish and Portuguese literature. Search via the SPARQL linked-data catalog (data.cervantesvirtual.com); full text available for a small curated set of well-known works (Quijote, Lorca, Neruda, Borges, Rulfo, Calderón, San Juan de la Cruz).',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'literature',

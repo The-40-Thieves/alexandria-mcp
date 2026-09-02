@@ -47,7 +47,7 @@ function isoDate(d: Date): string {
 }
 
 // bioRxiv has no free-text search API (the old /search/biorxiv/{terms}/...
-// path was removed) — the only listing endpoint is a date-window details
+// path was removed); the only listing endpoint is a date-window details
 // feed. Page through the last 7 days and filter client-side by title/
 // abstract substring match; this can miss matches older than the window
 // or past MAX_PAGES, which is an inherent limitation of this approach.
@@ -95,7 +95,7 @@ export async function biorxivRead(doi: string): Promise<{
 
 register('biorxiv', {
   description:
-    'bioRxiv — biological sciences preprints. No API key required. bioRxiv has no free-text search API; search() lists the last 7 days of postings (paged, capped) and filters client-side by title/abstract match, so it can miss older matches or ones past the scan cap — use read(doi) directly when you already have a DOI.',
+    'bioRxiv: biological sciences preprints. No API key required. bioRxiv has no free-text search API; search() lists the last 7 days of postings (paged, capped) and filters client-side by title/abstract match, so it can miss older matches or ones past the scan cap. Use read(doi) directly when you already have a DOI.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'science',

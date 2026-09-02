@@ -5,7 +5,7 @@ import test from 'node:test';
 import { govinfoSearch, normalizeGovInfo } from '../govinfo.js';
 
 // Recorded from the shell using GovInfo's public DEMO_KEY (per the docs at
-// api.govinfo.gov/docs) — never used in code, only to capture this fixture.
+// api.govinfo.gov/docs), never used in code, only to capture this fixture.
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/govinfo-search.json'), 'utf8'),
 );

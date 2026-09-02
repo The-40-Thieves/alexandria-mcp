@@ -28,7 +28,7 @@ function getKey(): string {
   const key = process.env.GOOGLE_BOOKS_API_KEY;
   if (!key)
     throw new Error(
-      'Google Books requires GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted — ' +
+      'Google Books requires GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted, ' +
         'confirmed live: every unauthenticated request returns 429 "Quota exceeded"). ' +
         'Create a free key at: https://console.cloud.google.com/apis/credentials then set GOOGLE_BOOKS_API_KEY.',
     );
@@ -124,7 +124,7 @@ export async function googleBooksRead(id: string): Promise<{
 
 register('googlebooks', {
   description:
-    'Google Books — 40M+ books. Full text for public domain titles; preview snippets for in-copyright works. Requires free GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted).',
+    'Google Books: 40M+ books. Full text for public domain titles; preview snippets for in-copyright works. Requires free GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted).',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'literature',

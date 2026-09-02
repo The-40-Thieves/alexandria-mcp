@@ -296,12 +296,12 @@ export function sacredTextsSearch(query: string, limit = 10): LibraryResult[] {
 }
 
 // sacred-texts.com returns HTTP 403 to unauthenticated/automated requests
-// (confirmed live 2026-09 — the whole site is bot-gated, not just this
+// (confirmed live 2026-09, the whole site is bot-gated, not just this
 // scraper's request shape). read() no longer attempts to scrape it; the
 // curated registry search still works entirely offline.
 register('sacredtexts', {
   description:
-    'Sacred-Texts.com — curated registry of religious/philosophical texts: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism. The live site is bot-gated (HTTP 403); read() returns metadata only.',
+    'Sacred-Texts.com: curated registry of religious/philosophical texts: Quran, Sufi corpus, Vedanta, Buddhism, Taoism, Hermeticism, Christian mysticism. The live site is bot-gated (HTTP 403); read() returns metadata only.',
   supportsIngest: true,
   kind: 'scrape',
   cluster: 'literature',
@@ -326,7 +326,7 @@ register('sacredtexts', {
       language: entry.language,
       metadataOnly: true,
       externalUrl: entry.tocUrl,
-      note: 'sacred-texts.com returns HTTP 403 to automated requests (bot-gated) — full text is not fetchable. Visit externalUrl directly in a browser.',
+      note: 'sacred-texts.com returns HTTP 403 to automated requests (bot-gated); full text is not fetchable. Visit externalUrl directly in a browser.',
     };
   },
 });

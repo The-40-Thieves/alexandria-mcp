@@ -20,7 +20,7 @@ test('openitiSearch falls back to the unauthenticated Trees API when GITHUB_TOKE
     const out = await openitiSearch('hadith', 5);
     assert.ok(out.length > 0);
     // The .yml metadata file and non-data/ paths (.gitignore, README.md)
-    // must be filtered out — only the leaf text file should match.
+    // must be filtered out; only the leaf text file should match.
     assert.ok(out.every((r) => !r.id.includes('.yml')));
     assert.ok(out.every((r) => r.id.includes('data/')));
     assert.equal(out[0].authors[0], '0476IbnAbiSaqrAnbari');
@@ -61,7 +61,7 @@ test('openitiSearch uses GitHub code search when GITHUB_TOKEN is set', async () 
       out[0].id,
       '0500AH||data/0505Ghazali/0505Ghazali.IhyaCulumDin/0505Ghazali.IhyaCulumDin.Shamela0011606-ara1',
     );
-    assert.equal(out[0].title, '0505Ghazali — IhyaCulumDin');
+    assert.equal(out[0].title, '0505Ghazali, IhyaCulumDin');
   } finally {
     globalThis.fetch = originalFetch;
     if (savedToken !== undefined) process.env.GITHUB_TOKEN = savedToken;

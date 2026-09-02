@@ -96,7 +96,7 @@ export async function earlyprintRead(id: string): Promise<{
 
 register('earlyprint', {
   description:
-    'EarlyPrint — 60,000+ Early Modern English texts (EEBO/ECCO/Evans TCP), 1473–1700. Linguistically annotated. BlackLab-indexed. Hidden: the eplab.artsci.wustl.edu BlackLab catalog is returning 404 as of 2026-09; re-enable once it returns.',
+    'EarlyPrint: 60,000+ Early Modern English texts (EEBO/ECCO/Evans TCP), 1473-1700. Linguistically annotated. BlackLab-indexed. Hidden: the eplab.artsci.wustl.edu BlackLab catalog is returning 404 as of 2026-09; re-enable once it returns.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'literature',

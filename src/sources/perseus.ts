@@ -227,7 +227,7 @@ export async function perseusRead(id: string): Promise<{
 
 register('perseus', {
   description:
-    'Perseus Digital Library — classical Greek, Latin, and Arabic texts with translations, served via the Scaife reading environment.',
+    'Perseus Digital Library: classical Greek, Latin, and Arabic texts with translations, served via the Scaife reading environment.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'literature',

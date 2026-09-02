@@ -63,7 +63,7 @@ interface TroveResponse {
 }
 
 // The work-record schema (per Trove's API technical guide): identifiers
-// carry a link type — "fulltext" is the one worth following. They show up
+// carry a link type: "fulltext" is the one worth following. They show up
 // both at the work level and per-version.
 interface TroveIdentifier {
   type?: string;
@@ -111,7 +111,7 @@ function stripArticleHtml(html: string): string {
 // Trove's canonical newspaper article URL is
 // https://trove.nla.gov.au/newspaper/article/{articleId}, and the
 // article's own record id (e.g. "nla.news-article18341291") embeds the
-// same number — look for either form among a work's fulltext identifiers.
+// same number; look for either form among a work's fulltext identifiers.
 function findNewspaperArticleId(record: TroveWorkRecord): string | undefined {
   const allIdentifiers = [
     ...(record.identifier ?? []),
@@ -174,7 +174,7 @@ function metadataOnlyRead(id: string, title?: string, authors?: string[]): Trove
 export async function troveRead(id: string): Promise<TroveReadResult> {
   const key = process.env.TROVE_API_KEY;
   // No key: keep the pre-Stage-2 metadata-only shape exactly (no NLA calls
-  // at all — nothing to cap against recordFullTextRead()).
+  // at all, nothing to cap against recordFullTextRead()).
   if (!key) return metadataOnlyRead(id);
 
   const params = new URLSearchParams({
@@ -202,7 +202,7 @@ export async function troveRead(id: string): Promise<TroveReadResult> {
       if (rawText) {
         const text = stripArticleHtml(rawText);
         if (text.length > 20) {
-          // Full text is actually being returned to the caller — count it
+          // Full text is actually being returned to the caller; count it
           // against the NLA data-agreement session cap.
           recordFullTextRead();
           return {
@@ -223,7 +223,7 @@ export async function troveRead(id: string): Promise<TroveReadResult> {
 
 register('trove', {
   description:
-    'Trove (NLA Australia) — 340M+ items from Australian libraries, newspapers, archives. Requires free TROVE_API_KEY. Full text is fetched only for newspaper articles that carry a fulltext link; other categories stay metadata-only. Governed by an NLA data agreement: live calls only, no storage, capped full-text reads per session.',
+    'Trove (NLA Australia): 340M+ items from Australian libraries, newspapers, archives. Requires free TROVE_API_KEY. Full text is fetched only for newspaper articles that carry a fulltext link; other categories stay metadata-only. Governed by an NLA data agreement: live calls only, no storage, capped full-text reads per session.',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'archives',

@@ -282,7 +282,7 @@ export async function youtubeRead(id: string): Promise<YoutubeReadResult> {
 
 register('youtube', {
   description:
-    'YouTube — video search via the official Data API v3 (requires YOUTUBE_API_KEY, ~100 searches/day). Transcripts prefer Supadata (SUPADATA_API_KEY, a maintained third-party transcript service) when configured; otherwise fall back to an undocumented endpoint since no official transcript API exists for third-party videos — same risk profile as codewiki (can break without notice, ToS gray area for automated access; low-volume personal/research use only). No ingest: transcripts stay read-only, never indexed.',
+    'YouTube: video search via the official Data API v3 (requires YOUTUBE_API_KEY, ~100 searches/day). Transcripts prefer Supadata (SUPADATA_API_KEY, a maintained third-party transcript service) when configured; otherwise fall back to an undocumented endpoint since no official transcript API exists for third-party videos, same risk profile as codewiki (can break without notice, ToS gray area for automated access; low-volume personal/research use only). No ingest: transcripts stay read-only, never indexed.',
   supportsIngest: false,
   kind: 'rest',
   cluster: 'video',

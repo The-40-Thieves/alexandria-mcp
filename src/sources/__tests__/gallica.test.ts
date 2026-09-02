@@ -5,7 +5,7 @@ import test from 'node:test';
 import { normalizeGallica } from '../gallica.js';
 
 // Recorded shape is transcribed from Gallica's documented SRU/DC response
-// (see the fixture's own header comment) — the endpoint currently returns
+// (see the fixture's own header comment); the endpoint currently returns
 // an ALTCHA bot-check page to this sandbox's egress IP rather than XML.
 const xml = readFileSync(path.resolve(process.cwd(), 'eval/fixtures/gallica-search.xml'), 'utf8');
 

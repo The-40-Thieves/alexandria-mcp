@@ -3,7 +3,7 @@
   by an ALTCHA bot-check (curl from the shell returns a "Verification de
   securite" HTML page for GET requests to
   gallica.bnf.fr/services/engine/search/sru, and a 500
-  "Could not resolve view with name 'altcha'" for others — evidenced
+  "Could not resolve view with name 'altcha'" for others, evidenced
   2026-09-01). This fixture is transcribed from Gallica's documented SRU/DC
   response shape (the same oai_dc:dc-in-srw:record wrapper the pre-Stage-2
   adapter already parsed, just single- rather than double-encoded query and

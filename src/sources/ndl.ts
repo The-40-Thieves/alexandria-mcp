@@ -35,7 +35,7 @@ function toArray(val: unknown): unknown[] {
 }
 
 // First matching value for `key` found anywhere under `obj`, depth-first in
-// document order — dcndl records nest the fields we want at varying depths
+// document order; dcndl records nest the fields we want at varying depths
 // (and a record can repeat dcndl:BibResource as a near-empty stub), so a
 // deep search for the first occurrence is more robust than a fixed path.
 function findDeep(obj: unknown, key: string): unknown {

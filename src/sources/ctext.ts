@@ -8,7 +8,7 @@ import { register, truncateText } from './registry.js';
 // current api.ctext.org REST API. Ids are now ctp: URNs (e.g. "ctp:analects")
 // instead of bare titleids. gettextinfo is keyless; gettext (the actual
 // passage text) is restricted to registered IPs or an API key per ctext's
-// own docs (https://ctext.org/tools/api) — pass CTEXT_API_KEY if set, and
+// own docs (https://ctext.org/tools/api); pass CTEXT_API_KEY if set, and
 // surface the live "requires authentication" error clearly otherwise.
 const API = 'https://api.ctext.org';
 
@@ -31,7 +31,7 @@ interface CtextTextInfo extends CtextApiError {
   topurn?: string;
   workurn?: string;
   // Present for some multi-chapter works; absent for others (observed live
-  // on 2026-09-01 — gettextinfo for "ctp:analects" carries no chapter list).
+  // on 2026-09-01, gettextinfo for "ctp:analects" carries no chapter list).
   chapters?: Array<{ title: string; urn: string }>;
   books?: Array<{ title: string; urn: string }>;
 }
@@ -128,7 +128,7 @@ export async function ctextRead(id: string): Promise<{
 
 register('ctext', {
   description:
-    'Chinese Text Project — pre-Qin and Han dynasty classical Chinese texts with English translations. Full-text read requires a registered IP or optional CTEXT_API_KEY per ctext.org/tools/api; search stays keyless.',
+    'Chinese Text Project: pre-Qin and Han dynasty classical Chinese texts with English translations. Full-text read requires a registered IP or optional CTEXT_API_KEY per ctext.org/tools/api; search stays keyless.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'literature',

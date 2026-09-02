@@ -14,7 +14,7 @@ export function normalizeStandardEbooksSearch(html: string, limit: number): Libr
   const root = parse(html);
   // The page has other <li>s outside the results list (nav menus etc.), so
   // filter to entries that actually look like a book (typeof="schema:Book")
-  // before slicing to `limit` — slicing first can leave a well-populated
+  // before slicing to `limit`; slicing first can leave a well-populated
   // results list under-represented if unrelated <li>s sort earlier in the DOM.
   const items = root
     .querySelectorAll('li')

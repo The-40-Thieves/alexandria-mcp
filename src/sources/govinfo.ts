@@ -106,7 +106,7 @@ export async function govinfoRead(id: string): Promise<{
 
 register('govinfo', {
   description:
-    'GovInfo — US Congressional Record, Federal Register, US Code, Bills, CFR, and more. GPO official archive. Requires free GOVINFO_API_KEY.',
+    'GovInfo: US Congressional Record, Federal Register, US Code, Bills, CFR, and more. GPO official archive. Requires free GOVINFO_API_KEY.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'government',

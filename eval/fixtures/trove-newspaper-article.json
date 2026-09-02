@@ -1,5 +1,5 @@
 {
-  "_source_note": "See trove-work.json's _source_note — schema-derived, not freshly recorded, matching Trove's documented articleText example verbatim (api-technical-guide, 'articleText' row).",
+  "_source_note": "See trove-work.json's _source_note: schema-derived, not freshly recorded, matching Trove's documented articleText example verbatim (api-technical-guide, 'articleText' row).",
   "article": {
     "id": "18341291",
     "heading": "SHIPPING INTELLIGENCE.",

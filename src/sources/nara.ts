@@ -96,7 +96,7 @@ export async function naraRead(id: string): Promise<{
 
 register('nara', {
   description:
-    'US National Archives (NARA) — 32M+ descriptions of historical government records: war diaries, presidential papers, military records, federal agencies. Requires free NARA_API_KEY.',
+    'US National Archives (NARA): 32M+ descriptions of historical government records: war diaries, presidential papers, military records, federal agencies. Requires free NARA_API_KEY.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'archives',

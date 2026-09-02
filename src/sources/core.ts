@@ -48,7 +48,7 @@ export function normalizeCore(data: CoreSearchResponse): LibraryResult[] {
 
 export async function coreSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   // Trailing slash: a bare /search/works?... 301-redirects to /search/works/
-  // (confirmed live) — request the final URL directly.
+  // (confirmed live); request the final URL directly.
   const data = await fetchJSON<CoreSearchResponse>(
     `${BASE}/search/works/?q=${encodeURIComponent(query)}&limit=${limit}`,
     { headers: headers() },
@@ -77,7 +77,7 @@ export async function coreRead(id: string): Promise<{
 
 register('core', {
   description:
-    'CORE — 57M+ open access research papers with full text. Broadest OA academic aggregator across all disciplines. Requires free CORE_API_KEY.',
+    'CORE: 57M+ open access research papers with full text. Broadest OA academic aggregator across all disciplines. Requires free CORE_API_KEY.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'academic',

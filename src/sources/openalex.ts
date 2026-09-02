@@ -100,7 +100,7 @@ export async function openalexRead(id: string): Promise<{
 
 register('openalex', {
   description:
-    'OpenAlex — 200M+ scholarly works. Free replacement for Scopus/Web of Science. Covers all disciplines. No API key required (set CONTACT_EMAIL for the polite pool, or OPENALEX_API_KEY for the paid tier).',
+    'OpenAlex: 200M+ scholarly works. Free replacement for Scopus/Web of Science. Covers all disciplines. No API key required (set CONTACT_EMAIL for the polite pool, or OPENALEX_API_KEY for the paid tier).',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'academic',

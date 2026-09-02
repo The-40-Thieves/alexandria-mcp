@@ -12,7 +12,7 @@ export interface ProbeResult {
 }
 
 // Sources whose search() is expected to return [] by design (not a live
-// failure) — e.g. hathitrust, whose only remaining public endpoint is a
+// failure), e.g. hathitrust, whose only remaining public endpoint is a
 // lookup-by-identifier, not a keyword search. An OK -> EMPTY transition for
 // one of these is not a regression.
 export const EXPECTED_EMPTY = new Set<string>(['hathitrust']);
@@ -26,7 +26,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   codewiki: 'react hooks',
   youtube: 'lecture',
   // api.ctext.org's searchtexts does a case-sensitive prefix match against
-  // its English title index — "analects" returns zero books, "Analects" does.
+  // its English title index: "analects" returns zero books, "Analects" does.
   ctext: 'Analects',
   openiti: 'hadith',
   nasa: 'mars rover',
@@ -59,7 +59,7 @@ export function regressions(
       const now_ = now[s];
       if (now_ === undefined || now_.status === 'OK') return false;
       // An unconfigured key (no env var set in this environment) is expected
-      // for a source that declares auth — only a source with no auth
+      // for a source that declares auth; only a source with no auth
       // declared going from OK to KEY_MISSING is a real regression.
       if (now_.status === 'KEY_MISSING' && hasAuth(s)) return false;
       if (now_.status === 'EMPTY' && EXPECTED_EMPTY.has(s)) return false;

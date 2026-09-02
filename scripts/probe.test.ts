@@ -21,7 +21,7 @@ test('probe classification', async (t) => {
   await t.test('KEY_MISSING when the error names a missing key/token/env', () => {
     assert.equal(
       classify({ results: null, error: new Error('CORE_API_KEY is not set') }),
-      'ERROR', // "is not set" doesn't match "requires .* (key|token|env)" — see next cases
+      'ERROR', // "is not set" doesn't match "requires .* (key|token|env)", see next cases
     );
     assert.equal(
       classify({
@@ -35,7 +35,7 @@ test('probe classification', async (t) => {
         results: null,
         error: new Error('YOUTUBE_API_KEY is required for the youtube source'),
       }),
-      'ERROR', // "is required" doesn't match "requires" either — see openiti-style wording below
+      'ERROR', // "is required" doesn't match "requires" either, see openiti-style wording below
     );
     assert.equal(
       classify({

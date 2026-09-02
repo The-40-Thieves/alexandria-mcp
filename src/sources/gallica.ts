@@ -9,7 +9,7 @@ const FULLTEXT = 'https://gallica.bnf.fr/services/engine/fulltext';
 
 // removeNSPrefix strips namespace prefixes uniformly, so "srw:record"
 // parses as "record" and "dc:title" (inside the oai_dc:dc wrapper) parses
-// as "title" — both prefixes collapse to the same unprefixed keys below.
+// as "title": both prefixes collapse to the same unprefixed keys below.
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -67,7 +67,7 @@ export function normalizeGallica(xml: string, limit: number): LibraryResult[] {
 
 export async function gallicaSearch(query: string, limit: number): Promise<LibraryResult[]> {
   // The previous code built `query` with a template literal and then let
-  // URLSearchParams encode it — but the SRU service also needs the inner
+  // URLSearchParams encode it, but the SRU service also needs the inner
   // quotes/parens literally, so passing the same string through
   // encodeURIComponent (as URLSearchParams does) a second time via a
   // pre-encoded template double-encoded it. Let URLSearchParams encode the
