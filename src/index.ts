@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { indexText, ingestText } from './pipeline/index.js';
 import { getAdapter, listSources } from './sources/registry.js';
 import { s2Recommend } from './sources/semanticscholar.js';
+import { libraryAnswer } from './tools/libraryAnswer.js';
 import { libraryAsk } from './tools/libraryAsk.js';
 import type { LibrarySource } from './types.js';
 
@@ -312,6 +313,68 @@ server.registerTool(
           ? `No recommendations for paper ${id}.`
           : JSON.stringify(results, null, 2);
       return { content: [{ type: 'text', text }], structuredContent: { results } };
+    } catch (err) {
+      return {
+        content: [
+          { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+        ],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ── library_answer ────────────────────────────────────────────────────────────
+server.registerTool(
+  'library_answer',
+  {
+    title: 'Answer With Cited Sources',
+    description: `Ask a question in plain English and get a synthesized answer with inline [n] citations. Routes and searches like library_ask, fuses the per-source results with reciprocal rank fusion, reads the top full-text results, and asks an LLM to answer using only those sources. Every factual sentence is cited or marked "not found in the sources"; sentences with a dangling citation are dropped.
+
+Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY).
+Returns: { answer, citations[], results[], routing[] }`,
+    inputSchema: {
+      query: z.string().min(1).max(1000).describe('Natural language question'),
+      max_sources: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(6)
+        .describe('Max number of sources to search (default 6)'),
+      results_per_source: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(5)
+        .describe('Results to fetch per source (default 5)'),
+      read_top: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .default(4)
+        .describe('How many top full-text results to read and cite (default 4)'),
+    },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ query, max_sources, results_per_source, read_top }) => {
+    try {
+      const result = await libraryAnswer(query, {
+        maxSources: max_sources,
+        resultsPerSource: results_per_source,
+        readTop: read_top,
+      });
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        structuredContent: toStructured(result),
+      };
     } catch (err) {
       return {
         content: [

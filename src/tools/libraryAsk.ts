@@ -17,7 +17,7 @@ import type { LibraryResult } from '../types.js';
 import { type CatalogEntry, candidates } from '../utils/catalogIndex.js';
 import { chatJSON } from '../utils/providers.js';
 
-interface RouteItem {
+export interface RouteItem {
   source: string;
   query: string;
   reason: string;
