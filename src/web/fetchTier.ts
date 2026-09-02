@@ -29,7 +29,7 @@
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
 import { parseHTML } from 'linkedom';
-import { fetchJSON, fetchWithRetry } from '../utils/http.js';
+import { fetchWithRetry } from '../utils/http.js';
 
 // defuddle/node only declares an ESM "import" condition (no "require"), and
 // this package compiles to CommonJS (no "type": "module" in package.json,
@@ -290,12 +290,16 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
 // Rejects fast on an honest, oversized Content-Length; otherwise streams the
 // body counting bytes and aborts once the running total passes the cap, so a
 // server that lies about (or omits) Content-Length can't force this process
-// to buffer an unbounded response.
-async function readCappedText(response: Response, url: string): Promise<string> {
+// to buffer an unbounded response. Shared by all three tiers (defuddle
+// fetches directly; jina and crawl4ai delegate the fetch but the response
+// still flows through this process), each tagging its own error messages
+// with `label` so a cap failure reads the same way callers already expect
+// (`/defuddle:/`, `/jina:/`, `/crawl4ai:/` in fetchAsText's error).
+async function readCappedText(response: Response, url: string, label: string): Promise<string> {
   const declared = response.headers.get('content-length');
   if (declared && Number(declared) > MAX_RESPONSE_BYTES) {
     throw new Error(
-      `defuddle: response for ${url} declares ${declared} bytes, over the ${MAX_RESPONSE_BYTES}-byte cap`,
+      `${label}: response for ${url} declares ${declared} bytes, over the ${MAX_RESPONSE_BYTES}-byte cap`,
     );
   }
   const body = response.body;
@@ -312,7 +316,7 @@ async function readCappedText(response: Response, url: string): Promise<string> 
       if (total > MAX_RESPONSE_BYTES) {
         await reader.cancel().catch(() => {});
         throw new Error(
-          `defuddle: response for ${url} exceeded the ${MAX_RESPONSE_BYTES}-byte cap while streaming`,
+          `${label}: response for ${url} exceeded the ${MAX_RESPONSE_BYTES}-byte cap while streaming`,
         );
       }
       chunks.push(value);
@@ -351,6 +355,11 @@ async function fetchFollowingRedirects(
     if (!REDIRECT_STATUSES.has(response.status)) {
       return { response, finalUrl: currentUrl };
     }
+    // A redirect hop's body is never read (redirects carry at most a short
+    // HTML stub, if anything); drain/cancel it here so the connection can be
+    // released back to the pool instead of sitting open until GC finalizes
+    // the unread stream.
+    await response.body?.cancel().catch(() => {});
     if (hop >= MAX_REDIRECTS) {
       throw new Error(
         `fetchAsText: more than ${MAX_REDIRECTS} redirects starting from ${startUrl}`,
@@ -385,7 +394,7 @@ async function tryDefuddle(url: string): Promise<FetchedPage | null> {
       `defuddle: response for ${finalUrl} is not HTML (content-type: ${contentType})`,
     );
   }
-  const html = await readCappedText(response, finalUrl);
+  const html = await readCappedText(response, finalUrl, 'defuddle');
   const { document } = parseHTML(html);
   const Defuddle = await loadDefuddle();
   const result = await Defuddle(document, finalUrl, { markdown: true });
@@ -420,7 +429,7 @@ async function tryJinaReader(url: string): Promise<FetchedPage> {
   if (!response.ok) {
     throw new Error(`jina: HTTP ${response.status} ${response.statusText} fetching ${url}`);
   }
-  const raw = await response.text();
+  const raw = await readCappedText(response, url, 'jina');
   const page = parseJinaPlainText(raw, url);
   if (!page.text) throw new Error(`jina: empty reader response for ${url}`);
   return page;
@@ -448,11 +457,12 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
   await assertFetchableUrl(url);
   const base = process.env.CRAWL4AI_URL;
   if (!base) throw new Error('crawl4ai: CRAWL4AI_URL is not set');
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { Accept: 'application/json' };
   const token = process.env.CRAWL4AI_API_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
-  const data = await fetchJSON<Crawl4aiResponse>(
-    `${base.replace(/\/$/, '')}/crawl`,
+  const crawlUrl = `${base.replace(/\/$/, '')}/crawl`;
+  const response = await fetchWithRetry(
+    crawlUrl,
     {
       method: 'POST',
       headers,
@@ -463,6 +473,13 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
     },
     FETCH_TIMEOUT_MS,
   );
+  if (!response.ok) {
+    throw new Error(`crawl4ai: HTTP ${response.status} ${response.statusText} fetching ${url}`);
+  }
+  // fetchJSON() calls response.json() directly with no size cap; this tier
+  // reads through the same capped path as the other two instead.
+  const raw = await readCappedText(response, crawlUrl, 'crawl4ai');
+  const data = JSON.parse(raw) as Crawl4aiResponse;
   const result = data.results?.[0];
   if (!result || result.success === false) {
     throw new Error(`crawl4ai: failed to render ${url}`);

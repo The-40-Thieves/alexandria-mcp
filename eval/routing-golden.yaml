@@ -1,0 +1,211 @@
+# Routing golden set (THE-320). Each entry names a natural-language query
+# and the 1-3 sources a correct stage-1/stage-2 selection should surface,
+# written by hand from each source's own registry description (see
+# docs/sources.md or run `library_list_sources`). Loaded by
+# scripts/eval-routing.ts to score nDCG@5 and recall@5.
+#
+# A source may be `hidden` (needs an API key not set in this environment);
+# the unit test that checks every `expected` name is real validates against
+# listSources() (which includes hidden sources), not catalog() (which
+# doesn't) - a hidden expected source is a legitimate, if currently
+# unreachable, answer.
+
+# ── academic ────────────────────────────────────────────────────────────────
+- query: recent preprints on diffusion models for music generation
+  expected: [arxiv]
+- query: open access papers on climate change across all academic disciplines
+  expected: [openalex, doaj]
+- query: biomedical literature on CRISPR gene editing with full text
+  expected: [europmc, plos]
+- query: psychology preprints on cognitive bias from OSF
+  expected: [osf]
+- query: Cambridge University theses and working papers
+  expected: [apollo]
+
+# ── ai_research ─────────────────────────────────────────────────────────────
+- query: machine learning papers with their code implementations
+  expected: [paperswithcode]
+- query: trending AI research papers with community upvotes this week
+  expected: [hfpapers, huggingface]
+
+# ── archives ─────────────────────────────────────────────────────────────────
+- query: US newspapers from the early 1900s with full OCR text
+  expected: [chroniclingamerica, loc]
+- query: US military records and war diaries from World War II
+  expected: [nara]
+- query: Australian newspaper and library archives
+  expected: [trove]
+
+# ── culture ──────────────────────────────────────────────────────────────────
+- query: European cultural heritage items from museums and libraries
+  expected: [europeana]
+- query: New Zealand Maori and Pacific digital heritage collections
+  expected: [digitalnz]
+- query: digitized documents from the French national library
+  expected: [gallica]
+- query: Smithsonian air and space museum records
+  expected: [smithsonian]
+- query: rare cultural heritage items from the World Digital Library
+  expected: [wdl]
+
+# ── developer ────────────────────────────────────────────────────────────────
+- query: source code documentation for the fastify web framework
+  expected: [codewiki]
+- query: npm package left-pad maintainers
+  expected: [ecosystems, depsdev]
+- query: Python Enhancement Proposal for structural pattern matching
+  expected: [peps]
+- query: Hacker News discussion threads about Rust
+  expected: [hn]
+- query: current stage of a JavaScript language proposal
+  expected: [tc39]
+- query: Swift Evolution proposal status
+  expected: [swiftevolution]
+- query: Stack Overflow question about async iterators
+  expected: [stackexchange]
+
+# ── economics ────────────────────────────────────────────────────────────────
+- query: Case-Shiller home price index last 12 months
+  expected: [fred, dbnomics]
+- query: US Census Bureau dataset catalog
+  expected: [census]
+- query: EPA toxics release inventory facility search
+  expected: [epatri]
+- query: USD to EUR exchange rate today
+  expected: [frankfurter]
+- query: international merchandise trade statistics by HS commodity code
+  expected: [comtrade]
+
+# ── geopolitical ─────────────────────────────────────────────────────────────
+- query: Hormuz shipping disruption this week
+  expected: [gdelt, aljazeera, almonitor]
+- query: conflict events and organized violence in Sudan
+  expected: [ucdp, hapi]
+- query: humanitarian situation reports for Gaza from UN OCHA
+  expected: [reliefweb]
+
+# ── government ───────────────────────────────────────────────────────────────
+- query: US federal bill search on health care
+  expected: [congress]
+- query: Federal Register rules published today
+  expected: [federalregister]
+- query: UK Parliament bills before the House of Commons
+  expected: [ukparliament]
+- query: US government open data catalog
+  expected: [datagov]
+
+# ── law ──────────────────────────────────────────────────────────────────────
+- query: UK Acts of Parliament on data protection
+  expected: [legislation]
+- query: Scottish Parliament legislation on education
+  expected: [legislationscot]
+- query: US federal court opinions on patent law
+  expected: [courtlistener]
+
+# ── literature ───────────────────────────────────────────────────────────────
+- query: Pride and Prejudice full text
+  expected: [gutenberg, standardebooks]
+- query: public domain ebooks from before 1928
+  expected: [gutenberg]
+- query: classical Greek and Latin texts with English translations
+  expected: [perseus, internetclassics]
+- query: pre-Qin and Han dynasty classical Chinese texts
+  expected: [ctext]
+- query: Scandinavian literature by Ibsen and Strindberg
+  expected: [projectruneberg]
+- query: socialist and critical theory texts by Gramsci
+  expected: [marxists]
+- query: Early Modern English texts from EEBO and ECCO
+  expected: [earlyprint]
+- query: Spanish and Portuguese literature full text
+  expected: [cervantes]
+
+# ── markets ──────────────────────────────────────────────────────────────────
+- query: Bitcoin price and market cap
+  expected: [coingecko]
+- query: stock symbol search for Apple across global exchanges
+  expected: [twelvedata]
+
+# ── news_global ──────────────────────────────────────────────────────────────
+- query: breaking world news today
+  expected: [gdelt, wikicurrent, googlenews]
+- query: Guardian investigative journalism full article text
+  expected: [guardian]
+- query: real-time global news article search
+  expected: [newsdata]
+
+# ── news_regional ────────────────────────────────────────────────────────────
+- query: Middle East news analysis and commentary
+  expected: [aljazeera, almonitor, arabnews]
+- query: pan-African news aggregator
+  expected: [allafrica, dailymaverick]
+- query: Asia-Pacific current affairs magazine coverage
+  expected: [thediplomat, nikkeiasia]
+- query: Japanese public broadcaster world news headlines
+  expected: [nhk]
+- query: Hong Kong based coverage of China and Asia
+  expected: [scmp]
+- query: German public international broadcaster news
+  expected: [dw, france24]
+- query: technology news from the Global South
+  expected: [restofworld]
+
+# ── real_estate ──────────────────────────────────────────────────────────────
+- query: HUD fair market rent benchmarks by ZIP code
+  expected: [hud]
+- query: US rental and sale market statistics by ZIP code
+  expected: [rentcast]
+
+# ── science ──────────────────────────────────────────────────────────────────
+- query: NASA astrophysics data system research papers
+  expected: [nasaads]
+- query: biology preprints on bioRxiv
+  expected: [biorxiv]
+- query: Department of Energy nuclear and materials science research
+  expected: [osti]
+- query: NIH funded research project abstracts
+  expected: [nih]
+- query: biodiversity heritage literature on botany and zoology
+  expected: [bhl]
+- query: NASA technical reports on aeronautics
+  expected: [nasa]
+
+# ── security ─────────────────────────────────────────────────────────────────
+- query: CVE-2026-1234 exploitation status
+  expected: [circl, kev, epss]
+- query: CISA known exploited vulnerabilities catalog
+  expected: [kev]
+- query: MITRE ATT&CK adversary tactics and techniques
+  expected: [attack]
+- query: Common Weakness Enumeration CWE-79
+  expected: [cwe]
+- query: Microsoft security update guide advisories
+  expected: [msrc]
+- query: npm package lodash vulnerability advisory
+  expected: [osv, ghsa]
+- query: Cisco PSIRT security advisories
+  expected: [cisco-psirt]
+- query: exploit probability score for a CVE in the next 30 days
+  expected: [epss]
+
+# ── standards ────────────────────────────────────────────────────────────────
+- query: RFC search for HTTP/3
+  expected: [ietf]
+- query: W3C specification for WebSockets
+  expected: [w3c]
+- query: NIST draft publication open for public comment
+  expected: [nist-csrc]
+
+# ── video ────────────────────────────────────────────────────────────────────
+- query: lecture video on machine learning fundamentals
+  expected: [youtube]
+
+# ── web ──────────────────────────────────────────────────────────────────────
+- query: live web search for current events
+  expected: [jina, jinasearch]
+- query: fetch and extract the text of a web page URL
+  expected: [webfetch]
+- query: privacy respecting metasearch engine results
+  expected: [searxng]
+- query: web search API purpose built for LLM agents
+  expected: [tavily]

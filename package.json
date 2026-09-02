@@ -10,6 +10,7 @@
     "test": "npx tsx --test --test-reporter=spec 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
     "probe": "npx tsx scripts/probe.ts",
     "probe:baseline": "npx tsx scripts/probe.ts --baseline",
+    "eval:routing": "npx tsx scripts/eval-routing.ts",
     "lint": "biome check .",
     "gate": "npm run build && npm test && npm run lint"
   },
@@ -47,6 +48,7 @@
     "node-html-parser": "^9.0.2",
     "openai": "^7.8.0",
     "p-limit": "^7.3.0",
+    "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
