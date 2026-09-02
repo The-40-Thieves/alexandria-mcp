@@ -73,6 +73,7 @@ import './peps.js';
 import './tc39.js';
 import './swiftevolution.js';
 import './mdn.js';
+import './context7.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';
