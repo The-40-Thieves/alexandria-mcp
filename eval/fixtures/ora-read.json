@@ -1,0 +1,28 @@
+{
+  "links": {
+    "self": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52"
+  },
+  "data": {
+    "id": "uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52",
+    "attributes": {
+      "title": "Exploring science capital with primary-school-aged children",
+      "type_of_work": {
+        "id": "https://ora.ox.ac.uk/objects/uuid:8e985971-f0d9-4a7e-8be1-70a9c531dc52#type_of_work",
+        "type": "document_value",
+        "attributes": {
+          "value": [
+            "Thesis"
+          ],
+          "label": "Type"
+        }
+      },
+      "abstract": {
+        "attributes": {
+          "value": [
+            "It is widely recognised that there is an urgent need to make access to and engagement in science,\r\ntechnology, engineering, and maths (STEM) education more equitable, from both a social justice and\r\neconomic perspective. The concept of science capital has been used as a tool to understand patterns\r\nin young people’s perceptions of science, science identity and aspirations, with those categorised a"
+          ]
+        }
+      }
+    }
+  }
+}

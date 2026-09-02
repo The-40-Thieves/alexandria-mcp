@@ -2,79 +2,74 @@ import type { LibraryResult } from '../types.js';
 import { fetchJSON } from '../utils/http.js';
 import { register, truncateText } from './registry.js';
 
-const BASE_URL = 'https://ora.ox.ac.uk/api';
+const BASE_URL = 'https://ora.ox.ac.uk';
 
-interface ORAPersonOrOrg {
-  name?: string;
-  family_name?: string;
-  given_name?: string;
+// ORA's public JSON is JSON:API-flavoured: most fields are wrapped as
+// { attributes: { value: [...] } } "document_value" nodes rather than plain
+// scalars.
+interface ORADocumentValue {
+  attributes?: { value?: Array<string | number> };
 }
 
-interface ORACreator {
-  person_or_org?: ORAPersonOrOrg;
+interface ORAAttributes {
+  title?: string;
+  index_authors?: ORADocumentValue;
+  rights_copyright_date?: ORADocumentValue;
+  abstract?: ORADocumentValue;
+  type_of_work?: ORADocumentValue;
 }
 
-interface ORAFilesEntry {
-  key: string;
-  links?: { content?: string };
-}
-
-interface ORARecord {
+interface ORAObject {
   id: string;
-  metadata?: {
-    title?: string;
-    creators?: ORACreator[];
-    publication_date?: string;
-    description?: string;
-    subjects?: Array<{ subject: string }>;
-    languages?: Array<{ id: string }>;
-    resource_type?: { id?: string };
-  };
-  files?: {
-    enabled?: boolean;
-    entries?: Record<string, ORAFilesEntry>;
-  };
+  attributes?: ORAAttributes;
 }
 
-interface ORAResponse {
-  hits?: { total?: number; hits?: ORARecord[] };
+interface ORASearchResponse {
+  data?: ORAObject[];
 }
 
-function creatorName(c: ORACreator): string {
-  const p = c.person_or_org;
-  if (!p) return '';
-  if (p.name) return p.name;
-  return [p.given_name, p.family_name].filter(Boolean).join(' ');
+interface ORAReadResponse {
+  data?: ORAObject;
 }
 
-function firstFileUrl(record: ORARecord): string | undefined {
-  const entries = record.files?.entries;
-  if (!entries) return undefined;
-  return Object.values(entries)[0]?.links?.content;
+function docValues(dv?: ORADocumentValue): Array<string | number> {
+  return dv?.attributes?.value ?? [];
 }
 
-export async function oraSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const data = await fetchJSON<ORAResponse>(
-    `${BASE_URL}/records/?q=${encodeURIComponent(query)}&size=${limit}`,
-  );
-  return (data.hits?.hits || []).map((r) => {
-    const meta = r.metadata || {};
-    const year = meta.publication_date
-      ? parseInt(meta.publication_date.substring(0, 4), 10)
-      : undefined;
+function docText(dv?: ORADocumentValue): string {
+  return String(docValues(dv)[0] ?? '');
+}
+
+// index_authors comes back as one comma-joined string per contributing
+// group (e.g. "Park, W, Song, J") rather than a clean per-author array;
+// callers get it back as-is via authors[0] since ORA doesn't expose a
+// reliably splittable structure.
+function authorsOf(attrs?: ORAAttributes): string[] {
+  const values = docValues(attrs?.index_authors).map(String);
+  return values.length ? values : [];
+}
+
+export function normalizeOra(data: ORASearchResponse, limit: number): LibraryResult[] {
+  return (data.data ?? []).slice(0, limit).map((item) => {
+    const attrs = item.attributes ?? {};
+    const yearRaw = docValues(attrs.rights_copyright_date)[0];
+    const year = typeof yearRaw === 'number' ? yearRaw : undefined;
     return {
-      id: r.id,
+      id: item.id,
       source: 'ora' as const,
-      title: meta.title || 'Untitled',
-      authors: (meta.creators || []).map(creatorName).filter(Boolean),
-      year: Number.isNaN(year as number) ? undefined : year,
-      language: meta.languages?.[0]?.id,
-      subjects: (meta.subjects || []).map((s) => s.subject),
-      hasFullText: Boolean(meta.description || r.files?.enabled),
-      previewUrl: firstFileUrl(r) || `https://ora.ox.ac.uk/objects/uuid:${r.id}`,
-      description: meta.description?.substring(0, 300),
+      title: attrs.title ?? item.id,
+      authors: authorsOf(attrs),
+      year,
+      hasFullText: false,
+      previewUrl: `${BASE_URL}/objects/${item.id}`,
     };
   });
+}
+
+export async function oraSearch(query: string, limit: number): Promise<LibraryResult[]> {
+  const params = new URLSearchParams({ q: query, format: 'json', per_page: String(limit) });
+  const data = await fetchJSON<ORASearchResponse>(`${BASE_URL}/objects?${params}`);
+  return normalizeOra(data, limit);
 }
 
 export async function oraRead(id: string): Promise<{
@@ -82,26 +77,25 @@ export async function oraRead(id: string): Promise<{
   title: string;
   authors: string[];
   year?: number;
-  language?: string;
 }> {
-  const r = await fetchJSON<ORARecord>(`${BASE_URL}/records/${id}`);
-  const meta = r.metadata || {};
-  const year = meta.publication_date
-    ? parseInt(meta.publication_date.substring(0, 4), 10)
-    : undefined;
+  const data = await fetchJSON<ORAReadResponse>(`${BASE_URL}/objects/${id}?format=json`);
+  const attrs = data.data?.attributes;
+  const text = docText(attrs?.abstract) || `No abstract available for Oxford ORA record ${id}`;
   return {
-    text: meta.description || `No description available for Oxford ORA record ${id}`,
-    title: meta.title || id,
-    authors: (meta.creators || []).map(creatorName).filter(Boolean),
-    year: Number.isNaN(year as number) ? undefined : year,
-    language: meta.languages?.[0]?.id,
+    text,
+    title: attrs?.title ?? id,
+    authors: authorsOf(attrs),
   };
 }
 
 register('ora', {
   description:
-    'Oxford ORA — Oxford University Research Archive. Oxford theses, preprints, working papers, and the Oxford Text Archive (classical texts, TEI/XML). InvenioRDM API, no auth required.',
+    'Oxford ORA — Oxford University Research Archive. Oxford theses, preprints, working papers, and the Oxford Text Archive (classical texts, TEI/XML). No auth required.',
   supportsIngest: true,
+  kind: 'rest',
+  cluster: 'academic',
+  freshness: 'daily',
+  homepage: 'https://ora.ox.ac.uk',
   search: oraSearch,
   async read(id) {
     const raw = await oraRead(id);
