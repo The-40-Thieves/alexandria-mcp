@@ -1,0 +1,12 @@
+{
+  "seriess": [
+    {
+      "id": "UNRATE",
+      "title": "Unemployment Rate",
+      "observation_start": "1948-01-01",
+      "observation_end": "2026-07-01",
+      "frequency": "Monthly",
+      "notes": "The unemployment rate represents the number of unemployed as a percentage of the labor force."
+    }
+  ]
+}

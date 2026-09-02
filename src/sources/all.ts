@@ -91,3 +91,4 @@ import './twelvedata.js';
 import './coingecko.js';
 import './frankfurter.js';
 import './eia.js';
+import './fred.js';
