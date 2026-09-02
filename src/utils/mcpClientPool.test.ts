@@ -74,7 +74,6 @@ test('McpClientPool', async (t) => {
       const handleA = await startTestMcpServer({
         search: () => ({ content: [{ type: 'text', text: 'from A' }] }),
       });
-      const port = handleA.port;
 
       const pool = new McpClientPool();
       const server: RemoteServerConfig = {
@@ -87,23 +86,25 @@ test('McpClientPool', async (t) => {
       assert.equal(first.text, 'from A');
 
       // Kill the server the pool's cached client is still connected to,
-      // then recreate a new instance on the same port. The recreated
-      // server's first request fails (simulating it not recognizing the
-      // old client's session); the pool must retry once with a fresh
-      // client, which succeeds against the recreated server.
+      // then recreate a fresh instance (a new ephemeral port, so there is
+      // no dependency on OS-level port/keep-alive reuse timing). The pool
+      // still has a client pointed at the dead port from handleA; its
+      // first attempt against the *same server name* with the *new* url
+      // fails for real (nothing is listening on the old port any more),
+      // and the retry must connect fresh against handleB's url and
+      // succeed.
       await handleA.close();
       const handleB = await startTestMcpServer({
-        port,
-        failRequest: 1,
-        failStatus: 400,
         search: () => ({ content: [{ type: 'text', text: 'from B' }] }),
       });
       try {
-        const second = await pool.call(server, 'search', { query: 'y' });
+        const recreated: RemoteServerConfig = { ...server, url: handleB.url };
+        const second = await pool.call(recreated, 'search', { query: 'y' });
         assert.equal(second.text, 'from B');
-        // 1 failed request (the stale client's first attempt) + a fresh
-        // initialize + notifications/initialized + tools/call = 4.
-        assert.equal(handleB.requestCount(), 4);
+        // The failed first attempt hit the dead port from handleA, not
+        // handleB, so handleB only ever sees the fresh client's own
+        // initialize + notifications/initialized + tools/call = 3.
+        assert.equal(handleB.requestCount(), 3);
       } finally {
         await handleB.close();
       }
