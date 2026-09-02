@@ -88,6 +88,7 @@ export const PROBE_QUERIES: Record<string, string> = {
   ietf: 'tls',
   w3c: 'css',
   coingecko: 'bitcoin',
+  frankfurter: 'USD EUR',
 };
 const DEFAULT_QUERY = 'history of science';
 
