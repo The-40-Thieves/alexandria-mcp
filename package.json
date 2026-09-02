@@ -13,7 +13,8 @@
     "eval:routing": "npx tsx scripts/eval-routing.ts",
     "docs": "npx tsx scripts/gen-docs.ts",
     "lint": "biome check .",
-    "gate": "npm run build && npm test && npm run lint"
+    "gate": "npm run build && npm test && npm run lint",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",

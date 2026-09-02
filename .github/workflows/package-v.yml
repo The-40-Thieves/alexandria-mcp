@@ -1,4 +1,4 @@
-# This workflow will run tests using node and then publish a package to GitHub Packages when a release is created
+# Publishes the package to GitHub Packages on manual dispatch.
 # For more information see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
 
 name: Node.js Package
@@ -6,7 +6,6 @@ name: Node.js Package
 on: workflow_dispatch
 
 jobs:
-
   publish-gpr:
     runs-on: ubuntu-latest
     permissions:
@@ -14,11 +13,12 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          registry-url: https://npm.pkg.github.com/
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+      - run: npm ci
+      - run: npm run build
       - run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
