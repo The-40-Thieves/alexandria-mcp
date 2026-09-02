@@ -72,6 +72,7 @@ import './githubsearch.js';
 import './peps.js';
 import './tc39.js';
 import './swiftevolution.js';
+import './mdn.js';
 import './googlenews.js';
 import './nhk.js';
 import './circl.js';
