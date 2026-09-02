@@ -131,6 +131,34 @@ Required by two tools only:
 
 `library_list_sources`, `library_search`, `library_read`, `library_index`, and `library_recommend` all work without an OpenAI key.
 
+#### Pointing roles at a gateway instead of OpenAI directly
+
+Every LLM/embedding call (routing in `library_ask`, embeddings in `library_ingest`) goes through a small per-role provider table (`src/utils/providers.ts`, THE-318) instead of talking to OpenAI's SDK directly. There are five roles: `router`, `synth`, `research`, `embeddings`, `rerank`. Each is resolved from env in this order:
+
+1. `ALEXANDRIA_<ROLE>_BASE_URL`, `ALEXANDRIA_<ROLE>_API_KEY`, `ALEXANDRIA_<ROLE>_MODEL` (per-role overrides; `<ROLE>` is the role name upper-cased, e.g. `ALEXANDRIA_ROUTER_BASE_URL`)
+2. `ALEXANDRIA_BASE_URL`, `ALEXANDRIA_API_KEY` (shared defaults across every role)
+3. `OPENAI_API_KEY`, with `baseURL` defaulted to `https://api.openai.com/v1`
+
+With only `OPENAI_API_KEY` set, every role resolves through step 3, which is exactly today's behavior (`gpt-4o-mini` for `router`/`synth` against `api.openai.com`, `text-embedding-3-small` for `embeddings`).
+
+To route every role through a LiteLLM gateway instead:
+
+```env
+ALEXANDRIA_BASE_URL=http://100.78.123.100:4001/v1
+ALEXANDRIA_API_KEY=sk-litellm-...
+```
+
+To route through Cloudflare AI Gateway (its OpenAI-compatible endpoint):
+
+```env
+ALEXANDRIA_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account_id>/<gateway_id>/openai
+ALEXANDRIA_API_KEY=<your OpenAI key, forwarded through the gateway>
+```
+
+Or point just one role at a gateway while the rest stay on OpenAI directly, e.g. `ALEXANDRIA_ROUTER_BASE_URL` + `ALEXANDRIA_ROUTER_API_KEY` for routing only.
+
+When `ALEXANDRIA_<ROLE>_BASE_URL`/`ALEXANDRIA_BASE_URL` is set *and* `OPENAI_API_KEY` is also present, `OPENAI_API_KEY` is wired up as a one-shot fallback: a network error or 5xx from the gateway falls through to a direct OpenAI call once before the request fails. `chatJSON` (used by routing) always validates the model's response against a zod schema and retries once, on the same backend, with the validation error appended to the prompt, which helps when a gateway is proxying a smaller or local model that doesn't reliably follow the JSON contract on the first try. It requests `response_format: json_object` only against `api.openai.com`, or when `ALEXANDRIA_<ROLE>_JSON_MODE=1` confirms the gateway/model supports it; otherwise it asks for JSON in the prompt instead.
+
 ### Supabase — optional ([supabase.com](https://supabase.com/dashboard))
 
 Required by one tool only:
