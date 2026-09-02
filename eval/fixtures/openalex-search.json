@@ -1,0 +1,137 @@
+{
+  "meta": {
+    "count": 5916627,
+    "db_response_time_ms": 405,
+    "page": 1,
+    "per_page": 2,
+    "groups_count": null,
+    "x_query": {
+      "oql": "works where full text has (machine learning)",
+      "oqo": {
+        "get_rows": "works",
+        "filter_rows": [
+          {
+            "column_id": "fulltext.search",
+            "value": "machine learning",
+            "operator": "has"
+          }
+        ]
+      },
+      "url": "/works?filter=fulltext.search:machine learning&per_page=2"
+    },
+    "cost_usd": 0.001
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W2101234009",
+      "title": "Scikit-learn: Machine Learning in Python",
+      "authorships": [
+        {
+          "author": {
+            "display_name": "Fabián Pedregosa"
+          }
+        },
+        {
+          "author": {
+            "display_name": "Gaël Varoquaux"
+          }
+        },
+        {
+          "author": {
+            "display_name": "Alexandre Gramfort"
+          }
+        }
+      ],
+      "publication_year": 2012,
+      "language": "en",
+      "concepts": [
+        {
+          "display_name": "Python (programming language)",
+          "level": 2
+        },
+        {
+          "display_name": "Documentation",
+          "level": 2
+        },
+        {
+          "display_name": "Computer science",
+          "level": 0
+        }
+      ],
+      "open_access": {
+        "is_oa": true,
+        "oa_status": "green",
+        "oa_url": "https://orbi.uliege.be/handle/2268/225787",
+        "any_repository_has_fulltext": true
+      },
+      "doi": "https://doi.org/10.48550/arxiv.1201.0490",
+      "abstract_inverted_index": {
+        "Scikit-learn": [
+          0
+        ],
+        "is": [
+          1,
+          35,
+          51
+        ],
+        "a": [
+          2,
+          6,
+          30
+        ],
+        "Python": [
+          3
+        ],
+        "module": [
+          4
+        ]
+      }
+    },
+    {
+      "id": "https://openalex.org/W3023540311",
+      "title": "Genetic algorithms in search, optimization, and machine learning",
+      "authorships": [],
+      "publication_year": 1989,
+      "language": "en",
+      "concepts": [
+        {
+          "display_name": "Computer science",
+          "level": 0
+        },
+        {
+          "display_name": "Artificial intelligence",
+          "level": 1
+        },
+        {
+          "display_name": "Machine learning",
+          "level": 1
+        }
+      ],
+      "open_access": {
+        "is_oa": false,
+        "oa_status": "closed",
+        "oa_url": null,
+        "any_repository_has_fulltext": false
+      },
+      "doi": "https://doi.org/10.5860/choice.27-0936",
+      "abstract_inverted_index": {
+        "From": [
+          0
+        ],
+        "the": [
+          1,
+          14
+        ],
+        "Publisher:\r\nThis": [
+          2
+        ],
+        "book": [
+          3
+        ],
+        "brings": [
+          4
+        ]
+      }
+    }
+  ]
+}
