@@ -291,15 +291,16 @@ register('youtube', {
   freshness: 'realtime',
   homepage: 'https://www.youtube.com',
   verifiedAt: '2026-09-01',
-  // No `auth` declared on purpose. The registry's auth field is
-  // source-level: declaring it would hide youtube entirely without
-  // YOUTUBE_API_KEY, but read() needs no Data API key at all (it uses
-  // Supadata when SUPADATA_API_KEY is set, otherwise the keyless
-  // Innertube path), so the source stays useful and must stay visible.
-  // Only search() requires the key, and it throws the same
-  // "<name> requires <ENV>" text an auth declaration would produce, so
-  // scripts/probe.ts still classifies it KEY_MISSING rather than ERROR.
-  // Declaring auth per method would need a registry contract change.
+  // No `auth` declared on purpose: read() needs no Data API key at all
+  // (Supadata when SUPADATA_API_KEY is set, otherwise the keyless
+  // Innertube path), so library_read(source='youtube') must keep working
+  // without YOUTUBE_API_KEY. Only search() needs the key. `hidden` is the
+  // right lever for that half: a hidden source is excluded from routing
+  // (so library_ask never fans out to a search that would throw) but stays
+  // callable by name, exactly like the REST context7/mdn sources. search()
+  // still throws the standard "<name> requires <ENV>" text when called by
+  // name without the key, so scripts/probe.ts classifies it KEY_MISSING.
+  hidden: !process.env.YOUTUBE_API_KEY,
   optionalEnv: ['YOUTUBE_API_KEY', 'SUPADATA_API_KEY'],
   pacing: { dailyCap: 90 },
   search: youtubeSearch,

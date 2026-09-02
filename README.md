@@ -21,7 +21,7 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 <!-- sources:start -->
 ## Sources (138)
 
-138 sources across 19 clusters (34 hidden pending a key or config not present in this deployment). Full per-source detail, including auth env vars and last-verified dates, is generated in [docs/sources.md](docs/sources.md).
+138 sources across 19 clusters (35 hidden pending a key or config not present in this deployment). Full per-source detail, including auth env vars and last-verified dates, is generated in [docs/sources.md](docs/sources.md).
 
 | Cluster | Sources | Hidden |
 |---|---|---|
@@ -42,9 +42,9 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 | science | 7 | 2 |
 | security | 14 | 0 |
 | standards | 3 | 0 |
-| video | 1 | 0 |
+| video | 1 | 1 |
 | web | 5 | 3 |
-| **Total** | 138 | 34 |
+| **Total** | 138 | 35 |
 
 <!-- sources:end -->
 
@@ -255,7 +255,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: 138, visible: 104, hidden: 34, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, tools: 9 }`.
+Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: 138, visible: 103, hidden: 35, byKind: { rest: 104, hub: 0, rss: 22, mcp: 6, scrape: 6 }, tools: 9 }`.
 
 ## Adding Custom Providers
 
