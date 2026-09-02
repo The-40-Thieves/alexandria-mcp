@@ -29,6 +29,7 @@
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
 import { parseHTML } from 'linkedom';
+import { type AddressPin, guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
 
 // Loaded dynamically rather than with a static import so it is only pulled
@@ -250,16 +251,27 @@ function stripBrackets(hostname: string): string {
 // a hostname's *string* looks public but resolves to a private address —
 // attacker-controlled DNS / DNS rebinding).
 //
-// Known residual gap (TOCTOU): the address(es) validated here are not what
-// pins the actual TCP connection Node's fetch/undici makes a moment later —
-// a second DNS answer at connect time (rebinding between this check and the
-// fetch) is not caught. Closing that fully needs pinning the connection to
-// the validated address (e.g. an undici Agent with a custom
-// `connect.lookup`), which this module doesn't add: the window is a single
-// resolution race, not a repeatable bypass, and every redirect hop (where a
-// server has full control of the next URL) is fully re-validated by
-// fetchFollowingRedirects, which is the more realistic attack path.
-export async function assertFetchableUrl(rawUrl: string): Promise<void> {
+// TOCTOU: the address(es) validated here are not, on their own, what pins
+// the actual TCP connection Node's fetch/undici makes a moment later — a
+// second DNS answer at connect time (rebinding between this check and the
+// fetch) would not be caught by validation alone. resolveFetchTarget()
+// below closes that gap for the one fetch that actually connects to a
+// caller-supplied hostname (tier 1, via fetchFollowingRedirects): it reuses
+// THIS SAME dns.lookup() call as the pin fetchFollowingRedirects then
+// forces guardedDispatcher's connection to, via withPinnedAddress() (see
+// dispatcher.ts) — a second, independent lookup to build the pin would just
+// reopen the race it exists to close. assertFetchableUrl() below is a thin
+// wrapper that keeps the original validate-only signature for callers that
+// only need the guard (e.g. src/sources/mcp/jina.ts, which never performs
+// the fetch itself).
+export interface ResolvedFetchTarget {
+  // Set only when the target was an ordinary hostname (not a literal IP or
+  // 'localhost'): the exact address the SAME lookup that validated it also
+  // resolved to first, safe to pin the connection to.
+  pin?: AddressPin;
+}
+
+async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -284,16 +296,16 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
   }
   if (hostname === 'localhost') {
     assertIpClassAllowed('loopback', rawUrl);
-    return;
+    return {}; // resolved locally (hosts file/loopback), nothing to pin
   }
 
   const literalClass = classifyIpLiteral(hostname);
   if (literalClass) {
     assertIpClassAllowed(literalClass, rawUrl);
-    return; // a literal IP host: nothing to resolve
+    return {}; // a literal IP host: nothing to resolve or pin
   }
 
-  let addresses: Array<{ address: string }>;
+  let addresses: Array<{ address: string; family: number }>;
   try {
     addresses = await dnsResolver.lookup(parsed.hostname, { all: true });
   } catch (err) {
@@ -304,6 +316,12 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
     const cls = classifyIpLiteral(address.toLowerCase());
     if (cls) assertIpClassAllowed(cls, rawUrl, `${hostname} resolves to ${address}`);
   }
+  const first = addresses[0];
+  return first ? { pin: { hostname, address: first.address, family: first.family } } : {};
+}
+
+export async function assertFetchableUrl(rawUrl: string): Promise<void> {
+  await resolveFetchTarget(rawUrl);
 }
 
 // ─── Response size cap ──────────────────────────────────────────────────────
@@ -365,14 +383,29 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 // private address can't be reached by handing fetch() the follow-automatically
 // default, since that would only guard the URL the caller supplied and let
 // every subsequent hop go unchecked.
+//
+// This is the one fetch in this module that actually opens a TCP connection
+// to a caller-supplied hostname (tryJinaReader/tryCrawl4ai connect to a
+// fixed, already-allowlisted service endpoint instead - see their own
+// comments), so it is the one that needs guardedDispatcher and the pin:
+// every hop's fetch carries dispatcher: guardedDispatcher, and is wrapped in
+// withPinnedAddress() with the SAME address resolveFetchTarget() just
+// validated that hop's URL against - see resolveFetchTarget's comment for
+// why reusing that one lookup (rather than resolving again to build the
+// pin) is what actually closes the TOCTOU gap.
 async function fetchFollowingRedirects(
   startUrl: string,
   init: RequestInit,
   timeoutMs: number,
+  startPin: AddressPin | undefined,
 ): Promise<{ response: Response; finalUrl: string }> {
   let currentUrl = startUrl;
+  let pin = startPin;
   for (let hop = 0; ; hop++) {
-    const response = await fetchWithRetry(currentUrl, { ...init, redirect: 'manual' }, timeoutMs);
+    const guardedInit = { ...init, redirect: 'manual' as const, dispatcher: guardedDispatcher };
+    const response = pin
+      ? await withPinnedAddress(pin, () => fetchWithRetry(currentUrl, guardedInit, timeoutMs))
+      : await fetchWithRetry(currentUrl, guardedInit, timeoutMs);
     if (!REDIRECT_STATUSES.has(response.status)) {
       return { response, finalUrl: currentUrl };
     }
@@ -391,18 +424,20 @@ async function fetchFollowingRedirects(
       throw new Error(`fetchAsText: redirect from ${currentUrl} had no Location header`);
     }
     const nextUrl = new URL(location, currentUrl).toString();
-    await assertFetchableUrl(nextUrl);
+    const resolved = await resolveFetchTarget(nextUrl);
+    pin = resolved.pin;
     currentUrl = nextUrl;
   }
 }
 
 // --- Tier 1: defuddle ------------------------------------------------------
 
-async function tryDefuddle(url: string): Promise<FetchedPage | null> {
+async function tryDefuddle(url: string, pin: AddressPin | undefined): Promise<FetchedPage | null> {
   const { response, finalUrl } = await fetchFollowingRedirects(
     url,
     { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml' } },
     FETCH_TIMEOUT_MS,
+    pin,
   );
   if (!response.ok) {
     throw new Error(
@@ -517,12 +552,17 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
 // --- Chain -------------------------------------------------------------------
 
 export async function fetchAsText(url: string): Promise<FetchedPage> {
-  await assertFetchableUrl(url);
+  // One resolveFetchTarget() call up front, shared by all three tiers (they
+  // all start from the same URL): it validates AND, for tier 1, hands
+  // tryDefuddle the pin for the connection it is about to make - a second,
+  // separate call here just to re-derive that pin would reopen the TOCTOU
+  // gap resolveFetchTarget's own comment describes.
+  const { pin } = await resolveFetchTarget(url);
 
   let lastError: Error = new Error(`fetchAsText: no tier was able to fetch ${url}`);
 
   try {
-    const page = await tryDefuddle(url);
+    const page = await tryDefuddle(url, pin);
     if (page) return page;
     lastError = new Error(`defuddle: extracted under ${MIN_TEXT_CHARS} chars for ${url}`);
   } catch (err) {

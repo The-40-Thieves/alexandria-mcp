@@ -5,3 +5,6 @@ dist/
 *.d.ts
 *.d.ts.map
 .superpowers/
+# Default ALEXANDRIA_HTTP_CACHE location (src/utils/dispatcher.ts): the
+# undici RFC 9111 http-cache SQLite database, created at runtime.
+/data/

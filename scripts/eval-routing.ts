@@ -32,6 +32,7 @@ import '../src/sources/all.ts';
 import { listSources } from '../src/sources/registry.ts';
 import { planRoute } from '../src/tools/libraryAsk.ts';
 import { candidates } from '../src/utils/catalogIndex.ts';
+import { installDispatcher } from '../src/utils/dispatcher.ts';
 import { hasEmbeddingsConfigured, roleConfig } from '../src/utils/providers.ts';
 
 export interface GoldenQuery {
@@ -225,6 +226,11 @@ function printReport(
 }
 
 export async function main(): Promise<void> {
+  // Same dispatcher production installs at startup (src/index.ts): the
+  // router LLM call this eval makes (when a router role is configured)
+  // should go through the same connection pooling and caching production
+  // traffic does.
+  installDispatcher();
   const golden = loadGolden();
   const clusterByName = new Map(listSources().map((s) => [s.name, s.cluster as string]));
   const hiddenNames = new Set(

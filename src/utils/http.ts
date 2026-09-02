@@ -1,4 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Dispatcher } from 'undici';
+
+// The ambient global RequestInit (from @types/node) has no `dispatcher`
+// field under this project's tsconfig, so options that want one are typed
+// through this intersection rather than the bare global RequestInit.
+export type FetchOptions = RequestInit & { dispatcher?: Dispatcher };
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
@@ -17,7 +23,7 @@ function sleep(ms: number): Promise<void> {
 
 export async function fetchWithRetry(
   url: string,
-  options: RequestInit = {},
+  options: FetchOptions = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retries = DEFAULT_RETRIES,
 ): Promise<Response> {
@@ -33,6 +39,17 @@ export async function fetchWithRetry(
     const signal = ambient ? AbortSignal.any([controller.signal, ambient]) : controller.signal;
 
     try {
+      // Node's global fetch is its OWN bundled undici build. The `undici`
+      // package this repo installs for Agent/interceptors
+      // (src/utils/dispatcher.ts) is pinned in package.json to the EXACT
+      // version Node 24 currently bundles, specifically so that an explicit
+      // `dispatcher` option built by that package is accepted here by the
+      // ambient global fetch (a different major throws "invalid
+      // onRequestStart method" - see dispatcher.ts's module comment and the
+      // report for the confirming two-line check). Pinned rather than
+      // ranged: this coupling to Node's internal, undocumented bundled
+      // version is real and must be re-verified whenever Node's bundled
+      // undici moves.
       const response = await fetch(url, {
         ...options,
         signal,
