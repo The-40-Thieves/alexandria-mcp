@@ -268,17 +268,27 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
   // A cache hit replays a previously computed decision (router or
   // margin-skip) verbatim - no stage 1 or stage 2 work at all, so no LLM
   // call of any kind, not even the query embed() cosine ranking needs.
-  // The key folds in stage1ModeHint(), the effective skip margin, and the
-  // router model - all cheap, synchronous reads - so a decision cached
-  // under one mode/margin/model is never replayed once any of the three
-  // changes (final wave, A2).
+  // The key folds in stage1ModeHint(), the effective skip margin, the
+  // router model, and (Task 10 fix round) whether ALEXANDRIA_MULTI_QUERY
+  // is on - all cheap, synchronous reads - so a decision cached under one
+  // mode/margin/model/multi-query setting is never replayed once any of
+  // the four changes (final wave, A2; multi-query added after review
+  // caught it replaying a pre-flag decision once the flag was flipped).
   const stage1Hint = stage1ModeHint();
   const skipMarginHint = parseSkipMargin(
     config.ALEXANDRIA_ROUTER_SKIP_MARGIN,
     stage1Hint === 'embeddings' ? DEFAULT_ROUTER_SKIP_MARGIN : Number.POSITIVE_INFINITY,
   );
   const routerModel = roleConfig('router').model;
-  const key = routingCacheKey(query, maxSources, stage1Hint, skipMarginHint, routerModel);
+  const multiQueryHint = config.ALEXANDRIA_MULTI_QUERY === '1';
+  const key = routingCacheKey(
+    query,
+    maxSources,
+    stage1Hint,
+    skipMarginHint,
+    routerModel,
+    multiQueryHint,
+  );
   const cached = routingCache.get(key);
   if (cached) {
     return {

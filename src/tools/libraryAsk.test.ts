@@ -915,3 +915,76 @@ test('a routing decision cached under one stage-1 mode is a cache miss under ano
   delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
   delete process.env.ALEXANDRIA_CATALOG_CACHE;
 });
+
+// Task 10 fix round (review finding): routingCacheKey() did not fold in
+// ALEXANDRIA_MULTI_QUERY, so a decision cached with the flag off was
+// silently replayed once the flag was flipped on for the identical
+// query/maxSources - the alternate-phrasings call never ran, exactly as
+// if multi-query had never been enabled. Mirrors the stage-1-mode-flip
+// test above, but flips ALEXANDRIA_MULTI_QUERY instead of the embeddings
+// key, and deliberately does NOT reset the routing cache between the two
+// calls (a reset would hide the bug this reproduces).
+test('a routing decision cached with multi-query off is a cache miss once multi-query is on', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  const query = 'npm package left-pad maintainers';
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  // Force the stage-2 branch every time (never skip the router), the only
+  // branch expandCandidatesWithAlternates() is ever reached from.
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+  delete process.env.ALEXANDRIA_MULTI_QUERY;
+  resetCatalogCacheForTests();
+  resetRoutingCacheForTests();
+
+  const router = await startFakeRouter((system) => {
+    if (system.includes('alternate phrasings')) {
+      return { queries: ['left-pad npm package', 'left-pad maintainer controversy'] };
+    }
+    return { intent: 'x', routes: [{ source: 'depsdev', query: 'left-pad', reason: 'r' }] };
+  });
+  t.after(() => router.close());
+  process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+  process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+  // First call: multi-query off, cached under multiQuery=false. Exactly
+  // one router call (the routing decision itself); no alternate-phrasings
+  // request at all.
+  const off = await planRoute(query, { maxSources: 3 });
+  assert.equal(off.stage2, 'llm');
+  assert.equal(router.systemPrompts.length, 1, 'first call is a genuine cache miss');
+  assert.ok(
+    !router.systemPrompts[0].includes('alternate phrasings'),
+    'multi-query is off: no alternate-phrasings call yet',
+  );
+
+  // Second call: SAME query and maxSources, routing cache left untouched
+  // (no resetRoutingCacheForTests() call here - that is the point of this
+  // test), only ALEXANDRIA_MULTI_QUERY flipped on. Before the fix, this
+  // replayed the first call's cached decision verbatim: no new router
+  // call of any kind, and router.systemPrompts.length stayed at 1.
+  process.env.ALEXANDRIA_MULTI_QUERY = '1';
+  const on = await planRoute(query, { maxSources: 3 });
+  assert.equal(on.stage2, 'llm');
+  assert.equal(
+    router.systemPrompts.length,
+    3,
+    'a genuine cache miss: one alternate-phrasings call plus one routing-decision call were made, not zero',
+  );
+  assert.ok(
+    router.systemPrompts.slice(1).some((s) => s.includes('alternate phrasings')),
+    'the alternate-phrasings call actually happened this time',
+  );
+
+  delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+  delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+  delete process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN;
+  delete process.env.ALEXANDRIA_MULTI_QUERY;
+});
