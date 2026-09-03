@@ -64,6 +64,7 @@ export async function osfRead(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi?: string;
 }> {
   const data = await fetchJSON<{ data?: OSFPreprint }>(`${BASE}/preprints/${id}/`);
   const a = data.data?.attributes || {};
@@ -75,6 +76,7 @@ export async function osfRead(id: string): Promise<{
     authors: [],
     year: date ? parseInt(date.substring(0, 4), 10) : undefined,
     language: 'en',
+    doi: a.doi,
   };
 }
 

@@ -48,6 +48,7 @@ test('medrxivRead', async (t) => {
     const result = await medrxivRead('10.64898/2026.03.27.26349549');
     assert.equal(result.title, fixture.collection[0].title);
     assert.match(result.text, /major histocompatibility complex/);
+    assert.equal(result.doi, '10.64898/2026.03.27.26349549');
   });
 
   await t.test('throws when the DOI is not found', async () => {

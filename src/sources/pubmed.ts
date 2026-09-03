@@ -10,7 +10,11 @@ import { fetchJSON, fetchText } from '../utils/http.ts';
 import { register, truncateText } from './registry.ts';
 
 const EUTILS_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
-const BIOC_BASE = 'https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json';
+// Exported: openAccess.ts's PMC hop (task 6) builds the same URL from a
+// PMCID it gets via idconv (rather than esummary's articleids, which is
+// unavailable when the caller only has a DOI) and needs the identical
+// base to construct a guarded URL and to reuse fetchBiocFullText below.
+export const BIOC_BASE = 'https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_json';
 
 // Raises the E-utilities keyless 3 rps limit to 10 rps; the source works
 // without one.
@@ -111,7 +115,11 @@ export function parseBiocFullText(raw: string): string | undefined {
   return text.length > 0 ? text : undefined;
 }
 
-async function fetchBiocFullText(pmcid: string): Promise<string | undefined> {
+// Exported for openAccess.ts's PMC hop (task 6): given a PMCID (from
+// idconv, since a DOI-only caller has no esummary articleids to read one
+// from), fetch and parse the same BioC full text this module's own read()
+// uses - do not re-implement the fetch+parse here.
+export async function fetchBiocFullText(pmcid: string): Promise<string | undefined> {
   try {
     const raw = await fetchText(`${BIOC_BASE}/${pmcid}/unicode`);
     return parseBiocFullText(raw);

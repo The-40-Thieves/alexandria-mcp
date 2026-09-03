@@ -78,6 +78,7 @@ export async function biorxivRead(doi: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi: string;
 }> {
   const data = await fetchJSON<BiorxivResponse>(
     `${BASE}/details/biorxiv/${encodeURIComponent(doi)}/na/json`,
@@ -90,6 +91,7 @@ export async function biorxivRead(doi: string): Promise<{
     authors: p.authors ? p.authors.split('; ') : [],
     year: p.date ? parseInt(p.date.substring(0, 4), 10) : undefined,
     language: 'en',
+    doi,
   };
 }
 

@@ -82,6 +82,24 @@ export interface ReadResult {
   metadataOnly?: boolean;
   externalUrl?: string;
   note?: string;
+  // Task 6: an adapter-provided DOI, read by library_read's handler
+  // (src/index.ts) to drive the open-access fallback chain
+  // (src/web/openAccess.ts) when metadataOnly is true and this field (or
+  // one embedded in externalUrl) is present.
+  doi?: string;
+  // Page anchors into `text`, set only when the text came from a PDF
+  // (src/web/pdf.ts via src/web/fetchTier.ts's 'pdf' tier). charStart/
+  // charEnd are character offsets into the untruncated `text` (before
+  // truncateText() slices it for the 200k-char cap), so they stay valid
+  // even when `truncated` is true - a consumer just won't have the tail
+  // pages' text.
+  pages?: { page: number; charStart: number; charEnd: number }[];
+  // Set instead of `text` when library_read's open-access fallback chain
+  // could not produce any full text - never an empty `text` string.
+  unavailable?: {
+    reason: 'no_full_text' | 'paywalled' | 'not_found' | 'too_large' | 'blocked';
+    triedTiers: string[];
+  };
 }
 
 export interface EmbeddingProvider {

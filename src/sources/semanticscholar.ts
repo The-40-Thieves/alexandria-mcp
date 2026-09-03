@@ -85,6 +85,7 @@ export async function s2Read(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi?: string;
 }> {
   const p = await s2Fetch<S2Paper>(`${GRAPH}/paper/${id}?fields=${FIELDS}`);
   const text = p.abstract || '';
@@ -98,6 +99,7 @@ export async function s2Read(id: string): Promise<{
     authors: (p.authors || []).map((a) => a.name),
     year: p.year,
     language: 'en',
+    doi: p.externalIds?.DOI,
   };
 }
 

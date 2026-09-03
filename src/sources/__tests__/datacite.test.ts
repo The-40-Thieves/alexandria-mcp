@@ -63,6 +63,7 @@ test('datacite adapter', async (t) => {
     assert.equal(result.title, 'SNAI1 target genes in myoblasts');
     assert.match(result.text ?? '', /SNAI proteins/);
     assert.equal(result.truncated, false);
+    assert.equal(result.doi, '10.25434/elia-ines_phd2021');
   });
 
   await t.test('read() throws for a missing record', async () => {

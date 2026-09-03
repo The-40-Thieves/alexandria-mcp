@@ -7,7 +7,10 @@
 //                  works for any page this process can reach. Follows
 //                  redirects itself (redirect: 'manual' + a capped loop, see
 //                  fetchFollowingRedirects) so every hop gets the SSRF guard,
-//                  not just the URL the caller supplied.
+//                  not just the URL the caller supplied. When the response
+//                  is a PDF (by content-type or a .pdf URL path) this tier
+//                  extracts it with unpdf (see pdf.ts) instead of running
+//                  Defuddle, returning via: 'pdf' with per-page text.
 //   2. jina      - GET https://r.jina.ai/{url}, a hosted reader that renders
 //                  JS and strips boilerplate server-side. Only tried when
 //                  JINA_API_KEY or ALEXANDRIA_JINA_READER=1 is set, so an
@@ -32,6 +35,7 @@ import { parseHTML } from 'linkedom';
 import { config } from '../config.ts';
 import { type AddressPin, guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
+import { extractPdf, type PdfPage } from './pdf.ts';
 
 // Loaded dynamically rather than with a static import so it is only pulled
 // in when tier 1 actually runs, not on every module load. Cached after the
@@ -48,7 +52,12 @@ export interface FetchedPage {
   url: string;
   title: string;
   text: string;
-  via: 'defuddle' | 'jina' | 'crawl4ai';
+  via: 'defuddle' | 'jina' | 'crawl4ai' | 'pdf';
+  // Set only when via === 'pdf': one entry per PDF page, in order. `text`
+  // above is these pages' text joined by pdf.ts's PDF_PAGE_JOINER - the
+  // library_read handler (src/index.ts) walks that same join to turn this
+  // into ReadResult.pages' charStart/charEnd.
+  pages?: PdfPage[];
 }
 
 const FETCH_TIMEOUT_MS = 15_000;
@@ -388,7 +397,16 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
 // still flows through this process), each tagging its own error messages
 // with `label` so a cap failure reads the same way callers already expect
 // (`/defuddle:/`, `/jina:/`, `/crawl4ai:/` in fetchAsText's error).
-async function readCappedText(response: Response, url: string, label: string): Promise<string> {
+// Byte-level core shared by readCappedText (every existing tier) and the
+// PDF branch below (task 6, which needs the raw bytes, not a UTF-8
+// decode): same fast-reject-on-declared-size-then-stream-counting shape,
+// same per-tier error label, just stopping short of the text decode so a
+// binary body doesn't get mangled on its way to extractPdf().
+async function readCappedBytes(
+  response: Response,
+  url: string,
+  label: string,
+): Promise<Uint8Array> {
   const declared = response.headers.get('content-length');
   if (declared && Number(declared) > MAX_RESPONSE_BYTES) {
     throw new Error(
@@ -396,7 +414,7 @@ async function readCappedText(response: Response, url: string, label: string): P
     );
   }
   const body = response.body;
-  if (!body) return '';
+  if (!body) return new Uint8Array(0);
 
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
@@ -424,7 +442,12 @@ async function readCappedText(response: Response, url: string, label: string): P
     combined.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder('utf-8').decode(combined);
+  return combined;
+}
+
+async function readCappedText(response: Response, url: string, label: string): Promise<string> {
+  const bytes = await readCappedBytes(response, url, label);
+  return new TextDecoder('utf-8').decode(bytes);
 }
 
 // ─── Redirect handling ──────────────────────────────────────────────────────
@@ -499,6 +522,25 @@ async function tryDefuddle(url: string, pin: AddressPin | undefined): Promise<Fe
     );
   }
   const contentType = response.headers.get('content-type') ?? '';
+  // Task 6: an open-access PDF has no HTML to run Defuddle over, but it's
+  // still the same guarded fetch this tier just made - branch on it here
+  // rather than adding a fourth top-level tier, so a PDF gets exactly the
+  // same SSRF guard, redirect handling, and size cap as everything else.
+  // Checked by content-type first (the honest signal) and the URL's path
+  // second (some OA hosts serve a PDF with a generic
+  // application/octet-stream content-type but an honest .pdf path).
+  const isPdf = contentType.includes('pdf') || /\.pdf(?:[?#]|$)/i.test(finalUrl);
+  if (isPdf) {
+    const bytes = await readCappedBytes(response, finalUrl, 'defuddle');
+    const extracted = await extractPdf(bytes, finalUrl);
+    return {
+      url: finalUrl,
+      title: extracted.title || finalUrl,
+      text: extracted.text,
+      via: 'pdf',
+      pages: extracted.pages,
+    };
+  }
   if (!contentType.includes('html')) {
     throw new Error(
       `defuddle: response for ${finalUrl} is not HTML (content-type: ${contentType})`,

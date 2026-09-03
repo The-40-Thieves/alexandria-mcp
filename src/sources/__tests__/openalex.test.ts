@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeOpenAlex, openalexSearch } from '../openalex.ts';
+import { normalizeOpenAlex, openalexRead, openalexSearch } from '../openalex.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/openalex-search.json'), 'utf8'),
@@ -40,5 +40,25 @@ test('openalexSearch uses api_key when set, otherwise falls back to mailto', asy
     if (savedKey !== undefined) process.env.OPENALEX_API_KEY = savedKey;
     else delete process.env.OPENALEX_API_KEY;
     if (savedMail !== undefined) process.env.CONTACT_EMAIL = savedMail;
+  }
+});
+
+test('openalexRead normalizes a full doi.org URL to a bare DOI', async () => {
+  const originalFetch = globalThis.fetch;
+  const work = {
+    id: 'https://openalex.org/W123',
+    title: 'A Work With A DOI',
+    doi: 'https://doi.org/10.1371/journal.pone.0308000',
+    authorships: [],
+    abstract_inverted_index: { Hello: [0], world: [1] },
+  };
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify(work), { status: 200 })) as typeof fetch;
+  try {
+    const result = await openalexRead('W123');
+    assert.equal(result.title, 'A Work With A DOI');
+    assert.equal(result.doi, '10.1371/journal.pone.0308000');
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
