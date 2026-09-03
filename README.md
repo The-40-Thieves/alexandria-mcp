@@ -18,6 +18,8 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 `library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results.
 
+`library_ask`, `library_search`, `library_answer`, and `library_research` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations), detailed returns the full payload, including routing reasons, relevance scores, and per-stage diagnostics.
+
 <!-- sources:start -->
 ## Sources (138)
 

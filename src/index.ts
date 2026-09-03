@@ -6,15 +6,21 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
-import { isJsonContentType, McpServer } from '@modelcontextprotocol/server';
+import { isJsonContentType, McpServer, type ServerContext } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
+import { INSTRUCTIONS } from './instructions.ts';
 import { log } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
-import { libraryAnswer } from './tools/libraryAnswer.ts';
+import { formatResult } from './tools/format.ts';
+import {
+  type AnswerProgressCallback,
+  type AnswerProgressInfo,
+  libraryAnswer,
+} from './tools/libraryAnswer.ts';
 import { libraryAsk } from './tools/libraryAsk.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
 import type { LibrarySource } from './types.ts';
@@ -41,6 +47,154 @@ function toStructured(val: unknown): Record<string, unknown> {
   return JSON.parse(JSON.stringify(val)) as Record<string, unknown>;
 }
 
+const ResponseFormatSchema = z
+  .enum(['concise', 'detailed'])
+  .default('concise')
+  .describe(
+    'concise (default) trims results/citations to high-signal fields; detailed returns the full payload, including routing reasons, scores, and stage diagnostics.',
+  );
+
+// ── outputSchema building blocks ────────────────────────────────────────────
+//
+// Every tool's outputSchema below is the DETAILED shape, with every field a
+// concise response omits made optional - the SDK validates
+// `structuredContent` against this same schema on both response_format
+// values (see ajvProvider / registerTool's outputSchema doc), so a
+// concise-only-absent field cannot be required.
+
+const ResultRowSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  title: z.string(),
+  hasFullText: z.boolean(),
+  year: z.number().optional(),
+  url: z.string().optional(),
+  // Present in `response_format: "detailed"` only; concise rows omit them.
+  authors: z.array(z.string()).optional(),
+  language: z.string().optional(),
+  subjects: z.array(z.string()).optional(),
+  previewUrl: z.string().optional(),
+  downloadUrl: z.string().optional(),
+  description: z.string().optional(),
+  published: z.string().optional(),
+  cluster: z.string().optional(),
+});
+
+const RouteItemSchema = z.object({
+  source: z.string(),
+  query: z.string(),
+  reason: z.string(),
+});
+
+// library_ask's `routing` is RouteItem[] in detailed mode, collapsed to
+// plain source names in concise mode; the schema accepts either.
+const AskRoutingSchema = z.array(z.union([RouteItemSchema, z.string()]));
+
+const CitationSchema = z.object({
+  n: z.number(),
+  source: z.string(),
+  id: z.string(),
+  title: z.string(),
+  url: z.string().optional(),
+  // Task 9 (isnad citation grading) fills these in; declared now, optional,
+  // so this outputSchema never needs a breaking change when it lands.
+  grade: z
+    .object({
+      tier: z.enum(['A', 'B', 'C', 'D']),
+      signals: z.record(z.string(), z.unknown()),
+    })
+    .optional(),
+  resolves: z.boolean().optional(),
+});
+
+const AuthSpecSchema = z.object({
+  type: z.string(),
+  env: z.string().optional(),
+  param: z.string().optional(),
+  header: z.string().optional(),
+});
+
+const LibrarySourceInfoSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  supportsIngest: z.boolean(),
+  kind: z.string(),
+  cluster: z.string(),
+  freshness: z.string(),
+  homepage: z.string().optional(),
+  timeoutMs: z.number(),
+  headers: z.record(z.string(), z.string()).optional(),
+  auth: AuthSpecSchema.optional(),
+  pacing: z
+    .object({ minIntervalMs: z.number().optional(), dailyCap: z.number().optional() })
+    .optional(),
+  verifiedAt: z.string().optional(),
+  hidden: z.boolean(),
+  optionalEnv: z.array(z.string()).optional(),
+});
+
+const ChunkMetadataSchema = z.object({
+  source: z.string(),
+  sourceId: z.string(),
+  title: z.string(),
+  authors: z.array(z.string()),
+  year: z.number().optional(),
+  language: z.string().optional(),
+  section: z.string().optional(),
+  chunkIndex: z.number(),
+  totalChunks: z.number(),
+  qualityScore: z.number(),
+});
+
+const ChunkSchema = z.object({ text: z.string(), metadata: ChunkMetadataSchema });
+
+const ReadResultSchema = z.object({
+  title: z.string(),
+  authors: z.array(z.string()),
+  year: z.number().optional(),
+  language: z.string().optional(),
+  text: z.string().optional(),
+  charCount: z.number().optional(),
+  truncated: z.boolean().optional(),
+  truncatedAt: z.number().optional(),
+  metadataOnly: z.boolean().optional(),
+  externalUrl: z.string().optional(),
+  note: z.string().optional(),
+});
+
+// library_answer's four progress stages (src/tools/libraryAnswer.ts's
+// AnswerProgressInfo), mapped to the numeric `progress` notifications/
+// progress expects.
+const ANSWER_STAGE_INDEX: Record<AnswerProgressInfo['stage'], number> = {
+  routed: 1,
+  fetched: 2,
+  read: 3,
+  synthesised: 4,
+};
+
+// Factored from the inline progressToken dance every progress-emitting tool
+// handler below needs: notify the caller's progressToken if the request
+// carried one (notifications/progress), otherwise fall back to a plain
+// logging message so a client with no progress token still sees the
+// updates. Used by library_answer (stages: routed, fetched, read,
+// synthesised), library_ingest (per chunk batch), and library_research.
+function progressReporter(
+  server: McpServer,
+  ctx: ServerContext,
+): (progress: number, message: string) => Promise<void> {
+  const progressToken = ctx.mcpReq._meta?.progressToken;
+  return async (progress, message) => {
+    if (progressToken !== undefined) {
+      await ctx.mcpReq.notify({
+        method: 'notifications/progress',
+        params: { progressToken, progress, message },
+      });
+    } else {
+      await server.sendLoggingMessage({ level: 'info', data: message });
+    }
+  };
+}
+
 // Wraps one MCP tool invocation: bumps that tool's `invocations` counter
 // (src/utils/metrics.ts) and runs the handler inside a fresh reqId/tool
 // AsyncLocalStorage scope (src/utils/http.ts's requestContext), so
@@ -65,7 +219,10 @@ function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise
  * stateless pattern. stdio keeps one long-lived server for its single session.
  */
 export function createServer(): McpServer {
-  const server = new McpServer({ name: 'alexandria', version: VERSION });
+  const server = new McpServer(
+    { name: 'alexandria', version: VERSION },
+    { instructions: INSTRUCTIONS },
+  );
 
   // ── library_list_sources ─────────────────────────────────────────────────────
   server.registerTool(
@@ -74,6 +231,7 @@ export function createServer(): McpServer {
       title: 'List Available Library Sources',
       description: `List all ${listSources().length} library sources (count computed from the live registry at startup) with descriptions and capabilities.`,
       inputSchema: z.object({}),
+      outputSchema: z.object({ sources: z.array(LibrarySourceInfoSchema) }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -99,17 +257,7 @@ export function createServer(): McpServer {
     'library_ask',
     {
       title: 'Natural Language Library Search',
-      description: `Ask for content in plain English. Automatically selects the best sources from all ${listSources().length} libraries, generates optimized per-source queries, and searches in parallel. Returns unified, deduplicated results.
-
-  Examples:
-    "recent papers on diffusion models for music generation"
-    "ancient Greek texts about rhetoric and persuasion"
-    "US military records from World War II"
-    "source code documentation for the fastify web framework"
-    "open access books on cognitive science"
-
-  Requires OPENAI_API_KEY (already set for embeddings).
-  Returns: { query, intent, sources_searched, total_results, results[], routing[], stage1 ('embeddings'|'bm25'), stage2 ('llm'|'skipped'), errors[] }`,
+      description: `Ask for content in plain English; automatically selects the best sources from all ${listSources().length} libraries, generates optimized per-source queries, and searches in parallel. Use this as the default entry point for any natural-language request. Use library_search instead when you already know which source to query. Requires OPENAI_API_KEY (already set for embeddings). Set response_format: "detailed" for routing reasons and per-stage diagnostics.`,
       inputSchema: z.object({
         query: z
           .string()
@@ -130,6 +278,18 @@ export function createServer(): McpServer {
           .max(10)
           .default(5)
           .describe('Results to fetch per source (default 5)'),
+        response_format: ResponseFormatSchema,
+      }),
+      outputSchema: z.object({
+        query: z.string(),
+        intent: z.string(),
+        sources_searched: z.array(z.string()),
+        total_results: z.number(),
+        results: z.array(ResultRowSchema),
+        routing: AskRoutingSchema,
+        errors: z.array(z.object({ source: z.string(), error: z.string() })),
+        stage1: z.enum(['embeddings', 'bm25']).optional(),
+        stage2: z.enum(['llm', 'skipped']).optional(),
       }),
       annotations: {
         readOnlyHint: true,
@@ -138,13 +298,14 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, max_sources, results_per_source }) =>
+    async ({ query, max_sources, results_per_source, response_format }) =>
       withRequestContext('library_ask', async () => {
         try {
           const result = await libraryAsk(query, max_sources, results_per_source);
+          const formatted = formatResult('ask', result, response_format);
           return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-            structuredContent: toStructured(result),
+            content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+            structuredContent: toStructured(formatted),
           };
         } catch (err) {
           return {
@@ -165,14 +326,14 @@ export function createServer(): McpServer {
       description: `Search a specific library source by name. Use library_ask instead for natural language queries across multiple sources.
 
   Sources marked [full text] support library_read and library_ingest.
-  Sources marked [metadata] return discovery info and external URLs only.
-
-  Returns: Array of { id, source, title, authors, year, language, subjects, hasFullText, previewUrl, description }`,
+  Sources marked [metadata] return discovery info and external URLs only.`,
       inputSchema: z.object({
         query: z.string().min(1).max(300).describe('Title, author, subject, or keywords'),
         source: SourceSchema,
         limit: z.number().int().min(1).max(20).default(10).describe('Max results'),
+        response_format: ResponseFormatSchema,
       }),
+      outputSchema: z.object({ results: z.array(ResultRowSchema) }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -180,15 +341,16 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, source, limit }) =>
+    async ({ query, source, limit, response_format }) =>
       withRequestContext('library_search', async () => {
         try {
           const results = await getAdapter(source).search(query, limit);
+          const formatted = formatResult('search', { results }, response_format);
           const text =
-            results.length === 0
+            formatted.results.length === 0
               ? `No results for "${query}" on ${source}.`
-              : JSON.stringify(results, null, 2);
-          return { content: [{ type: 'text', text }], structuredContent: { results } };
+              : JSON.stringify(formatted.results, null, 2);
+          return { content: [{ type: 'text', text }], structuredContent: formatted };
         } catch (err) {
           return {
             content: [
@@ -205,13 +367,12 @@ export function createServer(): McpServer {
     'library_read',
     {
       title: 'Read Full Text or Metadata',
-      description: `Fetch text from a library source. Full-text sources return cleaned text (truncated at 200k chars). Metadata sources return item details and an external URL.
-
-  Returns: { title, authors, year?, language?, text?, charCount?, truncated?, metadataOnly?, externalUrl?, note? }`,
+      description: `Fetch text from a library source. Full-text sources return cleaned text (truncated at 200k chars). Metadata sources return item details and an external URL.`,
       inputSchema: z.object({
         id: z.string().min(1).describe('Item identifier from library_search or library_ask'),
         source: SourceSchema,
       }),
+      outputSchema: ReadResultSchema,
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -243,9 +404,18 @@ export function createServer(): McpServer {
     'library_index',
     {
       title: 'Preview Chunking (Dry Run)',
-      description: `Dry run: fetch text, chunk semantically, score OCR quality. No writes. Full-text sources only.
-  Returns: { totalChunks, droppedChunks, avgQualityScore, estimatedTokens, sampleChunks[0..2] }`,
+      description: `Dry run: fetch text, chunk semantically, score OCR quality. No writes. Full-text sources only.`,
       inputSchema: z.object({ id: z.string().min(1), source: SourceSchema }),
+      outputSchema: z.object({
+        sourceId: z.string(),
+        source: z.string(),
+        title: z.string(),
+        totalChunks: z.number(),
+        droppedChunks: z.number(),
+        avgQualityScore: z.number(),
+        sampleChunks: z.array(ChunkSchema),
+        estimatedTokens: z.number(),
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -297,9 +467,16 @@ export function createServer(): McpServer {
     'library_ingest',
     {
       title: 'Ingest Into Vector Database',
-      description: `Chunk, embed, and store a text. Idempotent. Full-text sources only. Requires OPENAI_API_KEY + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
-  Returns: { chunksWritten, chunksDropped, skippedDuplicate, title, sourceId }`,
+      description: `Chunk, embed, and store a text. Idempotent. Full-text sources only. Requires OPENAI_API_KEY + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.`,
       inputSchema: z.object({ id: z.string().min(1), source: SourceSchema }),
+      outputSchema: z.object({
+        sourceId: z.string(),
+        source: z.string(),
+        title: z.string(),
+        chunksWritten: z.number(),
+        chunksDropped: z.number(),
+        skippedDuplicate: z.boolean(),
+      }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -307,7 +484,7 @@ export function createServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ id, source }) =>
+    async ({ id, source }, ctx) =>
       withRequestContext('library_ingest', async () => {
         try {
           const adapter = getAdapter(source);
@@ -322,6 +499,8 @@ export function createServer(): McpServer {
               content: [{ type: 'text', text: `No text for ${source}:${id}` }],
               isError: true,
             };
+          const report = progressReporter(server, ctx);
+          await report(1, `read "${result.title}"; chunking and embedding`);
           const ingestResult = await ingestText(
             result.text,
             source as LibrarySource,
@@ -330,6 +509,10 @@ export function createServer(): McpServer {
             result.authors,
             result.year,
             result.language,
+          );
+          await report(
+            2,
+            `ingested chunk batch: ${ingestResult.chunksWritten} written, ${ingestResult.chunksDropped} dropped`,
           );
           return {
             content: [{ type: 'text', text: JSON.stringify(ingestResult, null, 2) }],
@@ -356,6 +539,7 @@ export function createServer(): McpServer {
         id: z.string().min(1).describe('Semantic Scholar paperId'),
         limit: z.number().int().min(1).max(500).default(20),
       }),
+      outputSchema: z.object({ results: z.array(ResultRowSchema) }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -388,12 +572,7 @@ export function createServer(): McpServer {
     'library_answer',
     {
       title: 'Answer With Cited Sources',
-      description: `Ask a question in plain English and get a synthesized answer with inline [n] citations. Routes and searches like library_ask, fuses the per-source results with reciprocal rank fusion, reads the top full-text results, and asks an LLM to answer using only those sources. Every factual sentence is cited or marked "not found in the sources"; sentences with a dangling citation are dropped. If the answer had no citation markers at all, or every sentence was dropped as uncited, a message is added to warnings[] (and, in the all-dropped case, answer falls back to a plain listing of the source titles).
-
-  At most 40 fused results are passed to the rerank stage (RERANK_POOL_CAP in src/tools/libraryAnswer.ts); a broader fan-out still searches every routed source, it just reranks the top 40.
-
-  Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY).
-  Returns: { answer, citations[], results[], routing[], warnings[] }`,
+      description: `Ask a question in plain English and get a synthesized answer with inline [n] citations, fused across sources with reciprocal rank fusion. Use this instead of library_ask when you want a cited answer rather than raw results. Every factual sentence is cited or dropped; an uncited or all-dropped answer is flagged in warnings[]. Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the full result set, routing, and warnings.`,
       inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Natural language question'),
         max_sources: z
@@ -417,6 +596,14 @@ export function createServer(): McpServer {
           .max(10)
           .default(4)
           .describe('How many top full-text results to read and cite (default 4)'),
+        response_format: ResponseFormatSchema,
+      }),
+      outputSchema: z.object({
+        answer: z.string(),
+        citations: z.array(CitationSchema),
+        results: z.array(ResultRowSchema.extend({ score: z.number() })).optional(),
+        routing: z.array(RouteItemSchema).optional(),
+        warnings: z.array(z.string()).optional(),
       }),
       annotations: {
         readOnlyHint: true,
@@ -425,17 +612,25 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, max_sources, results_per_source, read_top }) =>
+    async ({ query, max_sources, results_per_source, read_top, response_format }, ctx) =>
       withRequestContext('library_answer', async () => {
         try {
-          const result = await libraryAnswer(query, {
-            maxSources: max_sources,
-            resultsPerSource: results_per_source,
-            readTop: read_top,
-          });
+          const report = progressReporter(server, ctx);
+          const onProgress: AnswerProgressCallback = (info) =>
+            report(ANSWER_STAGE_INDEX[info.stage], info.message);
+          const result = await libraryAnswer(
+            query,
+            {
+              maxSources: max_sources,
+              resultsPerSource: results_per_source,
+              readTop: read_top,
+            },
+            onProgress,
+          );
+          const formatted = formatResult('answer', result, response_format);
           return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-            structuredContent: toStructured(result),
+            content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+            structuredContent: toStructured(formatted),
           };
         } catch (err) {
           return {
@@ -453,10 +648,7 @@ export function createServer(): McpServer {
     'library_research',
     {
       title: 'Recursive Cited Research',
-      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Writes a final cited report over the union of every round's sources, then removes unsupported claims it can excise unambiguously, listing any it left standing in warnings[].
-
-  Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY).
-  Returns: { report, citations[], rounds[], elapsedMs, warnings[] }`,
+      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the per-round breakdown and elapsed time.`,
       inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Research topic or question'),
         depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),
@@ -473,6 +665,23 @@ export function createServer(): McpServer {
           .max(30)
           .default(6)
           .describe('Wall-clock time budget in minutes (default 6)'),
+        response_format: ResponseFormatSchema,
+      }),
+      outputSchema: z.object({
+        report: z.string(),
+        citations: z.array(CitationSchema),
+        rounds: z
+          .array(
+            z.object({
+              round: z.number(),
+              queries: z.array(z.string()),
+              newSources: z.number(),
+              truncated: z.boolean(),
+            }),
+          )
+          .optional(),
+        elapsedMs: z.number().optional(),
+        warnings: z.array(z.string()).optional(),
       }),
       annotations: {
         readOnlyHint: true,
@@ -481,28 +690,20 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, depth, breadth, max_minutes }, ctx) =>
+    async ({ query, depth, breadth, max_minutes, response_format }, ctx) =>
       withRequestContext('library_research', async () => {
         try {
-          const progressToken = ctx.mcpReq._meta?.progressToken;
-          const onProgress: ProgressCallback = async (info) => {
-            if (progressToken !== undefined) {
-              await ctx.mcpReq.notify({
-                method: 'notifications/progress',
-                params: { progressToken, progress: info.round, message: info.message },
-              });
-            } else {
-              await server.sendLoggingMessage({ level: 'info', data: info.message });
-            }
-          };
+          const report = progressReporter(server, ctx);
+          const onProgress: ProgressCallback = (info) => report(info.round, info.message);
           const result = await libraryResearch(
             query,
             { depth, breadth, maxMinutes: max_minutes },
             onProgress,
           );
+          const formatted = formatResult('research', result, response_format);
           return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-            structuredContent: toStructured(result),
+            content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+            structuredContent: toStructured(formatted),
           };
         } catch (err) {
           return {

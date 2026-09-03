@@ -312,7 +312,16 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
 // Stage 1 + stage 2 + fan-out, without the flattened/deduped shape the
 // library_ask tool returns. Stage 9's library_answer/library_research call
 // this directly to get per-source results before fusion.
-export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunAskResult> {
+//
+// `onRouted`, when given, fires once routing is decided (cache hit or not)
+// and before the fan-out searches start - task 1's library_answer uses it
+// to emit a "routed" progress notification distinct from the "fetched" one
+// it emits once this function's searches have actually settled.
+export async function runAsk(
+  query: string,
+  opts: AskOptions = {},
+  onRouted?: (routing: RouteItem[]) => void | Promise<void>,
+): Promise<RunAskResult> {
   const resultsPerSource = opts.resultsPerSource ?? 5;
   const {
     intent,
@@ -321,6 +330,7 @@ export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunA
     stage1,
     stage2,
   } = await planRoute(query, opts);
+  if (onRouted) await onRouted(validRoutes);
 
   const searches = validRoutes.map(async (route) => {
     try {

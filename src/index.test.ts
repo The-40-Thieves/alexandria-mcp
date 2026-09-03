@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { type AddressInfo, connect as netConnect } from 'node:net';
 import test from 'node:test';
 import { createHttpApp, createServer } from './index.ts';
+import { register } from './sources/registry.ts';
 import { resetMetricsForTests } from './utils/metrics.ts';
 
 // Writes a raw, hand-built HTTP/1.1 request line straight to a socket
@@ -462,4 +463,156 @@ test('createServer returns a fresh instance each call', () => {
   const a = createServer();
   const b = createServer();
   assert.notEqual(a, b);
+});
+
+/**
+ * Task 1 (agent ergonomics): every tool advertises `title`, `annotations`,
+ * and `outputSchema` in `tools/list`, and `initialize` carries the
+ * server-wide `instructions` string. A client can't rely on any of these
+ * MAY-level fields silently regressing back to undefined.
+ */
+test('tools/list carries title/annotations/outputSchema for all 9 tools; initialize carries instructions', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const rpc = async (method: string, params: unknown) => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    return (await res.json()) as { result?: Record<string, unknown> };
+  };
+
+  await t.test('tools/list', async () => {
+    const { result } = await rpc('tools/list', {});
+    const tools = result?.tools as Array<Record<string, unknown>> | undefined;
+    assert.equal(tools?.length, 9);
+    for (const tool of tools ?? []) {
+      assert.ok(typeof tool.title === 'string' && tool.title.length > 0, `${tool.name}: no title`);
+      assert.ok(
+        tool.annotations && typeof tool.annotations === 'object',
+        `${tool.name}: no annotations`,
+      );
+      assert.ok(
+        tool.outputSchema && typeof tool.outputSchema === 'object',
+        `${tool.name}: no outputSchema`,
+      );
+    }
+  });
+
+  await t.test('initialize', async () => {
+    const { result } = await rpc('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'test', version: '1.0.0' },
+    });
+    assert.ok(
+      typeof result?.instructions === 'string' && (result.instructions as string).length > 0,
+    );
+  });
+});
+
+/**
+ * A structured-content-against-schema regression for library_search: the
+ * SDK validates `structuredContent` against the tool's advertised
+ * `outputSchema` on every call (see registerTool's outputSchema doc and
+ * ajvProvider), so a shape drift between format.ts's concise row and
+ * index.ts's ResultRowSchema fails HERE, as an `isError` tool result, not
+ * silently at some client months later. Both response_format values are
+ * exercised against the same stubbed adapter.
+ */
+test('library_search structuredContent validates against outputSchema, concise and detailed', async (t) => {
+  register('t_index_schema_fixture', {
+    description: 'fixture source for the outputSchema regression test',
+    supportsIngest: false,
+    async search() {
+      return [
+        {
+          id: 'x1',
+          source: 't_index_schema_fixture',
+          title: 'Fixture Item',
+          authors: ['A. Author'],
+          year: 2020,
+          hasFullText: true,
+          url: 'https://example.org/x1',
+          description: 'a fixture description',
+        },
+      ];
+    },
+    async read() {
+      return { title: 'x', authors: [] };
+    },
+  });
+
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const call = async (args: Record<string, unknown>) => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'library_search', arguments: args },
+      }),
+    });
+    return (await res.json()) as {
+      result?: {
+        isError?: boolean;
+        structuredContent?: { results: Array<Record<string, unknown>> };
+      };
+    };
+  };
+
+  await t.test(
+    'concise (default): rows drop authors/description, keep the wrapper shape',
+    async () => {
+      const { result } = await call({ query: 'x', source: 't_index_schema_fixture' });
+      assert.equal(
+        result?.isError,
+        undefined,
+        'the concise payload must validate against outputSchema',
+      );
+      const row = result?.structuredContent?.results[0];
+      assert.deepEqual(row, {
+        title: 'Fixture Item',
+        source: 't_index_schema_fixture',
+        id: 'x1',
+        hasFullText: true,
+        year: 2020,
+        url: 'https://example.org/x1',
+      });
+    },
+  );
+
+  await t.test('detailed: rows keep authors/description', async () => {
+    const { result } = await call({
+      query: 'x',
+      source: 't_index_schema_fixture',
+      response_format: 'detailed',
+    });
+    assert.equal(
+      result?.isError,
+      undefined,
+      'the detailed payload must validate against outputSchema',
+    );
+    const row = result?.structuredContent?.results[0];
+    assert.equal((row?.authors as string[] | undefined)?.[0], 'A. Author');
+    assert.equal(row?.description, 'a fixture description');
+  });
 });
