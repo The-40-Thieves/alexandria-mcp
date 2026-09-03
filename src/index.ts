@@ -13,6 +13,7 @@ import { config, loadConfig } from './config.ts';
 import { buildInstructions } from './instructions.ts';
 import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
+import { assertIngestAllowed, ingestMetadata } from './sources/ingestPolicy.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
 import { TOOL_COUNT } from './toolCount.ts';
@@ -133,6 +134,7 @@ const LibrarySourceInfoSchema = z.object({
   verifiedAt: z.string().optional(),
   hidden: z.boolean(),
   optionalEnv: z.array(z.string()).optional(),
+  ingestPolicy: z.enum(['allowed', 'attribution', 'timeboxed', 'forbidden']).optional(),
 });
 
 const SourceHealthSchema = z.object({
@@ -158,6 +160,9 @@ const ChunkMetadataSchema = z.object({
   chunkIndex: z.number(),
   totalChunks: z.number(),
   qualityScore: z.number(),
+  license: z.string().optional(),
+  attribution: z.string().optional(),
+  expiresAt: z.string().optional(),
 });
 
 const ChunkSchema = z.object({ text: z.string(), metadata: ChunkMetadataSchema });
@@ -478,6 +483,7 @@ export function createServer(): McpServer {
         avgQualityScore: z.number(),
         sampleChunks: z.array(ChunkSchema),
         estimatedTokens: z.number(),
+        ingestPolicy: z.enum(['allowed', 'attribution', 'timeboxed', 'forbidden']).optional(),
       }),
       annotations: {
         readOnlyHint: true,
@@ -501,15 +507,18 @@ export function createServer(): McpServer {
               content: [{ type: 'text', text: `No text for ${source}:${id}` }],
               isError: true,
             };
-          const preview = indexText(
-            result.text,
-            source as LibrarySource,
-            id,
-            result.title,
-            result.authors,
-            result.year,
-            result.language,
-          );
+          const preview = {
+            ...indexText(
+              result.text,
+              source as LibrarySource,
+              id,
+              result.title,
+              result.authors,
+              result.year,
+              result.language,
+            ),
+            ingestPolicy: adapter.ingestPolicy ?? 'allowed',
+          };
           return {
             content: [{ type: 'text', text: JSON.stringify(preview, null, 2) }],
             structuredContent: toStructured(preview),
@@ -556,6 +565,11 @@ export function createServer(): McpServer {
               content: [{ type: 'text', text: `"${source}" is metadata-only.` }],
               isError: true,
             };
+          assertIngestAllowed({
+            name: source,
+            ingestPolicy: adapter.ingestPolicy,
+            homepage: adapter.homepage,
+          });
           const result = await adapter.read(id);
           if (!result.text)
             return {
@@ -564,6 +578,11 @@ export function createServer(): McpServer {
             };
           const report = progressReporter(server, ctx);
           await report(1, `read "${result.title}"; chunking and embedding`);
+          const chunkStamp = ingestMetadata({
+            name: source,
+            ingestPolicy: adapter.ingestPolicy,
+            homepage: adapter.homepage,
+          });
           const ingestResult = await ingestText(
             result.text,
             source as LibrarySource,
@@ -572,6 +591,7 @@ export function createServer(): McpServer {
             result.authors,
             result.year,
             result.language,
+            chunkStamp,
           );
           await report(
             2,

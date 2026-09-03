@@ -66,6 +66,9 @@ defineRest<SeSearchResponse>({
   freshness: 'realtime',
   homepage: 'https://stackoverflow.com',
   supportsIngest: true,
+  // Stack Exchange content is CC BY-SA: attribution is a license
+  // condition, not optional (see src/sources/ingestPolicy.ts).
+  ingestPolicy: 'attribution',
   verifiedAt: '2026-09-01',
   // Raises the daily quota from 300 to 10000; the source works without one.
   optionalEnv: ['STACKEXCHANGE_KEY'],

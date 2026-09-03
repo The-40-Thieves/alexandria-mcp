@@ -261,6 +261,16 @@ const rawFields = {
       'library_ingest vector store provider. Only "supabase" (the default) is implemented.',
     ),
 
+  // ── Ingest policy (src/sources/ingestPolicy.ts) ─────────────────────────
+  ALEXANDRIA_INGEST_TIMEBOXED: z
+    .string()
+    .optional()
+    .describe(
+      'Set to "1" to confirm you will delete stored text within its retention window before ' +
+        'library_ingest is allowed to ingest a "timeboxed"-policy source (e.g. guardian, 24h). ' +
+        'Unset refuses the ingest instead.',
+    ),
+
   // ── Diagnostics ──────────────────────────────────────────────────────────
   NODE_ENV: z
     .string()

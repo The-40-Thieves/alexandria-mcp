@@ -618,6 +618,79 @@ test('library_search structuredContent validates against outputSchema, concise a
   });
 });
 
+test('library_ingest and library_index honor the source ingestPolicy', async (t) => {
+  const LONG_TEXT =
+    'The quick brown fox jumps over the lazy dog near the riverbank every single morning ' +
+    'before the sun has fully risen above the eastern hills, and the villagers who wake ' +
+    'early enough to see it always remark on how gracefully it moves through the tall grass.';
+
+  register('t_ingest_forbidden', {
+    description: 'fixture source with a forbidden ingest policy',
+    supportsIngest: true,
+    ingestPolicy: 'forbidden',
+    async search() {
+      return [];
+    },
+    async read() {
+      throw new Error('read() must never be called: assertIngestAllowed should refuse first');
+    },
+  });
+
+  register('t_index_attribution', {
+    description: 'fixture source with an attribution ingest policy',
+    supportsIngest: true,
+    ingestPolicy: 'attribution',
+    homepage: 'https://example.org/attribution-source',
+    async search() {
+      return [];
+    },
+    async read() {
+      return { title: 'Fixture Title', authors: ['A. Author'], text: LONG_TEXT };
+    },
+  });
+
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name, arguments: args },
+      }),
+    });
+    return (await res.json()) as {
+      result?: {
+        isError?: boolean;
+        content?: Array<{ type: string; text: string }>;
+        structuredContent?: Record<string, unknown>;
+      };
+    };
+  };
+
+  await t.test('library_ingest refuses a forbidden source before calling read()', async () => {
+    const { result } = await call('library_ingest', { id: 'x1', source: 't_ingest_forbidden' });
+    assert.equal(result?.isError, true);
+    assert.match(result?.content?.[0]?.text ?? '', /"t_ingest_forbidden" cannot be ingested/);
+  });
+
+  await t.test('library_index reports the source ingestPolicy in its preview', async () => {
+    const { result } = await call('library_index', { id: 'x1', source: 't_index_attribution' });
+    assert.equal(result?.isError, undefined);
+    assert.equal(result?.structuredContent?.ingestPolicy, 'attribution');
+  });
+});
+
 /**
  * Task 1 review finding 3: a progress/logging notification is best-effort.
  * By the time library_ingest's second `report()` call fires, ingestText()

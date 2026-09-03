@@ -225,6 +225,10 @@ register('trove', {
   description:
     'Trove (NLA Australia): 340M+ items from Australian libraries, newspapers, archives. Requires free TROVE_API_KEY. Full text is fetched only for newspaper articles that carry a fulltext link; other categories stay metadata-only. Governed by an NLA data agreement: live calls only, no storage, capped full-text reads per session.',
   supportsIngest: false,
+  // The NLA data agreement (see the module comment above) forbids storage
+  // and bulk retrieval outright, not just via supportsIngest above (see
+  // src/sources/ingestPolicy.ts).
+  ingestPolicy: 'forbidden',
   kind: 'rest',
   cluster: 'archives',
   freshness: 'daily',

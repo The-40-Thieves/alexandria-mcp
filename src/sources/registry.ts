@@ -13,6 +13,7 @@ import { rateLimited } from '../utils/rateLimit.ts';
 import { READ_CACHE_TTL_MS, readCache } from '../utils/readCache.ts';
 import { cacheKey, searchCache } from '../utils/resultCache.ts';
 import { stateStore } from '../utils/stateStore.ts';
+import type { IngestPolicy } from './ingestPolicy.ts';
 
 export type SourceKind = 'rest' | 'hub' | 'rss' | 'mcp' | 'scrape';
 export type Freshness = 'realtime' | 'daily' | 'static';
@@ -61,6 +62,12 @@ export interface SourceMeta {
   // scripts/gen-docs.ts emits them into .env.example so a reader can find
   // every key the code looks at, not just the mandatory ones.
   optionalEnv?: string[];
+  // What the source's terms allow doing with retrieved text, separate from
+  // `supportsIngest` above (which only says text is retrievable at all).
+  // Defaults to 'allowed' when unset. See src/sources/ingestPolicy.ts for
+  // what each value means and the two functions (assertIngestAllowed,
+  // ingestMetadata) that enforce and stamp it.
+  ingestPolicy?: IngestPolicy;
 }
 
 export interface SourceAdapter extends Partial<SourceMeta> {
@@ -358,6 +365,7 @@ export function listSources(): Array<
     verifiedAt: adapter.verifiedAt,
     hidden: adapter.hidden,
     optionalEnv: adapter.optionalEnv,
+    ingestPolicy: adapter.ingestPolicy,
   }));
 }
 

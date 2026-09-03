@@ -36,6 +36,12 @@ export interface ChunkMetadata {
   chunkIndex: number;
   totalChunks: number;
   qualityScore: number;
+  // Stamped by ingestText() from the source's ingestPolicy (see
+  // src/sources/ingestPolicy.ts's ingestMetadata()) so provenance and any
+  // retention deadline survive alongside the chunk in the vector store.
+  license?: string;
+  attribution?: string;
+  expiresAt?: string;
 }
 
 export interface IndexPreview {
@@ -47,6 +53,12 @@ export interface IndexPreview {
   avgQualityScore: number;
   sampleChunks: Chunk[];
   estimatedTokens: number;
+  // The source's ingest policy (src/sources/ingestPolicy.ts), so a caller
+  // previewing an ingest can see up front whether library_ingest will
+  // refuse it or stamp attribution/expiry. Set by the library_index tool
+  // handler, not by indexText() itself (this is registry data, not
+  // something the text-chunking pipeline knows about).
+  ingestPolicy?: 'allowed' | 'attribution' | 'timeboxed' | 'forbidden';
 }
 
 export interface IngestResult {

@@ -50,6 +50,10 @@ defineRest<GuardianSearchResponse>({
   freshness: 'realtime',
   homepage: 'https://open-platform.theguardian.com',
   supportsIngest: true,
+  // The Guardian Open Platform's terms require deleting cached/stored
+  // content within 24 hours; gated behind ALEXANDRIA_INGEST_TIMEBOXED=1
+  // (see src/sources/ingestPolicy.ts).
+  ingestPolicy: 'timeboxed',
   auth: { type: 'query', env: 'GUARDIAN_API_KEY', param: 'api-key' },
   pacing: { dailyCap: 450 },
   search: {

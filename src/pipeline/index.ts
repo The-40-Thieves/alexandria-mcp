@@ -1,4 +1,13 @@
-import type { Chunk, ChunkMetadata, IndexPreview, IngestResult, LibrarySource } from '../types.ts';
+import type { IngestMetadata } from '../sources/ingestPolicy.ts';
+import type {
+  Chunk,
+  ChunkMetadata,
+  EmbeddingProvider,
+  IndexPreview,
+  IngestResult,
+  LibrarySource,
+  VectorStoreProvider,
+} from '../types.ts';
 import {
   buildEmbeddingProvider,
   buildVectorStoreProvider,
@@ -132,10 +141,19 @@ export async function ingestText(
   authors: string[],
   year?: number,
   language?: string,
+  // The ingest-policy stamp (src/sources/ingestPolicy.ts's ingestMetadata())
+  // to merge onto every chunk's metadata before it's embedded and written,
+  // so license/attribution/an expiry survive alongside the chunk in the
+  // vector store. Undefined (the 'allowed' policy's stamp) merges nothing.
+  chunkStamp?: IngestMetadata,
+  // Test-only injection point: a caller (ingestPolicy.test.ts-adjacent
+  // pipeline tests) can pass a fake embedder/store instead of the real
+  // OpenAI/Supabase ones resolveConfig() would otherwise build.
+  providers?: { embedder?: EmbeddingProvider; store?: VectorStoreProvider },
 ): Promise<IngestResult> {
   const config = resolveConfig();
-  const embedder = await buildEmbeddingProvider(config.embedding);
-  const store = await buildVectorStoreProvider(config.vectorStore);
+  const embedder = providers?.embedder ?? (await buildEmbeddingProvider(config.embedding));
+  const store = providers?.store ?? (await buildVectorStoreProvider(config.vectorStore));
 
   const mcpName = `${MCP_NAME_PREFIX}-${source}`;
 
@@ -161,7 +179,11 @@ export async function ingestText(
     language,
   });
 
-  const { passed, dropped } = filterChunks(raw);
+  const stamped = chunkStamp
+    ? raw.map((c) => ({ ...c, metadata: { ...c.metadata, ...chunkStamp } }))
+    : raw;
+
+  const { passed, dropped } = filterChunks(stamped);
 
   if (passed.length === 0) {
     return {

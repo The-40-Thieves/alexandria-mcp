@@ -107,9 +107,9 @@ test('probe classification', async (t) => {
     );
   });
   await t.test('regressions does not flag OK -> EMPTY for an EXPECTED_EMPTY source', () => {
-    assert.ok(EXPECTED_EMPTY.has('hathitrust'));
-    const base = { hathitrust: { status: 'OK' } } as any;
-    const now = { hathitrust: { status: 'EMPTY' } } as any;
+    assert.ok(EXPECTED_EMPTY.has('webfetch'));
+    const base = { webfetch: { status: 'OK' } } as any;
+    const now = { webfetch: { status: 'EMPTY' } } as any;
     assert.deepEqual(regressions(base, now), []);
   });
   await t.test('regressions DOES flag OK -> EMPTY for a source not in EXPECTED_EMPTY', () => {
@@ -143,10 +143,10 @@ test('withEmptyRegressionLabels', async (t) => {
   await t.test(
     'leaves EMPTY alone for an EXPECTED_EMPTY source even when the baseline was OK',
     () => {
-      assert.ok(EXPECTED_EMPTY.has('hathitrust'));
-      const base = { hathitrust: { status: 'OK' } };
-      const now = { hathitrust: { status: 'EMPTY', ms: 10, count: 0 } } as any;
-      assert.equal(withEmptyRegressionLabels(base, now).hathitrust.status, 'EMPTY');
+      assert.ok(EXPECTED_EMPTY.has('webfetch'));
+      const base = { webfetch: { status: 'OK' } };
+      const now = { webfetch: { status: 'EMPTY', ms: 10, count: 0 } } as any;
+      assert.equal(withEmptyRegressionLabels(base, now).webfetch.status, 'EMPTY');
     },
   );
 

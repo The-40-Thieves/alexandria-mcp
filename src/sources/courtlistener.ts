@@ -119,7 +119,7 @@ register('courtlistener', {
   homepage: 'https://www.courtlistener.com',
   verifiedAt: '2026-09-01',
   auth: { type: 'header', env: 'COURTLISTENER_API_KEY', header: 'Authorization' },
-  pacing: { minIntervalMs: 12000, dailyCap: 120 },
+  pacing: { minIntervalMs: 12000, dailyCap: 125 },
   search: courtlistenerSearch,
   async read(id) {
     const raw = await courtlistenerRead(id);

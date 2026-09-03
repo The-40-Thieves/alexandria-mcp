@@ -77,6 +77,10 @@ export async function wikisourceRead(
 register('wikisource', {
   description: 'Wikisource — multilingual library of free-content source texts in 70+ languages.',
   supportsIngest: true,
+  // Wikisource content is CC BY-SA (like other Wikimedia projects):
+  // attribution is a license condition, not optional (see
+  // src/sources/ingestPolicy.ts).
+  ingestPolicy: 'attribution',
   kind: 'rest',
   cluster: 'literature',
   freshness: 'daily',
