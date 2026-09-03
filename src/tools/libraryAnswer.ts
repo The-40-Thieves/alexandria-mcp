@@ -1,6 +1,7 @@
 // THE-317: library_answer (Stage 9, task 9.1). Runs libraryAsk's routing
 // and fan-out, fuses the per-source result lists with RRF, optionally
-// reranks them with an LLM, reads the top full-text results, and asks the
+// reranks them (Task 10: an LLM listwise pass or a cross-encoder backend -
+// src/utils/rerank.ts), reads the top full-text results, and asks the
 // `synth` role for a cited answer. Every LLM call goes through
 // src/utils/providers.ts; nothing here imports openai directly.
 import { config } from '../config.ts';
@@ -14,14 +15,14 @@ import {
   retractedWarning,
 } from '../utils/citationGrade.ts';
 import { type ClaimVerdict, checkClaims } from '../utils/claimCheck.ts';
-import { llmRerank, rrf } from '../utils/fuse.ts';
+import { rrf } from '../utils/fuse.ts';
 import { checkLiveness } from '../utils/liveness.ts';
 import { pool, type RemoteServerConfig } from '../utils/mcpClientPool.ts';
 import { chatText, requireRoleForTool } from '../utils/providers.ts';
+import { rerank } from '../utils/rerank.ts';
 import { type RouteItem, runAsk } from './libraryAsk.ts';
 
 const READ_CHAR_LIMIT = 6000;
-const RERANK_POOL_CAP = 40;
 // Mirrors src/tools/libraryCitations.ts's own (unexported) DOI_RE and
 // scripts/eval-answer.ts's copy - a bare id shaped like a DOI (no adapter
 // gave us a ReadResult.doi, but the id itself already is one, e.g. some
@@ -419,8 +420,8 @@ export async function libraryAnswer(
   if (knowledgeResults.length > 0) lists.push(knowledgeResults);
 
   const fused = rrf(lists);
-  const rerankTop = Math.min(fused.length, RERANK_POOL_CAP) || 1;
-  const ranked = (await llmRerank(query, fused, rerankTop)) as Array<
+  const rerankPool = fused.slice(0, Math.min(fused.length, config.ALEXANDRIA_RERANK_POOL) || 1);
+  const ranked = (await rerank(query, rerankPool, { top: rerankPool.length })) as Array<
     LibraryResult & { score: number }
   >;
 

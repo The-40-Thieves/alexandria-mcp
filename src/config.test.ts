@@ -120,8 +120,34 @@ test('loadConfig', async (t) => {
     assert.equal(result.LOG_LEVEL, undefined);
     assert.equal(result.ALEXANDRIA_LEDGER, undefined);
     assert.equal(result.ALEXANDRIA_RERANK, undefined);
+    assert.equal(
+      result.ALEXANDRIA_RERANK_POOL,
+      60,
+      'a coerced-number field still gets its default',
+    );
+    assert.equal(result.ALEXANDRIA_MULTI_QUERY, undefined);
     assert.equal(result.ALEXANDRIA_ROUTER_SKIP_MARGIN, undefined);
     assert.equal(result.OPENAI_API_KEY, undefined);
+  });
+
+  await t.test('Task 10: ALEXANDRIA_RERANK accepts every backend name', () => {
+    for (const backend of ['off', 'llm', 'cohere', 'workers-ai']) {
+      const result = loadConfig({ ALEXANDRIA_RERANK: backend } as NodeJS.ProcessEnv);
+      assert.equal(result.ALEXANDRIA_RERANK, backend);
+    }
+  });
+
+  await t.test('Task 10: an explicit ALEXANDRIA_RERANK_POOL passes through unchanged', () => {
+    const result = loadConfig({ ALEXANDRIA_RERANK_POOL: '100' } as NodeJS.ProcessEnv);
+    assert.equal(result.ALEXANDRIA_RERANK_POOL, 100);
+  });
+
+  await t.test('Task 10: ALEXANDRIA_MULTI_QUERY only accepts "1"', () => {
+    assert.equal(
+      loadConfig({ ALEXANDRIA_MULTI_QUERY: '1' } as NodeJS.ProcessEnv).ALEXANDRIA_MULTI_QUERY,
+      '1',
+    );
+    assert.throws(() => loadConfig({ ALEXANDRIA_MULTI_QUERY: 'true' } as NodeJS.ProcessEnv));
   });
 });
 

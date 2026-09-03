@@ -318,6 +318,83 @@ test('runAsk / libraryAsk', async (t) => {
   });
 });
 
+// Task 10: margin-gated multi-query, against planRoute() directly (same
+// shape as the router-skip-margin block below) - reachable only from the
+// stage-2 branch, so ALEXANDRIA_ROUTER_SKIP_MARGIN is pinned high enough
+// that this BM25-mode run never skips.
+test('multi-query candidate expansion', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+  resetCatalogCacheForTests();
+  resetRoutingCacheForTests();
+
+  await t.test(
+    'ALEXANDRIA_MULTI_QUERY=1 unions stage-1 shortlists from two alternate phrasings, deduped by source',
+    async () => {
+      const router = await startFakeRouter((system) => {
+        if (system.includes('alternate phrasings')) {
+          return { queries: ['astronomy telescopes', 'space observation research'] };
+        }
+        return { intent: 'x', routes: [] };
+      });
+      t.after(() => router.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+      process.env.ALEXANDRIA_MULTI_QUERY = '1';
+      const withMultiQuery = await planRoute('nasa telescope discoveries', { maxSources: 5 });
+
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      resetRoutingCacheForTests();
+      const withoutMultiQuery = await planRoute('nasa telescope discoveries', { maxSources: 5 });
+
+      const names = [...withMultiQuery.clusterBySource.keys()];
+      assert.equal(new Set(names).size, names.length, 'the union has no duplicate source names');
+      assert.ok(
+        withMultiQuery.clusterBySource.size >= withoutMultiQuery.clusterBySource.size,
+        'the expanded shortlist is at least as large as the single-query shortlist',
+      );
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+    },
+  );
+
+  await t.test(
+    'off by default: no alternate-phrasing call, shortlist is stage 1 alone',
+    async () => {
+      let calls = 0;
+      const router = await startFakeRouter((system) => {
+        calls++;
+        assert.ok(!system.includes('alternate phrasings'), 'never asks for alternates when unset');
+        return { intent: 'x', routes: [] };
+      });
+      t.after(() => router.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      resetRoutingCacheForTests();
+
+      await planRoute('satellite imagery archives', { maxSources: 5 });
+      assert.equal(calls, 1, 'exactly one router call: the routing decision itself');
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+    },
+  );
+});
+
 // Task 6: the router-skip margin and the routing decision cache, both
 // against planRoute() directly (stage 1 + stage 2 only, no fan-out) so a
 // call count on the fake router server is a direct proxy for "how many LLM

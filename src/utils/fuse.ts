@@ -1,12 +1,11 @@
-// THE-317: Reciprocal Rank Fusion and an optional listwise LLM rerank for
-// library_answer/library_research (Stage 9). Fuses one ranked LibraryResult
-// list per source/engine into a single ranked list, then dedupes near
-// duplicates (the same work returned under slightly different titles by two
-// sources) before anything gets read or cited.
-import { z } from 'zod';
-import { config } from '../config.ts';
+// THE-317: Reciprocal Rank Fusion for library_answer/library_research
+// (Stage 9). Fuses one ranked LibraryResult list per source/engine into a
+// single ranked list, then dedupes near duplicates (the same work returned
+// under slightly different titles by two sources) before anything gets
+// read or cited. The optional rerank pass that used to live here (a
+// listwise LLM call) moved to src/utils/rerank.ts in Task 10, which also
+// adds cross-encoder backends behind the same rerank() entry point.
 import type { LibraryResult } from '../types.ts';
-import { chatJSON } from './providers.ts';
 
 export interface FusedResult extends LibraryResult {
   score: number;
@@ -56,55 +55,4 @@ export function rrf(lists: LibraryResult[][], k = 60): FusedResult[] {
     deduped.push(item);
   }
   return deduped;
-}
-
-const RerankOrderSchema = z.array(z.number().int());
-
-// Numbers each item 1..N (avoids id collisions across sources) and asks the
-// `rerank` role for a JSON array of item numbers, most to least relevant.
-function buildRerankPrompt(items: LibraryResult[]): string {
-  const listing = items
-    .map(
-      (item, i) => `${i + 1}. ${item.title} (${item.source}${item.year ? `, ${item.year}` : ''})`,
-    )
-    .join('\n');
-  return `You are a search result reranker. Given a query and a numbered list of candidate results, decide which are most relevant.
-
-Return JSON only: an array of the item numbers, most relevant first, e.g. [3, 1, 5, 2, 4]. Include every number exactly once.
-
-Candidates:
-${listing}`;
-}
-
-// Listwise rerank via the `rerank` role. Off by default; on only when
-// ALEXANDRIA_RERANK=llm. Falls back to the input order (truncated to `top`)
-// on any failure: no key configured, a network error, or a response that
-// fails schema validation twice.
-export async function llmRerank(
-  query: string,
-  items: LibraryResult[],
-  top = 10,
-): Promise<LibraryResult[]> {
-  if (config.ALEXANDRIA_RERANK !== 'llm' || items.length === 0) {
-    return items.slice(0, top);
-  }
-
-  try {
-    const order = await chatJSON('rerank', buildRerankPrompt(items), query, RerankOrderSchema);
-    const used = new Set<number>();
-    const ordered: LibraryResult[] = [];
-    for (const n of order) {
-      const idx = n - 1;
-      if (idx >= 0 && idx < items.length && !used.has(idx)) {
-        used.add(idx);
-        ordered.push(items[idx]);
-      }
-    }
-    for (let i = 0; i < items.length; i++) {
-      if (!used.has(i)) ordered.push(items[i]);
-    }
-    return ordered.slice(0, top);
-  } catch {
-    return items.slice(0, top);
-  }
 }

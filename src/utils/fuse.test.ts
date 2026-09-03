@@ -1,56 +1,10 @@
 import assert from 'node:assert/strict';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import test from 'node:test';
 import type { LibraryResult } from '../types.ts';
-import { llmRerank, rrf } from './fuse.ts';
+import { rrf } from './fuse.ts';
 
 function result(source: string, id: string, title: string): LibraryResult {
   return { id, source, title, authors: [], hasFullText: false };
-}
-
-interface FakeServer {
-  url: string;
-  requests: unknown[];
-  close(): Promise<void>;
-}
-
-function startFakeChatServer(
-  respond: () => { status: number; body: unknown },
-): Promise<FakeServer> {
-  const requests: unknown[] = [];
-  return new Promise((resolve) => {
-    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      let raw = '';
-      req.on('data', (chunk) => {
-        raw += chunk;
-      });
-      req.on('end', () => {
-        requests.push(JSON.parse(raw));
-        const { status, body } = respond();
-        res.writeHead(status, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(body));
-      });
-    });
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      resolve({
-        url: `http://127.0.0.1:${port}/v1`,
-        requests,
-        close: () => new Promise((res) => server.close(() => res())),
-      });
-    });
-  });
-}
-
-function chatCompletion(content: string) {
-  return {
-    id: 'chatcmpl-1',
-    object: 'chat.completion',
-    created: 0,
-    model: 'test-model',
-    choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
-  };
 }
 
 test('rrf', async (t) => {
@@ -105,75 +59,5 @@ test('rrf', async (t) => {
 
   await t.test('an empty list of lists returns an empty result', () => {
     assert.deepEqual(rrf([]), []);
-  });
-});
-
-test('llmRerank', async (t) => {
-  const originalEnv = { ...process.env };
-  t.after(() => {
-    process.env = originalEnv;
-  });
-
-  await t.test('is off by default: returns input order truncated to top', async () => {
-    delete process.env.ALEXANDRIA_RERANK;
-    const items = [result('a', '1', 'A'), result('a', '2', 'B'), result('a', '3', 'C')];
-    const out = await llmRerank('query', items, 2);
-    assert.deepEqual(
-      out.map((i) => i.id),
-      ['1', '2'],
-    );
-  });
-
-  await t.test('when enabled, reorders per the model response', async () => {
-    const server = await startFakeChatServer(() => ({
-      status: 200,
-      body: chatCompletion(JSON.stringify([3, 1, 2])),
-    }));
-    t.after(() => server.close());
-
-    process.env.ALEXANDRIA_RERANK = 'llm';
-    process.env.ALEXANDRIA_RERANK_BASE_URL = server.url;
-    process.env.ALEXANDRIA_RERANK_API_KEY = 'test-key';
-
-    const items = [result('a', '1', 'A'), result('a', '2', 'B'), result('a', '3', 'C')];
-    const out = await llmRerank('query', items, 10);
-    assert.deepEqual(
-      out.map((i) => i.id),
-      ['3', '1', '2'],
-    );
-  });
-
-  await t.test('falls back to input order on a malformed response', async () => {
-    const server = await startFakeChatServer(() => ({
-      status: 200,
-      body: chatCompletion('not json'),
-    }));
-    t.after(() => server.close());
-
-    process.env.ALEXANDRIA_RERANK = 'llm';
-    process.env.ALEXANDRIA_RERANK_BASE_URL = server.url;
-    process.env.ALEXANDRIA_RERANK_API_KEY = 'test-key';
-
-    const items = [result('a', '1', 'A'), result('a', '2', 'B')];
-    const out = await llmRerank('query', items, 10);
-    assert.deepEqual(
-      out.map((i) => i.id),
-      ['1', '2'],
-    );
-  });
-
-  await t.test('falls back to input order when no key is configured', async () => {
-    process.env.ALEXANDRIA_RERANK = 'llm';
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.ALEXANDRIA_RERANK_API_KEY;
-    delete process.env.ALEXANDRIA_RERANK_BASE_URL;
-    delete process.env.ALEXANDRIA_API_KEY;
-
-    const items = [result('a', '1', 'A'), result('a', '2', 'B')];
-    const out = await llmRerank('query', items, 10);
-    assert.deepEqual(
-      out.map((i) => i.id),
-      ['1', '2'],
-    );
   });
 });

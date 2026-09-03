@@ -149,11 +149,34 @@ const rawFields = {
   ...roleFields('RESEARCH', 'research'),
   ...roleFields('EMBEDDINGS', 'embeddings'),
   ...roleFields('RERANK', 'rerank'),
+  // Task 10: 'llm' is the original listwise-chat backend (over at most 20
+  // shuffled candidates - src/utils/rerank.ts). 'cohere' and 'workers-ai'
+  // are true cross-encoder backends, both resolved through the same
+  // ALEXANDRIA_RERANK_BASE_URL/_API_KEY/_MODEL as 'llm' rather than a
+  // second set of env vars: 'cohere' POSTs the Cohere/Jina/Voyage-shaped
+  // request to "<base>/rerank", 'workers-ai' POSTs Cloudflare's
+  // {query, contexts} shape straight to ALEXANDRIA_RERANK_BASE_URL (already
+  // the full per-account model run URL for that backend). Unset behaves
+  // exactly like the explicit 'off' value: the fused order is kept.
   ALEXANDRIA_RERANK: z
-    .enum(['llm'])
+    .enum(['off', 'llm', 'cohere', 'workers-ai'])
     .optional()
     .describe(
-      'Set to "llm" to rerank fused results with a chat call (the rerank role); otherwise the fused order is kept.',
+      'Rerank backend for library_answer\'s fused candidate pool: "llm" (listwise chat rerank), "cohere" (POST <rerank base>/rerank, Cohere request shape), or "workers-ai" (Cloudflare bge-reranker-base {query, contexts} shape). Unset or "off" keeps the fused order.',
+    ),
+  ALEXANDRIA_RERANK_POOL: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60)
+    .describe(
+      "How many of RRF's fused results library_answer hands to the configured rerank backend before reading/citing. The 'llm' backend further caps its own listwise input to the top 20 of this pool.",
+    ),
+  ALEXANDRIA_MULTI_QUERY: z
+    .enum(['1'])
+    .optional()
+    .describe(
+      'Set to "1" to have library_ask/library_answer ask the router role for two alternate phrasings when stage 1\'s margin is below the router-skip margin, running stage 1 again for each and unioning the shortlists before stage 2. Off by default.',
     ),
   ...roleFields('VERIFY', 'verify'),
   ALEXANDRIA_CLAIM_CHECK: z
