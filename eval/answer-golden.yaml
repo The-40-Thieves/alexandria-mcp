@@ -1,0 +1,198 @@
+# Answer/citation golden set (Task 8). Each entry names a natural-language
+# question, 3-6 `expected_nuggets` (short, independently checkable factual
+# statements a good answer should cover), and `expected_sources` (source
+# names a well-routed library_answer call would plausibly cite - grouping
+# only, the same role eval-routing.yaml's `expected` plays for its own
+# per-cluster table; scoring does not require an exact match against this
+# list). Written by hand from the topics already exercised in
+# eval/routing-golden.yaml, restricted to well-established, encyclopedic
+# facts so every nugget is checkable against a public source.
+#
+# Most rows name at least one `hasFullText: true` source (library_answer
+# only synthesizes from sources it can read), usually Wikipedia alongside
+# the domain-specific source the question is about. Three rows name a
+# domain source that is metadata-only (`hasFullText: false`): peps,
+# federalregister, and wikidata - each is flagged inline below, and each
+# still pairs with wikipedia so the row has a citable full-text source;
+# library_answer is expected to cite wikipedia for these, not the
+# metadata-only source named alongside it.
+#
+# Loaded by scripts/eval-answer.ts to score citation precision, nugget
+# (citation) recall, and URL/DOI resolvability.
+
+# ── academic ─────────────────────────────────────────────────────────────
+- query: When was the Transformer architecture introduced and what problem does self-attention solve?
+  expected_nuggets:
+    - The Transformer architecture was introduced in the 2017 paper "Attention Is All You Need".
+    - The paper's authors include Ashish Vaswani and colleagues at Google.
+    - The Transformer replaces recurrence and convolution with self-attention.
+    - Self-attention lets the model weigh the relevance of every token to every other token in a sequence.
+  expected_sources: [arxiv, wikipedia]
+
+# ── ai_research ──────────────────────────────────────────────────────────
+- query: What does AlphaFold do and what did it achieve at CASP14?
+  expected_nuggets:
+    - AlphaFold is a deep learning system developed by DeepMind.
+    - AlphaFold predicts a protein's 3D structure from its amino acid sequence.
+    - AlphaFold2 was presented at the CASP14 competition in 2020.
+    - It achieved a median accuracy competitive with experimental structure-determination methods at CASP14.
+  expected_sources: [arxiv, wikipedia]
+
+# ── developer ────────────────────────────────────────────────────────────
+- query: What is the JSON Web Token (JWT) standard and how is a JWT structured?
+  expected_nuggets:
+    - JSON Web Token (JWT) is defined in IETF RFC 7519.
+    - RFC 7519 was published in May 2015.
+    - A JWT consists of a header, a payload, and a signature, separated by dots.
+    - JWTs are commonly used for authentication and information exchange between parties.
+  expected_sources: [ietf, wikipedia]
+
+- query: What is a Python Enhancement Proposal (PEP) and what do PEP 8 and PEP 484 cover?
+  expected_nuggets:
+    - A Python Enhancement Proposal (PEP) is a design document that provides information to the Python community.
+    - PEP 8 is the style guide for Python code.
+    - PEP 484 introduced type hints to Python.
+    - PEPs are indexed and published on peps.python.org.
+  expected_sources: [peps, wikipedia] # peps is metadata-only (hasFullText: false); library_answer cites wikipedia
+
+# ── economics ────────────────────────────────────────────────────────────
+- query: What does the Case-Shiller home price index measure and who developed it?
+  expected_nuggets:
+    - The S&P CoreLogic Case-Shiller Home Price Index tracks changes in U.S. residential real estate prices.
+    - It was developed by economists Karl Case and Robert Shiller.
+    - The index uses a repeat-sales methodology, comparing sale prices of the same homes over time.
+    - FRED publishes several regional and national Case-Shiller series.
+  expected_sources: [fred, wikipedia]
+
+- query: What is the FRED economic database and who maintains it?
+  expected_nuggets:
+    - FRED (Federal Reserve Economic Data) is maintained by the Federal Reserve Bank of St. Louis.
+    - It provides free access to economic data series from many national and international sources.
+    - FRED includes series such as GDP, the unemployment rate, and the Consumer Price Index.
+    - FRED was launched in 1991.
+  expected_sources: [fred]
+
+# ── government ───────────────────────────────────────────────────────────
+- query: What is the Federal Register and what kinds of documents does it publish?
+  expected_nuggets:
+    - The Federal Register is the official daily publication of the U.S. federal government.
+    - It publishes proposed and final administrative rules and regulations from federal agencies.
+    - It also publishes presidential documents such as executive orders.
+    - The Federal Register has been published continuously since 1936.
+  expected_sources: [federalregister, wikipedia] # federalregister is metadata-only (hasFullText: false); library_answer cites wikipedia
+
+# ── law ──────────────────────────────────────────────────────────────────
+- query: What does the EU's General Data Protection Regulation (GDPR) require?
+  expected_nuggets:
+    - The GDPR is Regulation (EU) 2016/679.
+    - It became enforceable on 25 May 2018.
+    - It grants individuals rights over their personal data, including the right of access and the right to erasure.
+    - It applies to organizations that process personal data of EU residents, regardless of where the organization is based.
+  expected_sources: [eurlex, wikipedia]
+
+# ── literature ───────────────────────────────────────────────────────────
+- query: Who wrote Pride and Prejudice and what is the novel about?
+  expected_nuggets:
+    - Pride and Prejudice was written by Jane Austen.
+    - It was first published in 1813.
+    - The novel is set among the landed gentry in Regency-era England.
+    - The story centers on Elizabeth Bennet's evolving relationship with Mr. Darcy.
+  expected_sources: [gutenberg, wikipedia]
+
+- query: What is Antonio Gramsci's concept of cultural hegemony?
+  expected_nuggets:
+    - Antonio Gramsci was an Italian Marxist philosopher and politician.
+    - Gramsci developed the concept of cultural hegemony.
+    - He wrote much of his theoretical work, the "Prison Notebooks", while imprisoned by the Fascist regime.
+    - Cultural hegemony describes how a ruling class maintains power through cultural and ideological institutions, not just force.
+  expected_sources: [marxists, wikipedia]
+
+# ── markets ──────────────────────────────────────────────────────────────
+- query: What is Bitcoin and who is credited with creating it?
+  expected_nuggets:
+    - Bitcoin is a decentralized digital currency.
+    - It was introduced in a 2008 white paper by a person or group using the pseudonym Satoshi Nakamoto.
+    - The Bitcoin network launched in January 2009.
+    - Bitcoin has a fixed maximum supply of 21 million coins.
+  expected_sources: [coingecko, wikipedia]
+
+# ── news_global ──────────────────────────────────────────────────────────
+- query: What is The Guardian newspaper and when was it founded?
+  expected_nuggets:
+    - The Guardian is a British daily newspaper.
+    - It was founded in 1821 as the Manchester Guardian.
+    - It adopted its current name, The Guardian, in 1959.
+    - It is owned by the Scott Trust.
+  expected_sources: [guardian, wikipedia]
+
+# ── real_estate ──────────────────────────────────────────────────────────
+- query: What is HUD Fair Market Rent and how is it used?
+  expected_nuggets:
+    - Fair Market Rent (FMR) is calculated by the U.S. Department of Housing and Urban Development.
+    - FMRs are used to determine payment standards for the Housing Choice Voucher (Section 8) program.
+    - FMRs are typically set at the 40th or 50th percentile of gross rents in an area.
+    - HUD publishes FMRs annually by metropolitan area and county.
+  expected_sources: [hud, wikipedia]
+
+# ── science ──────────────────────────────────────────────────────────────
+- query: What is bioRxiv and what kind of content does it host?
+  expected_nuggets:
+    - bioRxiv is a preprint repository for the biological sciences.
+    - It was launched in 2013 by Cold Spring Harbor Laboratory.
+    - Papers posted to bioRxiv have not yet undergone peer review at the time of posting.
+    - bioRxiv lets researchers share findings before formal journal publication.
+  expected_sources: [biorxiv, wikipedia]
+
+# ── security ─────────────────────────────────────────────────────────────
+- query: What is the CVE system and who operates it?
+  expected_nuggets:
+    - CVE stands for Common Vulnerabilities and Exposures.
+    - The CVE program is sponsored by the U.S. Department of Homeland Security via CISA.
+    - The MITRE Corporation operates the CVE program.
+    - CVE identifiers follow the format CVE-YYYY-NNNNN.
+  expected_sources: [circl, wikipedia]
+
+# ── standards ────────────────────────────────────────────────────────────
+- query: What does IETF RFC 9110 define?
+  expected_nuggets:
+    - RFC 9110 defines HTTP Semantics.
+    - RFC 9110 was published by the IETF in June 2022.
+    - It obsoletes parts of the earlier RFC 7230-7235 series.
+    - HTTP Semantics defines the methods, status codes, and header fields shared across HTTP versions.
+  expected_sources: [ietf]
+
+# ── video ────────────────────────────────────────────────────────────────
+- query: What is YouTube and when was it founded?
+  expected_nuggets:
+    - YouTube is a video sharing platform.
+    - It was founded in February 2005 by Chad Hurley, Steve Chen, and Jawed Karim.
+    - Google acquired YouTube in November 2006.
+    - YouTube is headquartered in San Bruno, California.
+  expected_sources: [youtube, wikipedia]
+
+# ── web ──────────────────────────────────────────────────────────────────
+- query: What is Wikidata and how does it structure knowledge?
+  expected_nuggets:
+    - Wikidata is a free, collaborative knowledge base.
+    - It is operated by the Wikimedia Foundation.
+    - Wikidata launched in October 2012.
+    - Wikidata stores data as items with statements, each made of a property and a value.
+  expected_sources: [wikidata, wikipedia] # wikidata is metadata-only (hasFullText: false); library_answer cites wikipedia
+
+# ── archives ─────────────────────────────────────────────────────────────
+- query: What does the Chronicling America project provide?
+  expected_nuggets:
+    - Chronicling America is a digital collection of historic American newspapers.
+    - It is a joint project of the Library of Congress and the National Endowment for the Humanities.
+    - The collection includes newspaper pages with searchable OCR text.
+    - It is part of the National Digital Newspaper Program.
+  expected_sources: [chroniclingamerica, wikipedia]
+
+# ── culture ──────────────────────────────────────────────────────────────
+- query: What is Gallica and what does it provide access to?
+  expected_nuggets:
+    - Gallica is the digital library of the Bibliothèque nationale de France (BnF).
+    - Gallica launched in 1997.
+    - It provides free access to digitized books, manuscripts, and other documents.
+    - Gallica includes items from the BnF and from partner libraries.
+  expected_sources: [gallica, wikipedia]

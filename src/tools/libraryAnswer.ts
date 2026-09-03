@@ -189,8 +189,10 @@ Rules:
 
 // Splits on sentence-ending punctuation followed by whitespace. Not a full
 // sentence tokenizer, but adequate for finding citation markers per
-// sentence in LLM prose.
-function splitSentences(text: string): string[] {
+// sentence in LLM prose. Exported so scripts/eval-answer.ts can walk the
+// same per-sentence citations this module itself scores against, instead
+// of re-implementing sentence splitting.
+export function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
