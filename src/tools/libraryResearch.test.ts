@@ -348,3 +348,78 @@ test('checkCitations', async (t) => {
     assert.deepEqual(out.warnings, []);
   });
 });
+
+// Task 9: library_research re-grades its final union citations' chainSupported
+// signal (src/utils/citationGrade.ts) once checkCitations has run, using
+// whatever a citation's originating libraryAnswer() call already computed
+// for its other signals - no new network calls, just a tier recompute.
+test('libraryResearch: chainSupported wiring after checkCitations', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+
+  const draftReport =
+    'Fact A occurred due to substantial evidence [1]. Fact B happened due to overwhelming evidence [2].';
+  const unsupportedSentence = 'Fact B happened due to overwhelming evidence [2].';
+
+  function decide(system: string): unknown {
+    if (system.includes('planning a research pass')) return { queries: ['a single query'] };
+    if (system.includes('extract structured learnings')) return { learnings: [], followUps: [] };
+    if (system.includes('write a research report')) return { report: draftReport };
+    if (system.includes('fact-check')) return { unsupported: [unsupportedSentence] };
+    throw new Error(`unexpected prompt: ${system.slice(0, 80)}`);
+  }
+
+  const server = await startFakeChatServer(decide);
+  t.after(() => server.close());
+  process.env.ALEXANDRIA_RESEARCH_BASE_URL = server.url;
+  process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+  process.env.ALEXANDRIA_SYNTH_BASE_URL = server.url;
+  process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+  const answerFn = async (): Promise<LibraryAnswerResult> => ({
+    answer: 'Answer text citing sources [1][2].',
+    citations: [
+      {
+        n: 1,
+        source: 'fake',
+        id: 'a',
+        title: 'A',
+        grade: { tier: 'A', signals: { sourceTier: 1, fullTextVerified: true } },
+      },
+      {
+        n: 2,
+        source: 'fake',
+        id: 'b',
+        title: 'B',
+        grade: { tier: 'B', signals: { sourceTier: 2, fullTextVerified: true } },
+      },
+    ],
+    results: [],
+    routing: [],
+    warnings: [],
+  });
+
+  const result = await libraryResearch(
+    'a topic',
+    { depth: 1, breadth: 1, maxMinutes: 6 },
+    undefined,
+    { answerFn },
+  );
+
+  assert.equal(result.citations.length, 2);
+  const [citationA, citationB] = result.citations;
+
+  // Citation 1's sentence survived the fact-check pass: still cited in the
+  // final report, so chainSupported is true and its tier is unchanged (A).
+  assert.equal(citationA.grade?.signals.chainSupported, true);
+  assert.equal(citationA.grade?.tier, 'A');
+
+  // Citation 2's sole supporting sentence was removed as unsupported: no
+  // longer cited in the final report, so chainSupported is false and its
+  // tier (B, sourceTier 2) downgrades one step to C.
+  assert.equal(citationB.grade?.signals.chainSupported, false);
+  assert.equal(citationB.grade?.tier, 'C');
+  assert.doesNotMatch(result.report, /Fact B/);
+});

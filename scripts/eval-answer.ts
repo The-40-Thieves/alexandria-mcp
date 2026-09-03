@@ -61,25 +61,20 @@ import {
   libraryAnswer,
   splitSentences,
 } from '../src/tools/libraryAnswer.ts';
-import {
-  guardedDispatcher,
-  installDispatcher,
-  withPinnedAddress,
-} from '../src/utils/dispatcher.ts';
-import { fetchWithRetry } from '../src/utils/http.ts';
+import { installDispatcher } from '../src/utils/dispatcher.ts';
+import { checkUrlLiveness } from '../src/utils/liveness.ts';
 import {
   chatJSON,
   hasEmbeddingsConfigured,
   type Role,
   roleConfig,
 } from '../src/utils/providers.ts';
-import { resolveFetchTarget } from '../src/web/fetchTier.ts';
 
-// Task 9 adds a `verify` role dedicated to citation entailment checks
-// (falling back to `synth` when unset); until then this always reads
-// `synth`, from a single named constant so flipping it later is a one-line
-// change rather than a rewrite of this script.
-const CLAIM_SUPPORT_ROLE: Role = 'synth';
+// Task 9 added a `verify` role dedicated to citation entailment checks,
+// falling back to `synth` when ALEXANDRIA_VERIFY_* is unset (see
+// src/utils/providers.ts's roleConfig) - this is the one line that flipped
+// from 'synth' to 'verify' once that role existed.
+const CLAIM_SUPPORT_ROLE: Role = 'verify';
 
 // Same limit libraryAnswer.ts's own READ_CHAR_LIMIT uses for the text it
 // hands the synth role - not exported from there, so duplicated here
@@ -90,7 +85,6 @@ const READ_CHAR_LIMIT = 6000;
 const DOI_RE = /^10\.\d{4,9}\/\S+$/i;
 
 const MAX_RESOLVABILITY_CHECKS_PER_QUESTION = 20;
-const RESOLVE_TIMEOUT_MS = 5_000;
 
 export interface AnswerGoldenQuery {
   query: string;
@@ -205,46 +199,14 @@ async function judgeWarranted(role: Role, claim: string, evidence: string): Prom
   return result.warranted;
 }
 
+// Task 9 moved the guarded-and-pinned HEAD-falling-back-to-GET
+// implementation this used to own into src/utils/liveness.ts's
+// checkUrlLiveness (shared now with library_answer's own Citation.resolves
+// wiring), so this is a thin wrapper kept for this script's existing
+// boolean-returning call sites and tests.
 export async function checkResolvable(url: string): Promise<boolean> {
-  // resolveFetchTarget both validates (throws for a disallowed host, same
-  // as assertFetchableUrl) and returns the pin the guard just validated -
-  // guardedDispatcher's connect.lookup (dispatcher.ts's pinnedLookup) fails
-  // closed with no pin in scope for an ordinary hostname target, so this
-  // pin has to be threaded through withPinnedAddress() around BOTH fetch
-  // attempts below, exactly like fetchTier.ts's own fetchFollowingRedirects
-  // does. Unset (undefined) for a literal-IP target, which never goes
-  // through connect.lookup in the first place - withPin() below is a no-op
-  // in that case.
-  let pin: Awaited<ReturnType<typeof resolveFetchTarget>>['pin'];
-  try {
-    ({ pin } = await resolveFetchTarget(url));
-  } catch {
-    return false;
-  }
-  const withPin = <T>(fn: () => Promise<T>): Promise<T> =>
-    pin ? withPinnedAddress(pin, fn) : fn();
-
-  // HEAD first (cheap); some servers 405/501 on HEAD or lie about it, so a
-  // non-ok or failed HEAD falls back to a GET before giving up. retries: 0
-  // on both - this is a liveness probe, not a content fetch, so a single
-  // failed attempt per method is enough to call a target unresolvable
-  // rather than spending fetchWithRetry's default retry budget on it.
-  try {
-    const head = await withPin(() =>
-      fetchWithRetry(url, { method: 'HEAD', dispatcher: guardedDispatcher }, RESOLVE_TIMEOUT_MS, 0),
-    );
-    if (head.ok) return true;
-  } catch {
-    // fall through to GET
-  }
-  try {
-    const get = await withPin(() =>
-      fetchWithRetry(url, { method: 'GET', dispatcher: guardedDispatcher }, RESOLVE_TIMEOUT_MS, 0),
-    );
-    return get.ok;
-  } catch {
-    return false;
-  }
+  const result = await checkUrlLiveness(url);
+  return result.ok;
 }
 
 function resolvabilityTarget(citation: Citation): string | undefined {

@@ -87,25 +87,39 @@ test('formatResult(search, ..., concise): result rows drop authors/description/e
   assert.ok(!('description' in concise.results[0]));
 });
 
-test('formatResult(answer, ..., concise): keeps only answer + citations', () => {
+test('formatResult(answer, ..., concise): keeps answer + citations + warnings, drops grade/resolves', () => {
   const fixtureAnswer = {
     answer: 'The answer, cited [1].',
-    citations: [{ n: 1, source: 'arxiv', id: 'abc123', title: fixtureResult.title }],
+    citations: [
+      {
+        n: 1,
+        source: 'arxiv',
+        id: 'abc123',
+        title: fixtureResult.title,
+        grade: { tier: 'A' as const, signals: { sourceTier: 1 as const, fullTextVerified: true } },
+        resolves: true,
+      },
+    ],
     results: [{ ...fixtureResult, score: 0.9 }],
     routing: fixtureAsk.routing,
-    warnings: [] as string[],
+    warnings: ['answer contains no citation markers'],
   };
 
   const detailed = formatResult('answer', fixtureAnswer, 'detailed');
   const concise = formatResult('answer', fixtureAnswer, 'concise');
 
-  assert.deepEqual(concise, { answer: fixtureAnswer.answer, citations: fixtureAnswer.citations });
+  assert.deepEqual(concise, {
+    answer: fixtureAnswer.answer,
+    citations: [{ n: 1, source: 'arxiv', id: 'abc123', title: fixtureResult.title }],
+    warnings: fixtureAnswer.warnings,
+  });
   for (const key of Object.keys(concise)) {
     assert.ok(key in detailed);
   }
+  assert.ok(!('grade' in concise.citations[0]), 'grade is detailed-only');
+  assert.ok(!('resolves' in concise.citations[0]), 'resolves is detailed-only');
   assert.ok(!('results' in concise));
   assert.ok(!('routing' in concise));
-  assert.ok(!('warnings' in concise));
 });
 
 test('formatResult(citations, ..., concise): result rows collapse to ConciseResultRow, seed/direction/formatted pass through', () => {
@@ -145,13 +159,21 @@ test('formatResult(citations, ..., concise): omits formatted when the detailed p
   assert.ok(!('formatted' in concise));
 });
 
-test('formatResult(research, ..., concise): keeps only report + citations', () => {
+test('formatResult(research, ..., concise): keeps report + citations + warnings, drops grade/resolves', () => {
   const fixtureResearch = {
     report: 'A report, cited [1].',
-    citations: [{ n: 1, source: 'arxiv', id: 'abc123', title: fixtureResult.title }],
+    citations: [
+      {
+        n: 1,
+        source: 'arxiv',
+        id: 'abc123',
+        title: fixtureResult.title,
+        grade: { tier: 'B' as const, signals: { sourceTier: 2 as const, fullTextVerified: true } },
+      },
+    ],
     rounds: [{ round: 1, queries: ['q1'], newSources: 1, truncated: false }],
     elapsedMs: 1234,
-    warnings: [] as string[],
+    warnings: ['a fact-check warning'],
   };
 
   const detailed = formatResult('research', fixtureResearch, 'detailed');
@@ -159,11 +181,13 @@ test('formatResult(research, ..., concise): keeps only report + citations', () =
 
   assert.deepEqual(concise, {
     report: fixtureResearch.report,
-    citations: fixtureResearch.citations,
+    citations: [{ n: 1, source: 'arxiv', id: 'abc123', title: fixtureResult.title }],
+    warnings: fixtureResearch.warnings,
   });
   for (const key of Object.keys(concise)) {
     assert.ok(key in detailed);
   }
+  assert.ok(!('grade' in concise.citations[0]), 'grade is detailed-only');
   assert.ok(!('rounds' in concise));
   assert.ok(!('elapsedMs' in concise));
 });
