@@ -314,7 +314,17 @@ const LOCALHOST_PIN_ADDRESSES: Array<{ address: string; family: number }> = [
   { address: '::1', family: 6 },
 ];
 
-async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> {
+// Exported so a caller that needs to make its OWN guarded fetch (rather
+// than going through fetchAsText's tier chain) can get the same pin
+// fetchFollowingRedirects uses, instead of re-deriving it with a second,
+// independent lookup (which would reopen the TOCTOU gap this function's
+// own comment describes) or duplicating this guard's logic. See
+// scripts/eval-answer.ts's checkResolvable for the first such caller: a
+// guarded fetch through guardedDispatcher with no pin in scope fails
+// closed (dispatcher.ts's pinnedLookup), so a caller-supplied hostname
+// target must be wrapped in withPinnedAddress(pin, ...) using the pin this
+// returns, exactly like fetchFollowingRedirects does below.
+export async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);

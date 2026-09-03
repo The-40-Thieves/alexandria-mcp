@@ -5,11 +5,17 @@
 # only, the same role eval-routing.yaml's `expected` plays for its own
 # per-cluster table; scoring does not require an exact match against this
 # list). Written by hand from the topics already exercised in
-# eval/routing-golden.yaml, picked from sources that expose full text
-# (`hasFullText: true`) since library_answer only synthesizes from sources
-# it can read, and restricted to well-established, encyclopedic facts so
-# every nugget is checkable against a public source (mostly Wikipedia plus
-# the domain source itself).
+# eval/routing-golden.yaml, restricted to well-established, encyclopedic
+# facts so every nugget is checkable against a public source.
+#
+# Most rows name at least one `hasFullText: true` source (library_answer
+# only synthesizes from sources it can read), usually Wikipedia alongside
+# the domain-specific source the question is about. Three rows name a
+# domain source that is metadata-only (`hasFullText: false`): peps,
+# federalregister, and wikidata - each is flagged inline below, and each
+# still pairs with wikipedia so the row has a citable full-text source;
+# library_answer is expected to cite wikipedia for these, not the
+# metadata-only source named alongside it.
 #
 # Loaded by scripts/eval-answer.ts to score citation precision, nugget
 # (citation) recall, and URL/DOI resolvability.
@@ -47,7 +53,7 @@
     - PEP 8 is the style guide for Python code.
     - PEP 484 introduced type hints to Python.
     - PEPs are indexed and published on peps.python.org.
-  expected_sources: [peps, wikipedia]
+  expected_sources: [peps, wikipedia] # peps is metadata-only (hasFullText: false); library_answer cites wikipedia
 
 # ── economics ────────────────────────────────────────────────────────────
 - query: What does the Case-Shiller home price index measure and who developed it?
@@ -73,7 +79,7 @@
     - It publishes proposed and final administrative rules and regulations from federal agencies.
     - It also publishes presidential documents such as executive orders.
     - The Federal Register has been published continuously since 1936.
-  expected_sources: [federalregister, wikipedia]
+  expected_sources: [federalregister, wikipedia] # federalregister is metadata-only (hasFullText: false); library_answer cites wikipedia
 
 # ── law ──────────────────────────────────────────────────────────────────
 - query: What does the EU's General Data Protection Regulation (GDPR) require?
@@ -171,7 +177,7 @@
     - It is operated by the Wikimedia Foundation.
     - Wikidata launched in October 2012.
     - Wikidata stores data as items with statements, each made of a property and a value.
-  expected_sources: [wikidata, wikipedia]
+  expected_sources: [wikidata, wikipedia] # wikidata is metadata-only (hasFullText: false); library_answer cites wikipedia
 
 # ── archives ─────────────────────────────────────────────────────────────
 - query: What does the Chronicling America project provide?

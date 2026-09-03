@@ -45,7 +45,12 @@ problem: the required roles missing, or a golden question's `library_answer`
 call throwing outright - so a CI environment that expects this eval to
 actually run can catch "it silently no-op'd" or "it crashed", without
 asserting a numeric floor nobody has earned yet. Plain `npm run eval:answer`
-always exits 0.
+always exits 0. To be explicit: **`--gate` has no score floor yet** - it
+does not fail on a low citation precision, nugget recall, or resolvability
+number, only on the infrastructure problems above; a numeric floor is a
+follow-up once enough baseline runs exist to set one responsibly (the same
+way `eval:routing`'s 0.60/0.80 floors were set from an established run, not
+invented up front).
 
 ## 2026-09-03, first baseline (Cave LiteLLM gateway)
 
