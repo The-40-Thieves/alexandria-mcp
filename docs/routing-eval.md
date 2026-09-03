@@ -271,6 +271,39 @@ stage-1 modes.
 `DEFAULT_ROUTER_SKIP_MARGIN` in `src/tools/libraryAsk.ts` is set to `0.4`;
 override per deployment with `ALEXANDRIA_ROUTER_SKIP_MARGIN`.
 
+### The default only applies in embeddings mode
+
+Fix round 1 (review verdict, controller ruling): the default
+`routerSkipMargin` above was chosen entirely from the **embeddings** rows.
+The **BM25-only** rows tell a different story - at every one of the three
+tested margins (0.2, 0.3, 0.4), BM25-only stage-1+2 nDCG@5 was **0.872**
+against an always-router baseline of **0.896**, a 0.024 regression
+outside the brief's 0.01 tolerance band, and all three margins skipped
+the identical 60 of 62 queries (BM25's normalised margin is
+near-saturated: an unbounded, purely-additive score means the gap between
+the top candidate and the one at `max_sources+1` is very often close to
+the full top score, so nearly every query clears 0.2, 0.3, *and* 0.4
+alike - see the "All three BM25 skip margins land on the identical..."
+paragraph above). A deployment with a router key but no embeddings key
+would otherwise inherit that regression silently, since
+`ALEXANDRIA_ROUTER_SKIP_MARGIN` unset applies the same default margin
+regardless of which ranker produced it.
+
+**Rule** (`src/tools/libraryAsk.ts`'s `planRoute()`): the default skip
+margin applies only when stage 1 ran in embedding mode
+(`candidatesWithMargin()`'s `stage1: 'embeddings'`, i.e. `buildCatalog()`
+had every entry embedded). In BM25 mode
+(`stage1: 'bm25'`), `parseSkipMargin` is called with a fallback of
+`+Infinity` instead of `DEFAULT_ROUTER_SKIP_MARGIN`, so an unset or
+invalid `ALEXANDRIA_ROUTER_SKIP_MARGIN` never skips there - the margin,
+always finite, can never reach it. An operator who sets
+`ALEXANDRIA_ROUTER_SKIP_MARGIN` explicitly and validly is opting in
+deliberately, and that value is honoured in either mode exactly the same
+way, per the brief: "an explicit value is an opt-in and applies in both
+modes." The routing result now carries `stage1: 'embeddings' | 'bm25'`
+alongside `stage2` so a caller (and `/metrics`) can see which ranker
+produced a given decision.
+
 ### Routing cache
 
 Independent of the margin: `planRoute()` caches the full routing decision

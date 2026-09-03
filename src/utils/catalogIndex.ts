@@ -394,6 +394,17 @@ export async function candidates(
   return withClusterFloor(ranked, k);
 }
 
+// Which ranker actually produced the shortlist/margin: 'embeddings' when
+// every catalog entry carries a vector (buildCatalog() embedded it), else
+// the BM25 fallback. libraryAsk.ts's planRoute() reads this to decide
+// whether the router-skip margin applies at all: BM25's normalised scores
+// run structurally higher (see review 3.5's ruling, recorded in
+// docs/routing-eval.md) - the same three margins that measure real
+// confidence in cosine mode land on a near-saturated split under BM25, so
+// the default skip only ever applies in 'embeddings' mode; BM25 mode
+// needs an operator-set ALEXANDRIA_ROUTER_SKIP_MARGIN to opt in.
+export type Stage1Mode = 'embeddings' | 'bm25';
+
 export interface CandidatesWithMargin {
   candidates: CatalogEntry[];
   // Score of the top-ranked candidate minus the score at position
@@ -407,6 +418,7 @@ export interface CandidatesWithMargin {
   // decisively that cluster won.
   margin: number;
   topCluster: Cluster | undefined;
+  stage1: Stage1Mode;
 }
 
 // Same ranking as candidates(), but keeps the raw scored order long enough
@@ -436,5 +448,6 @@ export async function candidatesWithMargin(
       maxSources,
     ),
     topCluster: ranked[0]?.cluster,
+    stage1: hasVectors ? 'embeddings' : 'bm25',
   };
 }

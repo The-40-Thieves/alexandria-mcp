@@ -86,6 +86,7 @@ export interface CachedRoute {
 
 export interface CachedRoutingDecision {
   intent: string;
+  stage1: 'embeddings' | 'bm25';
   stage2: 'llm' | 'skipped';
   routes: CachedRoute[];
 }

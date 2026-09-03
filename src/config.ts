@@ -75,6 +75,28 @@ function roleFields<const Role extends string>(role: Role, lower: string): RoleF
   } as RoleFields<Role>;
 }
 
+// Some optional settings (ALEXANDRIA_CACHE_TTL_MS, ALEXANDRIA_ROUTER_SKIP_MARGIN)
+// are parsed downstream with Number(raw), falling back to a built-in
+// default for anything non-finite (resultCache.ts's parseTtlMs,
+// libraryAsk.ts's parseSkipMargin). An env-file loader commonly emits a
+// declared-but-empty var as "" (KEY=, the exact shape .env.example uses
+// for every optional field) - and Number('') is 0, which is finite and
+// often in-range, so a merely-unset value would silently become an
+// explicit, valid 0 instead of falling back to the default. This
+// preprocess strips that shape at the schema boundary (empty or
+// whitespace-only -> undefined) so neither downstream parser has to
+// special-case "" itself - only a genuinely-set, non-numeric, or
+// out-of-range value reaches them as invalid, which is their own concern
+// (a fallback, and for parseSkipMargin a one-time warn).
+function optionalNumericString(description: string): z.ZodType<string | undefined> {
+  return z
+    .preprocess(
+      (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+      z.string().optional(),
+    )
+    .describe(description);
+}
+
 const schema = z
   .object({
     // ── Transport ────────────────────────────────────────────────────────
@@ -119,20 +141,14 @@ const schema = z
       ),
 
     // ── Routing (src/tools/libraryAsk.ts, src/utils/catalogIndex.ts) ────────
-    ALEXANDRIA_ROUTER_SKIP_MARGIN: z
-      .string()
-      .optional()
-      .describe(
-        "Stage-1 confidence margin (0-1: top candidate score minus the score at max_sources+1, normalised by the top score) at or above which library_ask skips the LLM router call and fans out to stage 1's top max_sources directly with the raw query. Unset or invalid uses the built-in default (see docs/routing-eval.md for how it was chosen).",
-      ),
+    ALEXANDRIA_ROUTER_SKIP_MARGIN: optionalNumericString(
+      "Stage-1 confidence margin (0-1: top candidate score minus the score at max_sources+1, normalised by the top score) at or above which library_ask skips the LLM router call and fans out to stage 1's top max_sources directly with the raw query. Unset (or empty) uses the built-in default; an explicit, non-negative value opts in even in BM25 mode (see docs/routing-eval.md).",
+    ),
 
     // ── Caches / state / ledger ─────────────────────────────────────────────
-    ALEXANDRIA_CACHE_TTL_MS: z
-      .string()
-      .optional()
-      .describe(
-        'Search result cache TTL in milliseconds. Unset or non-numeric uses the built-in default.',
-      ),
+    ALEXANDRIA_CACHE_TTL_MS: optionalNumericString(
+      'Search result cache TTL in milliseconds. Unset (or empty) or non-numeric uses the built-in default.',
+    ),
     ALEXANDRIA_CATALOG_CACHE: z
       .string()
       .optional()

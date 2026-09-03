@@ -25,7 +25,7 @@ import { config } from '../config.ts';
 import { log } from '../log.ts';
 import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
-import { type CatalogEntry, candidatesWithMargin } from '../utils/catalogIndex.ts';
+import { type CatalogEntry, candidatesWithMargin, type Stage1Mode } from '../utils/catalogIndex.ts';
 import { chatJSON } from '../utils/providers.ts';
 import { routingCache, routingCacheKey } from '../utils/resultCache.ts';
 
@@ -44,19 +44,53 @@ export type Stage2Mode = 'llm' | 'skipped';
 const DEFAULT_ROUTER_SKIP_MARGIN = 0.4;
 
 // See config.ts's ALEXANDRIA_ROUTER_SKIP_MARGIN and docs/routing-eval.md for
-// how the default was chosen. A negative or non-numeric value falls back to
-// it, the same guard shape as resultCache.ts's parseTtlMs(). No upper-bound
-// clamp: margin is normally 0-1, but cosine mode can score the position
-// maxSources+1 candidate below zero (a real, dissimilar vector, unlike
-// BM25's floor of 0), which pushes margin above 1 - so a deployer wanting
-// to disable the skip entirely can set this above 1 (e.g. "2") and rely on
-// margin never reaching it, rather than needing a separate off switch.
+// how the default was chosen. No upper-bound clamp: margin is normally
+// 0-1, but cosine mode can score the position maxSources+1 candidate
+// below zero (a real, dissimilar vector, unlike BM25's floor of 0), which
+// pushes margin above 1 - so a deployer wanting to disable the skip
+// entirely can set this above 1 (e.g. "2") and rely on margin never
+// reaching it, rather than needing a separate off switch.
+//
+// Undefined, or present-but-empty/whitespace-only (the shape an env-file
+// loader produces for a declared, unset var - config.ts's own preprocess
+// already normalizes that away before this ever sees it, but this stays
+// defensive against a direct caller that doesn't go through config.ts),
+// is treated as "not configured" and falls back silently, no warning: an
+// explicit "0" is a valid, deliberate opt-in to "always skip". Anything
+// else that fails to parse as a finite, non-negative number (not a
+// number, or negative) is a genuinely malformed value, not merely unset -
+// falls back too, but with a one-time warning, the same "warn once, keep
+// going" shape stateStore.ts's warnFallbackOnce and dispatcher.ts's
+// warnFallbackOnce use.
+let warnedInvalidSkipMargin = false;
+
+function warnInvalidSkipMarginOnce(raw: string): void {
+  if (warnedInvalidSkipMargin) return;
+  warnedInvalidSkipMargin = true;
+  log.warn(
+    { ALEXANDRIA_ROUTER_SKIP_MARGIN: raw },
+    'invalid ALEXANDRIA_ROUTER_SKIP_MARGIN (not a finite, non-negative number); falling back to the default',
+  );
+}
+
+/** Test-only: clears the "already warned" latch so a test can observe the warning fire again. */
+export function resetSkipMarginWarningForTests(): void {
+  warnedInvalidSkipMargin = false;
+}
+
 export function parseSkipMargin(
   raw: string | undefined,
   fallback = DEFAULT_ROUTER_SKIP_MARGIN,
 ): number {
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
+  if (raw === undefined) return fallback;
+  const trimmed = raw.trim();
+  if (trimmed === '') return fallback;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) {
+    warnInvalidSkipMarginOnce(raw);
+    return fallback;
+  }
+  return n;
 }
 
 const RoutingDecisionSchema = z.object({
@@ -80,6 +114,11 @@ export interface AskResult {
   results: LibraryResult[];
   routing: RouteItem[];
   errors: Array<{ source: string; error: string }>;
+  // Which stage-1 ranker actually ran: 'embeddings' when the catalog was
+  // embedded (cosine ranking), 'bm25' for the offline fallback. Determines
+  // whether the router-skip margin applied at all by default - see
+  // Stage1Mode's comment in catalogIndex.ts and the module comment above.
+  stage1: Stage1Mode;
   // 'llm' when the router role picked the sources; 'skipped' when stage 1's
   // margin was confident enough that library_ask fanned out to its top
   // max_sources directly, with no router LLM call at all (see the module
@@ -97,6 +136,7 @@ export interface RunAskResult {
   routing: RouteItem[];
   perSource: Record<string, LibraryResult[]>;
   errors: Array<{ source: string; error: string }>;
+  stage1: Stage1Mode;
   stage2: Stage2Mode;
 }
 
@@ -162,6 +202,7 @@ export interface PlannedRoute {
   intent: string;
   routes: RouteItem[];
   clusterBySource: Map<string, string>;
+  stage1: Stage1Mode;
   stage2: Stage2Mode;
 }
 
@@ -182,6 +223,7 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
       intent: cached.intent,
       routes: cached.routes.map((r) => ({ source: r.source, query: r.query, reason: r.reason })),
       clusterBySource: new Map(cached.routes.map((r) => [r.source, r.cluster])),
+      stage1: cached.stage1,
       stage2: cached.stage2,
     };
   }
@@ -191,11 +233,29 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
     candidates: pool,
     margin,
     topCluster,
+    stage1,
   } = await candidatesWithMargin(query, CANDIDATE_POOL_SIZE, maxSources, { freshness });
-  log.debug({ query, maxSources, margin, topCluster }, 'library_ask: stage-1 routing margin');
+  log.debug(
+    { query, maxSources, margin, topCluster, stage1 },
+    'library_ask: stage-1 routing margin',
+  );
 
   const clusterBySource = new Map(pool.map((c) => [c.name, c.cluster]));
-  const skipMargin = parseSkipMargin(config.ALEXANDRIA_ROUTER_SKIP_MARGIN);
+  // Review 3.5 ruling (docs/routing-eval.md): the skip only applies by
+  // default in embeddings mode - BM25's margin measured 0.024 nDCG@5 below
+  // always-router at every tested threshold (outside the brief's 0.01
+  // band), and its normalised scores run structurally higher (near-
+  // saturated: 60/62 golden queries skipped at 0.2, 0.3, AND 0.4 alike),
+  // so the *default* margin isn't a meaningful confidence signal there.
+  // In BM25 mode the fallback passed to parseSkipMargin is +Infinity, not
+  // DEFAULT_ROUTER_SKIP_MARGIN, so an unset or invalid
+  // ALEXANDRIA_ROUTER_SKIP_MARGIN never skips (margin can't reach
+  // Infinity); an operator who sets it explicitly and validly is opting
+  // in deliberately, in either mode, exactly like any other value.
+  const skipMargin = parseSkipMargin(
+    config.ALEXANDRIA_ROUTER_SKIP_MARGIN,
+    stage1 === 'embeddings' ? DEFAULT_ROUTER_SKIP_MARGIN : Number.POSITIVE_INFINITY,
+  );
 
   let intent: string;
   let validRoutes: RouteItem[];
@@ -212,7 +272,7 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
     validRoutes = pool.slice(0, maxSources).map((c) => ({
       source: c.name,
       query,
-      reason: `stage-1 margin ${margin.toFixed(2)} >= skip margin ${skipMargin}`,
+      reason: `stage-1 (${stage1}) margin ${margin.toFixed(2)} >= skip margin ${skipMargin}`,
     }));
   } else {
     stage2 = 'llm';
@@ -226,11 +286,12 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
 
   routingCache.set(key, {
     intent,
+    stage1,
     stage2,
     routes: validRoutes.map((r) => ({ ...r, cluster: clusterBySource.get(r.source) ?? '' })),
   });
 
-  return { intent, routes: validRoutes, clusterBySource, stage2 };
+  return { intent, routes: validRoutes, clusterBySource, stage1, stage2 };
 }
 
 // Stage 1 + stage 2 + fan-out, without the flattened/deduped shape the
@@ -238,7 +299,13 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
 // this directly to get per-source results before fusion.
 export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunAskResult> {
   const resultsPerSource = opts.resultsPerSource ?? 5;
-  const { intent, routes: validRoutes, clusterBySource, stage2 } = await planRoute(query, opts);
+  const {
+    intent,
+    routes: validRoutes,
+    clusterBySource,
+    stage1,
+    stage2,
+  } = await planRoute(query, opts);
 
   const searches = validRoutes.map(async (route) => {
     try {
@@ -274,7 +341,7 @@ export async function runAsk(query: string, opts: AskOptions = {}): Promise<RunA
     }
   }
 
-  return { intent, routing: validRoutes, perSource, errors, stage2 };
+  return { intent, routing: validRoutes, perSource, errors, stage1, stage2 };
 }
 
 export async function libraryAsk(
@@ -282,7 +349,7 @@ export async function libraryAsk(
   maxSources = 5,
   resultsPerSource = 5,
 ): Promise<AskResult> {
-  const { intent, routing, perSource, errors, stage2 } = await runAsk(query, {
+  const { intent, routing, perSource, errors, stage1, stage2 } = await runAsk(query, {
     maxSources,
     resultsPerSource,
   });
@@ -309,6 +376,7 @@ export async function libraryAsk(
     results: deduped,
     routing,
     errors,
+    stage1,
     stage2,
   };
 }
