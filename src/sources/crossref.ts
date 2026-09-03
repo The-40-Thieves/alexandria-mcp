@@ -95,6 +95,24 @@ export async function crossrefSearch(query: string, limit: number): Promise<Libr
   return (data.message.items ?? []).map(normalizeCrossref);
 }
 
+// Extracted so Task 7's library_citations tool can reuse this exact
+// content-negotiation call for its own bibliography export (rather than
+// writing a second doi.org fetch) instead of only calling it via a full
+// crossrefRead(). Best-effort: doi.org content negotiation is a separate
+// service from the Crossref API and can be slow or unavailable, so a
+// failure here returns '' rather than throwing - crossrefRead below relies
+// on that to still return metadata when BibTeX isn't available.
+export async function fetchCrossrefBibtex(doi: string): Promise<string> {
+  try {
+    const bibtex = await fetchText(`https://doi.org/${encodeURIComponent(doi)}`, {
+      headers: { Accept: 'application/x-bibtex' },
+    });
+    return bibtex.trim();
+  } catch {
+    return '';
+  }
+}
+
 export async function crossrefRead(doi: string): Promise<{
   text: string;
   title: string;
@@ -114,17 +132,9 @@ export async function crossrefRead(doi: string): Promise<{
     .map((r, i) => `${i + 1}. ${r.unstructured || r['article-title'] || r.DOI || r.key}`)
     .join('\n');
 
-  // BibTeX is optional: doi.org content negotiation is a separate service
-  // from the Crossref API itself and can be slow or unavailable without
-  // failing the whole read.
-  let bibtex = '';
-  try {
-    bibtex = await fetchText(`https://doi.org/${encodeURIComponent(doi)}`, {
-      headers: { Accept: 'application/x-bibtex' },
-    });
-  } catch {
-    /* optional */
-  }
+  // BibTeX is optional (see fetchCrossrefBibtex's comment): a failed fetch
+  // there returns '' rather than failing the whole read.
+  const bibtex = await fetchCrossrefBibtex(doi);
 
   const abstract = work.abstract ? stripJats(work.abstract) : '';
   const sections = [abstract || `No abstract available for ${doi}.`];
@@ -133,7 +143,7 @@ export async function crossrefRead(doi: string): Promise<{
       `\nReferences (${work['reference-count'] ?? work.reference?.length ?? 0}):\n${refs}`,
     );
   }
-  if (bibtex.trim()) sections.push(`\nBibTeX:\n${bibtex.trim()}`);
+  if (bibtex) sections.push(`\nBibTeX:\n${bibtex}`);
 
   return {
     text: sections.join('\n'),

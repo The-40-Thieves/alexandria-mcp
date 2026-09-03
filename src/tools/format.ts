@@ -66,7 +66,27 @@ export interface ConciseResearchLike {
   citations: Citation[];
 }
 
-export type FormatKind = 'ask' | 'search' | 'answer' | 'research';
+interface CitationsSeed {
+  id: string;
+  source: string;
+  doi?: string;
+}
+
+interface CitationsLike {
+  seed: CitationsSeed;
+  direction: 'references' | 'citations';
+  results: LibraryResult[];
+  formatted?: string;
+}
+
+export interface ConciseCitationsResult {
+  seed: CitationsSeed;
+  direction: 'references' | 'citations';
+  results: ConciseResultRow[];
+  formatted?: string;
+}
+
+export type FormatKind = 'ask' | 'search' | 'answer' | 'research' | 'citations';
 
 export function formatResult(
   kind: 'ask',
@@ -88,6 +108,11 @@ export function formatResult<T extends ResearchLike>(
   payload: T,
   format: ResponseFormat,
 ): T | ConciseResearchLike;
+export function formatResult<T extends CitationsLike>(
+  kind: 'citations',
+  payload: T,
+  format: ResponseFormat,
+): T | ConciseCitationsResult;
 export function formatResult(kind: FormatKind, payload: unknown, format: ResponseFormat): unknown {
   if (format === 'detailed') return payload;
 
@@ -117,6 +142,16 @@ export function formatResult(kind: FormatKind, payload: unknown, format: Respons
     case 'research': {
       const p = payload as ResearchLike;
       const concise: ConciseResearchLike = { report: p.report, citations: p.citations };
+      return concise;
+    }
+    case 'citations': {
+      const p = payload as CitationsLike;
+      const concise: ConciseCitationsResult = {
+        seed: p.seed,
+        direction: p.direction,
+        results: p.results.map(toConciseRow),
+      };
+      if (p.formatted !== undefined) concise.formatted = p.formatted;
       return concise;
     }
     default:

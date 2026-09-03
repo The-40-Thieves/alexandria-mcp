@@ -9,4 +9,4 @@
 // not vary per connection, so this is a fixed fact about the tools
 // registered in src/index.ts's createServer(), not a runtime measurement.
 // Bump this when a tool is added or removed there.
-export const TOOL_COUNT = 10;
+export const TOOL_COUNT = 11;

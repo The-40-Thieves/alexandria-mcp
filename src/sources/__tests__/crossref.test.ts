@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { crossrefRead, crossrefSearch, normalizeCrossref } from '../crossref.ts';
+import {
+  crossrefRead,
+  crossrefSearch,
+  fetchCrossrefBibtex,
+  normalizeCrossref,
+} from '../crossref.ts';
 import { getAdapter } from '../registry.ts';
 
 const searchFixture = JSON.parse(
@@ -113,6 +118,31 @@ test('crossrefRead', async (t) => {
   await t.test('propagates a not-found error', async () => {
     globalThis.fetch = (async () => new Response('not found', { status: 404 })) as typeof fetch;
     await assert.rejects(() => crossrefRead('10.0000/nonexistent'), /HTTP 404/);
+  });
+});
+
+test('fetchCrossrefBibtex', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await t.test('returns the trimmed BibTeX on success', async () => {
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      assert.equal(
+        (init?.headers as Record<string, string> | undefined)?.Accept,
+        'application/x-bibtex',
+      );
+      return new Response('\n@article{Kucsko_2013}\n', { status: 200 });
+    }) as typeof fetch;
+    const out = await fetchCrossrefBibtex('10.1038/nature12373');
+    assert.equal(out, '@article{Kucsko_2013}');
+  });
+
+  await t.test('returns an empty string rather than throwing on failure', async () => {
+    globalThis.fetch = (async () => new Response('error', { status: 500 })) as typeof fetch;
+    const out = await fetchCrossrefBibtex('10.0000/nonexistent');
+    assert.equal(out, '');
   });
 });
 

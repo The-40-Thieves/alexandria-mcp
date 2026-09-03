@@ -4,7 +4,11 @@ import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://api.openalex.org';
 
-function authParam(): string {
+// Exported so Task 7's library_citations tool can build its own OpenAlex
+// URLs (works/arxiv:, works/doi:, the referenced_works batch filter, and
+// cited_by_api_url) with the same api_key/mailto precedence, instead of
+// re-deriving it.
+export function authParam(): string {
   const apiKey = process.env.OPENALEX_API_KEY;
   if (apiKey) return `api_key=${encodeURIComponent(apiKey)}`;
   const mailto = process.env.CONTACT_EMAIL || '';

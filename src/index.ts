@@ -24,6 +24,7 @@ import {
   libraryAnswer,
 } from './tools/libraryAnswer.ts';
 import { libraryAsk } from './tools/libraryAsk.ts';
+import { libraryCitations } from './tools/libraryCitations.ts';
 import { libraryHealth } from './tools/libraryHealth.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
 import type { LibrarySource, ReadResult } from './types.ts';
@@ -45,13 +46,13 @@ import { PDF_PAGE_JOINER } from './web/pdf.ts';
 
 import './sources/all.ts';
 
-// The ten public tools registered below (library_list_sources, library_ask,
-// library_search, library_read, library_index, library_ingest,
-// library_recommend, library_answer, library_research,
-// library_health_check). TOOL_COUNT itself lives in src/toolCount.ts, not
-// here, so scripts/gen-docs.ts's README /health example can read the same
-// value instead of carrying its own separate literal (task 2 review
-// finding: those two drifted).
+// The eleven public tools registered below (library_list_sources,
+// library_ask, library_search, library_read, library_index,
+// library_ingest, library_recommend, library_answer, library_research,
+// library_health_check, library_citations). TOOL_COUNT itself lives in
+// src/toolCount.ts, not here, so scripts/gen-docs.ts's README /health
+// example can read the same value instead of carrying its own separate
+// literal (task 2 review finding: those two drifted).
 
 const SourceSchema = z
   .string()
@@ -157,6 +158,12 @@ const SourceHealthSchema = z.object({
   avgLatencyMs: z.number().optional(),
   quotaUsed: z.number().optional(),
   note: z.string().optional(),
+});
+
+const LibraryCitationsSeedSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  doi: z.string().optional(),
 });
 
 const ChunkMetadataSchema = z.object({
@@ -914,6 +921,61 @@ export function createServer(): McpServer {
             onProgress,
           );
           const formatted = formatResult('research', result, response_format);
+          return {
+            content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+            structuredContent: toStructured(formatted),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
+      }),
+  );
+
+  // ── library_citations ─────────────────────────────────────────────────────────
+  server.registerTool(
+    'library_citations',
+    {
+      title: 'Get References or Citations (with Bibliography Export)',
+      description: `List the works a scholarly item cites (direction: "references") or the works that cite it (direction: "citations"), resolved through OpenAlex's citation graph with OpenCitations as a fallback when OpenAlex has no record. Accepts an id/source from library_search or library_ask, or a bare DOI/arXiv id. Set format: "bibtex" | "ris" | "apa" to also return a \`formatted\` bibliography string; BibTeX prefers Crossref's own citation when a DOI is resolvable, for the first 20 results only (a paced, one-at-a-time doi.org lookup per item), with later results using a locally generated entry instead. Set response_format: "detailed" for full result fields.`,
+      inputSchema: z.object({
+        id: z
+          .string()
+          .min(1)
+          .describe('Item identifier from library_search/library_ask, or a bare DOI/arXiv id'),
+        source: SourceSchema,
+        direction: z
+          .enum(['references', 'citations'])
+          .describe('references: works this item cites. citations: works that cite this item.'),
+        limit: z.number().int().min(1).max(100).default(20).describe('Max results'),
+        format: z
+          .enum(['bibtex', 'ris', 'apa'])
+          .optional()
+          .describe('Also return a `formatted` bibliography string in this style'),
+        response_format: ResponseFormatSchema,
+      }),
+      outputSchema: z.object({
+        seed: LibraryCitationsSeedSchema,
+        direction: z.enum(['references', 'citations']),
+        results: z.array(ResultRowSchema),
+        formatted: z.string().optional(),
+      }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ id, source, direction, limit, format, response_format }) =>
+      withRequestContext('library_citations', async () => {
+        try {
+          const result = await libraryCitations({ id, source, direction, limit, format });
+          const formatted = formatResult('citations', result, response_format);
           return {
             content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
             structuredContent: toStructured(formatted),
