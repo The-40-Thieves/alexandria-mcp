@@ -46,6 +46,35 @@ function rawRequest(port: number, requestLine: string, timeoutMs = 3000): Promis
   });
 }
 
+// Task 14: the dual-era handler's built-in 2025-era fallback
+// (`createMcpHandler`'s `legacy: 'stateless'`) always answers a POST over
+// its own `WebStandardStreamableHTTPServerTransport`, which streams
+// `text/event-stream` by default - unlike the hand-wired
+// `NodeStreamableHTTPServerTransport({ enableJsonResponse: true })` this
+// replaces, createMcpHandler exposes no equivalent knob for the legacy path
+// (see support-2026-07-28.md; `responseMode` only shapes 2026-07-28
+// exchanges). A single-request SSE response is exactly one
+// `event: message\ndata: <json>\n\n` frame, so parsing it is just picking
+// the one `data:` line back out; every /mcp call below (still a single,
+// non-streaming JSON-RPC request) goes through this instead of `res.json()`.
+interface McpRpcBody {
+  jsonrpc?: string;
+  id?: unknown;
+  result?: Record<string, unknown>;
+  error?: { code?: number; message?: string };
+}
+
+function parseMcpText(contentType: string | null, body: string): McpRpcBody {
+  if (!contentType?.includes('text/event-stream')) return JSON.parse(body);
+  const dataLine = body.split('\n').find((line) => line.startsWith('data: '));
+  if (!dataLine) throw new Error(`no SSE data line in response: ${body.slice(0, 200)}`);
+  return JSON.parse(dataLine.slice('data: '.length));
+}
+
+async function parseMcpResponse(res: Response): Promise<McpRpcBody> {
+  return parseMcpText(res.headers.get('content-type'), await res.text());
+}
+
 /**
  * Regression test for the shared-McpServer bug: a module-level McpServer that
  * every HTTP request connected to made Protocol.connect reject a second
@@ -83,9 +112,19 @@ test('HTTP transport handles concurrent requests', async (t) => {
     assert.equal(responses.length, 6);
     for (const res of responses) {
       assert.equal(res.status, 200, `expected 200, got ${res.status}: ${res.body.slice(0, 200)}`);
-      assert.ok(res.contentType?.includes('application/json'), `not JSON: ${res.contentType}`);
+      // Task 14: the dual-era handler's legacy fallback answers over SSE by
+      // default (see parseMcpText's comment) - either content-type is a
+      // valid, non-HTML response.
+      assert.ok(
+        res.contentType?.includes('application/json') ||
+          res.contentType?.includes('text/event-stream'),
+        `not JSON or SSE: ${res.contentType}`,
+      );
       assert.ok(!res.body.includes('<!DOCTYPE html>'), 'HTML error page leaked');
-      const parsed = JSON.parse(res.body) as { result?: { tools?: unknown[] }; error?: unknown };
+      const parsed = parseMcpText(res.contentType, res.body) as {
+        result?: { tools?: unknown[] };
+        error?: unknown;
+      };
       assert.equal(parsed.error, undefined);
       assert.equal(parsed.result?.tools?.length, TOOL_COUNT);
     }
@@ -492,7 +531,7 @@ test('tools/list carries title/annotations/outputSchema for all 11 tools; initia
       },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
     });
-    return (await res.json()) as { result?: Record<string, unknown> };
+    return (await parseMcpResponse(res)) as { result?: Record<string, unknown> };
   };
 
   await t.test('tools/list', async () => {
@@ -576,7 +615,7 @@ test('library_search structuredContent validates against outputSchema, concise a
         params: { name: 'library_search', arguments: args },
       }),
     });
-    return (await res.json()) as {
+    return (await parseMcpResponse(res)) as {
       result?: {
         isError?: boolean;
         structuredContent?: { results: Array<Record<string, unknown>> };
@@ -692,7 +731,7 @@ test('library_citations structuredContent validates against outputSchema, concis
         params: { name: 'library_citations', arguments: args },
       }),
     });
-    return (await res.json()) as {
+    return (await parseMcpResponse(res)) as {
       result?: {
         isError?: boolean;
         structuredContent?: {
@@ -793,7 +832,7 @@ test('library_ingest and library_index honor the source ingestPolicy', async (t)
         params: { name, arguments: args },
       }),
     });
-    return (await res.json()) as {
+    return (await parseMcpResponse(res)) as {
       result?: {
         isError?: boolean;
         content?: Array<{ type: string; text: string }>;
@@ -906,7 +945,7 @@ test('library_read open-access fallback', async (t) => {
         params: { name, arguments: args },
       }),
     });
-    return (await res.json()) as {
+    return (await parseMcpResponse(res)) as {
       result?: {
         isError?: boolean;
         content?: Array<{ type: string; text: string }>;
@@ -1072,4 +1111,168 @@ test('progressReporter swallows a notify failure so it can never turn a successf
 
   assert.deepEqual(outcome, { ok: true, value: 'durable work already happened here' });
   assert.equal(notifyCalls, 2, 'both notify attempts ran (and both failed) before this assertion');
+});
+
+/**
+ * Task 14 (2026-07-28 dual-era handler, brief 05): `createMcpHandler(factory,
+ * { legacy: 'stateless' })` must serve a 2026-07-28 `server/discover` probe
+ * and a legacy `initialize` handshake against the same `/mcp` listener, from
+ * the same `createServer()` factory.
+ */
+test('the dual-era handler serves both a 2026-07-28 probe and a legacy handshake', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  await t.test('2026-07-28 server/discover succeeds on the modern path', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-protocol-version': '2026-07-28',
+        'mcp-method': 'server/discover',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'server/discover',
+        params: {
+          _meta: {
+            'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+            'io.modelcontextprotocol/clientCapabilities': {},
+          },
+        },
+      }),
+    });
+    const parsed = (await parseMcpResponse(res)) as { result?: { supportedVersions?: string[] } };
+    assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(parsed)}`);
+    assert.ok(parsed.result?.supportedVersions?.includes('2026-07-28'));
+  });
+
+  await t.test('a legacy 2025-11-25 initialize still succeeds on the same endpoint', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'test', version: '1.0.0' },
+        },
+      }),
+    });
+    assert.equal(res.status, 200);
+    const { result } = (await parseMcpResponse(res)) as {
+      result?: { protocolVersion?: string };
+    };
+    assert.equal(result?.protocolVersion, '2025-11-25');
+  });
+});
+
+/**
+ * Task 14: the three canonical research-workflow prompts (literature_review,
+ * fact_check_claim, verify_bibliography) are registered and each returns a
+ * single user message naming the tools to call, in order.
+ */
+test('prompts/list returns the three research-workflow prompts', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const rpc = async (method: string, params: unknown) => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    return parseMcpResponse(res);
+  };
+
+  await t.test('prompts/list', async () => {
+    const { result } = await rpc('prompts/list', {});
+    const prompts = result?.prompts as Array<{ name: string }> | undefined;
+    assert.equal(prompts?.length, 3);
+    assert.deepEqual(prompts?.map((p) => p.name).sort(), [
+      'fact_check_claim',
+      'literature_review',
+      'verify_bibliography',
+    ]);
+  });
+
+  await t.test('literature_review names its tools in order, in a user message', async () => {
+    const { result } = await rpc('prompts/get', {
+      name: 'literature_review',
+      arguments: { topic: 'gut microbiome' },
+    });
+    const messages = result?.messages as
+      | Array<{ role: string; content: { type: string; text: string } }>
+      | undefined;
+    assert.equal(messages?.length, 1);
+    assert.equal(messages?.[0]?.role, 'user');
+    const text = messages?.[0]?.content.text ?? '';
+    assert.match(text, /gut microbiome/);
+    assert.match(text, /library_list_sources/);
+    assert.match(text, /library_ask/);
+    assert.match(text, /library_research/);
+    assert.match(text, /library_citations/);
+  });
+});
+
+/**
+ * Task 14: `library://doc/{source}/{id}` reads through the same adapter
+ * `library_read` uses, returning the item's text as the resource content.
+ */
+test('resources/read on library://doc/{source}/{id} returns text from a stubbed adapter', async (t) => {
+  register('t_resource_fixture', {
+    description: 'fixture source for the resources/read regression test',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read() {
+      return { title: 'Fixture Document', authors: ['A. Author'], text: 'Full fixture text.' };
+    },
+  });
+
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'resources/read',
+      params: { uri: 'library://doc/t_resource_fixture/x1' },
+    }),
+  });
+  const parsed = (await parseMcpResponse(res)) as {
+    result?: { contents?: Array<{ uri: string; text?: string; mimeType?: string }> };
+  };
+  assert.equal(res.status, 200, `expected 200, got ${res.status}: ${JSON.stringify(parsed)}`);
+  const { result } = parsed;
+  assert.equal(result?.contents?.length, 1);
+  assert.equal(result?.contents?.[0]?.text, 'Full fixture text.');
+  assert.equal(result?.contents?.[0]?.uri, 'library://doc/t_resource_fixture/x1');
 });
