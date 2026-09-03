@@ -1,0 +1,54 @@
+[
+  {
+    "source": "PMC",
+    "documents": [
+      {
+        "id": "PMC7239045",
+        "passages": [
+          {
+            "infons": {
+              "type": "front",
+              "section_type": "TITLE"
+            },
+            "text": "Isolation and characterization of SARS-CoV-2 from the first US COVID-19 patient"
+          },
+          {
+            "infons": {
+              "type": "abstract",
+              "section_type": "ABSTRACT"
+            },
+            "text": "The etiologic agent of the outbreak of pneumonia in Wuhan China was identified as severe acute respiratory syndrome associated coronavirus 2 (SARS-CoV-2) in January, 2020. The first US patient was diagnosed by the State of Washington and the US Centers for Disease Control and Prevention on January 20, 2020. We isolated virus from nasopharyngeal and oropharyngeal specimens, and characterized the viral sequence, replication properties, and cell culture tropism. We found that the virus replicates to high titer in Vero-CCL81 cells and Vero E6 cells in the absence of trypsin. We also deposited the virus into two virus repositories, making it broadly available to the public health and research communities. We hope that open access to this important reagent will expedite development of medical countermeasures."
+          },
+          {
+            "infons": {
+              "type": "abstract_title_1",
+              "section_type": "ABSTRACT"
+            },
+            "text": "Article Summary:"
+          },
+          {
+            "infons": {
+              "type": "abstract",
+              "section_type": "ABSTRACT"
+            },
+            "text": "Scientists have isolated virus from the first US COVID-19 patient. The isolation and reagents described here will serve as the US reference strain used in research, drug discovery and vaccine testing."
+          },
+          {
+            "infons": {
+              "type": "title_1",
+              "section_type": "INTRO"
+            },
+            "text": "BACKGROUND"
+          },
+          {
+            "infons": {
+              "type": "paragraph",
+              "section_type": "INTRO"
+            },
+            "text": "A novel coronavirus, severe acute respiratory syndrome coronavirus 2 (SARS-CoV-2), has been identified as the source of a pneumonia outbreak in Wuhan China in late 2019. The virus was found to be a member of the beta coronavirus family, in the same species as SARS-CoV and SARS-related bat CoVs. Patterns of spread indicate that SARS-CoV-2 can be transmitted person-to-person, and may be more transmissible than SARS-CoV. The spike protein of coronaviruses mediates virus binding and cell entry. Initial characterization of SARS-CoV-2 spike indicate that it binds the same receptor as SARS-CoV, ACE2, which is expressed in both upper and lower human respiratory tracts. The unprecedented rapidity of spread of this outbreak represents a critical need for reference reagents. The public health community requires viral lysates to serve as diagnostic references, and the research community needs virus isolates to test anti-viral compounds, develop new vaccines, and perform basic research. In this manuscript, we describe isolation of virus from the first US COVID-19 patient and described its genomic sequence and replication characteristics. We have made the virus isolate available to the public health community by depositing into two virus reagent repositories."
+          }
+        ]
+      }
+    ]
+  }
+]

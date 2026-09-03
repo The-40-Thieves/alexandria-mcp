@@ -1,0 +1,17 @@
+{
+  "type": "standard",
+  "title": "Alan Turing",
+  "titles": {
+    "canonical": "Alan_Turing",
+    "normalized": "Alan Turing"
+  },
+  "pageid": 1208,
+  "lang": "en",
+  "description": "English computer scientist (1912-1954)",
+  "extract": "Alan Mathison Turing was an English mathematician, computer scientist, logician, cryptanalyst, philosopher and theoretical biologist. He was highly influential in the development of theoretical computer science, providing a formalisation of the concepts of algorithm and computation with the Turing machine.",
+  "content_urls": {
+    "desktop": {
+      "page": "https://en.wikipedia.org/wiki/Alan_Turing"
+    }
+  }
+}

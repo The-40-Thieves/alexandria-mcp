@@ -120,3 +120,12 @@ import './searxng.ts';
 import './jinasearch.ts';
 import './tavily.ts';
 import './webfetch.ts';
+// Task 4: new sources, batch 1.
+import './wikipedia.ts';
+import './wikidata.ts';
+import './crossref.ts';
+import './pubmed.ts';
+import './medrxiv.ts';
+import './secedgar.ts';
+import './worldbank.ts';
+import './datacite.ts';

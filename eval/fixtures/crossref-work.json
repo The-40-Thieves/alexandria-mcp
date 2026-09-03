@@ -1,0 +1,94 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message-version": "1.0.0",
+  "message": {
+    "DOI": "10.1038/nature12373",
+    "title": [
+      "Nanometre-scale thermometry in a living cell"
+    ],
+    "author": [
+      {
+        "given": "G.",
+        "family": "Kucsko",
+        "sequence": "first",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "P. C.",
+        "family": "Maurer",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      },
+      {
+        "given": "N. Y.",
+        "family": "Yao",
+        "sequence": "additional",
+        "affiliation": [],
+        "role": [
+          {
+            "vocabulary": "crossref",
+            "role": "author"
+          }
+        ]
+      }
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2013,
+          7,
+          31
+        ]
+      ]
+    },
+    "container-title": [
+      "Nature"
+    ],
+    "language": "en",
+    "URL": "https://doi.org/10.1038/nature12373",
+    "reference-count": 30,
+    "reference": [
+      {
+        "key": "BFnature12373_CR1",
+        "doi-asserted-by": "publisher",
+        "unstructured": "Yue, Y. & Wang, X. Nanoscale thermal probing. Nano Rev. \n                    http://dx.doi.org/10.3402/nano.v3i0.11586\n                    \n                   (2012)",
+        "DOI": "10.3402/nano.v3i0.11586"
+      },
+      {
+        "key": "BFnature12373_CR2",
+        "doi-asserted-by": "publisher",
+        "first-page": "1134",
+        "DOI": "10.1038/nature03509",
+        "volume": "434",
+        "author": "E Lucchetta",
+        "year": "2005",
+        "unstructured": "Lucchetta, E., Lee, J., Fu, L., Patel, N. & Ismagilov, R. Dynamics of Drosophila embryonic patterning network perturbed in space and time using microfluidics. Nature 434, 1134\u20131138 (2005)",
+        "journal-title": "Nature"
+      },
+      {
+        "key": "BFnature12373_CR3",
+        "doi-asserted-by": "publisher",
+        "first-page": "136",
+        "DOI": "10.1016/j.cell.2009.11.006",
+        "volume": "140",
+        "author": "SV Kumar",
+        "year": "2010",
+        "unstructured": "Kumar, S. V. & Wigge, P. A. H2A.Z-containing nucleosomes mediate the thermosensory response in Arabidopsis. Cell 140, 136\u2013147 (2010)",
+        "journal-title": "Cell"
+      }
+    ]
+  }
+}

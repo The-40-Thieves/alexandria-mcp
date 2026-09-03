@@ -1,0 +1,28 @@
+{
+  "searchinfo": { "search": "Turing" },
+  "search": [
+    {
+      "id": "Q7251",
+      "title": "Q7251",
+      "pageid": 7196,
+      "concepturi": "http://www.wikidata.org/entity/Q7251",
+      "repository": "wikidata",
+      "url": "//www.wikidata.org/wiki/Q7251",
+      "label": "Alan Turing",
+      "description": "English computer scientist (1912-1954)",
+      "match": { "type": "label", "language": "en", "text": "Alan Turing" }
+    },
+    {
+      "id": "Q56231123",
+      "title": "Q56231123",
+      "pageid": 56172130,
+      "concepturi": "http://www.wikidata.org/entity/Q56231123",
+      "repository": "wikidata",
+      "url": "//www.wikidata.org/wiki/Q56231123",
+      "label": "Turing",
+      "description": "GPU microarchitecture designed by NVIDIA",
+      "match": { "type": "label", "language": "en", "text": "Turing" }
+    }
+  ],
+  "success": 1
+}

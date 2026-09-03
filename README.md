@@ -1,12 +1,12 @@
 # Alexandria
 
-A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 137 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
+A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 145 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
 
 ## Tools
 
 | Tool | Description |
 |---|---|
-| `library_list_sources` | List all 137 sources with descriptions and full-text capabilities |
+| `library_list_sources` | List all 145 sources with descriptions and full-text capabilities |
 | `library_ask(query, max_sources?, results_per_source?)` | **Natural language search** — routes your query to the best sources, searches in parallel, returns unified deduplicated results |
 | `library_search(query, source, limit?)` | Search a specific source by title, author, or keywords |
 | `library_read(id, source)` | Fetch full text or metadata for an item (200k char limit) |
@@ -22,18 +22,18 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 `library_ask`, `library_search`, `library_answer`, `library_research`, and `library_health_check` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations; name, cluster, status), detailed returns the full payload, including routing reasons, relevance scores, per-stage diagnostics, and per-source error rate/latency/quota usage.
 
 <!-- sources:start -->
-## Sources (137)
+## Sources (145)
 
-137 sources across 19 clusters (35 hidden pending a key or config not present in this deployment). Full per-source detail, including auth env vars and last-verified dates, is generated in [docs/sources.md](docs/sources.md).
+145 sources across 19 clusters (36 hidden pending a key or config not present in this deployment). Full per-source detail, including auth env vars and last-verified dates, is generated in [docs/sources.md](docs/sources.md).
 
 | Cluster | Sources | Hidden |
 |---|---|---|
-| academic | 16 | 3 |
+| academic | 19 | 3 |
 | ai_research | 3 | 0 |
 | archives | 4 | 2 |
 | culture | 8 | 3 |
 | developer | 16 | 5 |
-| economics | 8 | 2 |
+| economics | 10 | 3 |
 | geopolitical | 3 | 3 |
 | government | 6 | 3 |
 | law | 3 | 1 |
@@ -42,12 +42,12 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 | news_global | 5 | 2 |
 | news_regional | 15 | 0 |
 | real_estate | 2 | 2 |
-| science | 7 | 2 |
+| science | 8 | 2 |
 | security | 14 | 0 |
 | standards | 3 | 0 |
 | video | 1 | 1 |
-| web | 5 | 3 |
-| **Total** | 137 | 35 |
+| web | 7 | 3 |
+| **Total** | 145 | 36 |
 
 <!-- sources:end -->
 
@@ -266,7 +266,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: { total: 137, visible: 102, hidden: 35, calls: 0, errors: 0 }, byKind: { rest: 103, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }, cache: { entries: 0 }, tools: 10 }`.
+Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: { total: 145, visible: 109, hidden: 36, calls: 0, errors: 0 }, byKind: { rest: 111, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }, cache: { entries: 0 }, tools: 10 }`.
 
 Metrics: `GET /metrics` returns per-source counters (calls, errors, timeouts, cacheHits, quotaRejections, latencyMsTotal) and per-tool counters (invocations, llmCalls) as JSON, e.g. `{ "sources": { "arxiv": { "calls": 12, "errors": 0, "timeouts": 0, "cacheHits": 3, "quotaRejections": 0, "latencyMsTotal": 4210 } }, "tools": { "library_ask": { "invocations": 5, "llmCalls": 5 } } }`. Only sources/tools actually called since the process started appear.
 

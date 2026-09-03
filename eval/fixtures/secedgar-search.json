@@ -1,0 +1,63 @@
+{
+  "hits": {
+    "total": {
+      "value": 1453,
+      "relation": "eq"
+    },
+    "hits": [
+      {
+        "_id": "0000035527-22-000119:fitbannualreport202110-k.pdf",
+        "_score": 9.443026,
+        "_source": {
+          "ciks": [
+            "0000035527"
+          ],
+          "display_names": [
+            "FIFTH THIRD BANCORP  (FITB, FITBI, FITBO, FITBP)  (CIK 0000035527)"
+          ],
+          "form": "10-K",
+          "file_date": "2022-02-25",
+          "root_forms": [
+            "10-K"
+          ]
+        }
+      },
+      {
+        "_id": "0000815097-23-000012:ccl-20221130.htm",
+        "_score": 8.994344,
+        "_source": {
+          "ciks": [
+            "0000815097",
+            "0001125259"
+          ],
+          "display_names": [
+            "CARNIVAL CORP  (CCL)  (CIK 0000815097)",
+            "CARNIVAL PLC  (CUK, CUKPF)  (CIK 0001125259)"
+          ],
+          "form": "10-K",
+          "file_date": "2023-01-27",
+          "root_forms": [
+            "10-K"
+          ]
+        }
+      },
+      {
+        "_id": "0001326771-23-000051:ex108202210-k.htm",
+        "_score": 7.7300434,
+        "_source": {
+          "ciks": [
+            "0001326771"
+          ],
+          "display_names": [
+            "Federal Home Loan Bank of Cincinnati  (CIK 0001326771)"
+          ],
+          "form": "10-K",
+          "file_date": "2023-03-16",
+          "root_forms": [
+            "10-K"
+          ]
+        }
+      }
+    ]
+  }
+}

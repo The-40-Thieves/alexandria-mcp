@@ -1,0 +1,90 @@
+{
+  "data": [
+    {
+      "id": "10.25434/elia-ines_phd2021",
+      "type": "dois",
+      "attributes": {
+        "doi": "10.25434/elia-ines_phd2021",
+        "titles": [
+          {
+            "title": "SNAI1 target genes in myoblasts"
+          }
+        ],
+        "creators": [
+          {
+            "nameType": "Personal",
+            "givenName": "INES",
+            "familyName": "ELIA",
+            "name": "Elia, Ines",
+            "affiliation": [],
+            "nameIdentifiers": []
+          }
+        ],
+        "publisher": "Universit\ufffd degli Studi di Siena",
+        "publicationYear": 2021,
+        "language": "en",
+        "types": {
+          "schemaOrg": "ScholarlyArticle",
+          "resourceTypeGeneral": "Text",
+          "citeproc": "article-journal",
+          "bibtex": "article",
+          "ris": "RPRT",
+          "resourceType": "\n\tText\n"
+        },
+        "descriptions": [
+          {
+            "descriptionType": "Abstract",
+            "description": "SNAI proteins are zinc finger transcription factors that act as transcriptional repressors through a conserved domain (SNAG domain) located in the N-terminus of the protein. These factors bind to a palindromic sequence of the E-box group (CANNTG) in the regulatory regions of their target genes. The role of SNAI11 and SNAI2 is well known in the epithelial mesenchymal transition, where they act as r"
+          }
+        ],
+        "url": "https://usiena-air.unisi.it//handle/11365/1142998"
+      }
+    },
+    {
+      "id": "10.25434/teresa-petrucci_phd2021",
+      "type": "dois",
+      "attributes": {
+        "doi": "10.25434/teresa-petrucci_phd2021",
+        "titles": [
+          {
+            "title": "Building a platform for flexible and scalable testing of genetic editors"
+          }
+        ],
+        "creators": [
+          {
+            "nameType": "Personal",
+            "givenName": "TERESA",
+            "familyName": "PETRUCCI",
+            "name": "Teresa Petrucci",
+            "nameIdentifiers": [
+              {
+                "nameIdentifierScheme": "ORCID",
+                "schemeUri": "https://orcid.org",
+                "nameIdentifier": "https://orcid.org/0000-0002-8334-8445"
+              }
+            ],
+            "affiliation": []
+          }
+        ],
+        "publisher": "Universit\ufffd degli Studi di Siena",
+        "publicationYear": 2021,
+        "language": "en",
+        "types": {
+          "schemaOrg": "ScholarlyArticle",
+          "resourceTypeGeneral": "Text",
+          "citeproc": "article-journal",
+          "bibtex": "article",
+          "ris": "RPRT",
+          "resourceType": "\n\tText\n"
+        },
+        "descriptions": [
+          {
+            "descriptionType": "Abstract",
+            "description": "Cell-free systems allow to perform in-vitro transcription-translation reactions without requiring living organisms, revolutionising scientific research over the last decade.\nThis allows to easily synthesise a variety of molecular components for genetic editing applications without requiring expensive and time-consuming procedures such as cell culture, animal maintenance etc.\nIn this work, I aimed "
+          }
+        ],
+        "url": "https://usiena-air.unisi.it//handle/11365/1143160"
+      }
+    }
+  ]
+}

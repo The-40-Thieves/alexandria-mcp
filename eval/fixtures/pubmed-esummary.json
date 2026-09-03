@@ -1,0 +1,157 @@
+{
+  "header": {
+    "type": "esummary",
+    "version": "0.3"
+  },
+  "result": {
+    "uids": [
+      "42687624",
+      "42687383",
+      "37173523"
+    ],
+    "42687624": {
+      "uid": "42687624",
+      "title": "Artificial intelligence-guided engineering of precision ocular therapeutics.",
+      "pubdate": "2026 Sep 3",
+      "authors": [
+        {
+          "name": "Sayana R",
+          "authtype": "Author",
+          "clusterid": ""
+        },
+        {
+          "name": "Wang SK",
+          "authtype": "Author",
+          "clusterid": ""
+        },
+        {
+          "name": "Ting DSW",
+          "authtype": "Author",
+          "clusterid": ""
+        }
+      ],
+      "fulljournalname": "Current opinion in ophthalmology",
+      "lang": [
+        "eng"
+      ],
+      "articleids": [
+        {
+          "idtype": "pubmed",
+          "idtypen": 1,
+          "value": "42687624"
+        },
+        {
+          "idtype": "doi",
+          "idtypen": 3,
+          "value": "10.1097/ICU.0000000000001251"
+        },
+        {
+          "idtype": "pii",
+          "idtypen": 4,
+          "value": "00055735-990000000-00318"
+        }
+      ]
+    },
+    "42687383": {
+      "uid": "42687383",
+      "title": "Optimization of AsCas12f1-Mediated Long-Term Gene Repression.",
+      "pubdate": "2026 Sep 2",
+      "authors": [
+        {
+          "name": "Sun Y",
+          "authtype": "Author",
+          "clusterid": ""
+        },
+        {
+          "name": "Li L",
+          "authtype": "Author",
+          "clusterid": ""
+        },
+        {
+          "name": "Wang X",
+          "authtype": "Author",
+          "clusterid": ""
+        }
+      ],
+      "fulljournalname": "Molecular therapy : the journal of the American Society of Gene Therapy",
+      "lang": [
+        "eng"
+      ],
+      "articleids": [
+        {
+          "idtype": "pubmed",
+          "idtypen": 1,
+          "value": "42687383"
+        },
+        {
+          "idtype": "doi",
+          "idtypen": 3,
+          "value": "10.1016/j.ymthe.2026.09.001"
+        },
+        {
+          "idtype": "pii",
+          "idtypen": 4,
+          "value": "S1525-0016(26)00768-9"
+        }
+      ]
+    },
+    "37173523": {
+      "uid": "37173523",
+      "title": "Annotating and prioritizing human non-coding variants with RegulomeDB v.2.",
+      "pubdate": "2023 May",
+      "authors": [
+        {
+          "name": "Dong S",
+          "authtype": "Author",
+          "clusterid": ""
+        },
+        {
+          "name": "Zhao N",
+          "authtype": "Author",
+          "clusterid": ""
+        },
+        {
+          "name": "Spragins E",
+          "authtype": "Author",
+          "clusterid": ""
+        }
+      ],
+      "fulljournalname": "Nature genetics",
+      "lang": [
+        "eng"
+      ],
+      "articleids": [
+        {
+          "idtype": "pubmed",
+          "idtypen": 1,
+          "value": "37173523"
+        },
+        {
+          "idtype": "mid",
+          "idtypen": 8,
+          "value": "NIHMS1978770"
+        },
+        {
+          "idtype": "pmc",
+          "idtypen": 8,
+          "value": "PMC10989417"
+        },
+        {
+          "idtype": "pmcid",
+          "idtypen": 5,
+          "value": "pmc-id: PMC10989417;manuscript-id: NIHMS1978770;"
+        },
+        {
+          "idtype": "doi",
+          "idtypen": 3,
+          "value": "10.1038/s41588-023-01365-3"
+        },
+        {
+          "idtype": "pii",
+          "idtypen": 4,
+          "value": "10.1038/s41588-023-01365-3"
+        }
+      ]
+    }
+  }
+}
