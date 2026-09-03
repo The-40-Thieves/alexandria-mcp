@@ -1,0 +1,84 @@
+{
+  "count": 12,
+  "next": null,
+  "previous": null,
+  "projects": [
+    {
+      "slug": "requests",
+      "versions": [
+        {
+          "slug": "latest"
+        }
+      ]
+    }
+  ],
+  "query": "authentication",
+  "results": [
+    {
+      "blocks": [
+        {
+          "content": "This document discusses using various kinds of authentication with Requests. Many web services require authentication, and there are many different types. Below, we outline various forms of authentication available in Requests, from the simple to the complex.",
+          "highlights": {
+            "content": [
+              "This document discusses using various kinds of <span>authentication</span> with Requests."
+            ],
+            "title": [
+              "<span>Authentication</span>"
+            ]
+          },
+          "id": "authentication",
+          "title": "Authentication",
+          "type": "section"
+        }
+      ],
+      "domain": "https://requests.readthedocs.io",
+      "highlights": {
+        "title": [
+          "<span>Authentication</span>"
+        ]
+      },
+      "path": "/en/latest/user/authentication/",
+      "project": {
+        "alias": null,
+        "slug": "requests"
+      },
+      "title": "Authentication",
+      "type": "page",
+      "version": {
+        "slug": "latest"
+      }
+    },
+    {
+      "blocks": [
+        {
+          "content": "Requests allows you to specify your own authentication mechanism. Any callable which is passed as the auth argument to a request method will have the opportunity to modify the request before it is dispatched. Authentication implementations are subclasses of AuthBase, and are easy to define. Requests provides two common authentication scheme implementations in requests.auth: HTTPBasicAuth and HTTPDigestAuth. Let’s pretend that we have a web service that will only respond if the X-Pizza header is set to a password value. Unlikely, but just go with it. from requests.auth import AuthBase class PizzaAuth(AuthBase): \"\"\"Attaches HTTP Pizza Authentication to the given Request object.\"\"\" def __init__(self, username): # setup any auth-related data here self.username = username def __call__(self, r): # modify and return the request r.headers['X-Pizza'] = self.username return r Then, we can make a request using our Pizza Auth: >>> requests.get('http://pizzabin.org/admin', auth=PizzaAuth('kenneth')) <Response [200]>",
+          "highlights": {
+            "content": [
+              "Requests allows you to specify your own <span>authentication</span> mechanism."
+            ],
+            "title": [
+              "Custom <span>Authentication</span>"
+            ]
+          },
+          "id": "custom-authentication",
+          "title": "Custom Authentication",
+          "type": "section"
+        }
+      ],
+      "domain": "https://requests.readthedocs.io",
+      "highlights": {
+        "title": []
+      },
+      "path": "/en/latest/user/advanced/",
+      "project": {
+        "alias": null,
+        "slug": "requests"
+      },
+      "title": "Advanced Usage",
+      "type": "page",
+      "version": {
+        "slug": "latest"
+      }
+    }
+  ]
+}

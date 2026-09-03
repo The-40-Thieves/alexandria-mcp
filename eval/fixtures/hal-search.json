@@ -1,0 +1,44 @@
+{
+  "response": {
+    "numFound": 38490,
+    "start": 0,
+    "maxScore": 7.4888597,
+    "numFoundExact": true,
+    "docs": [
+      {
+        "title_s": [
+          "Advancing Cybersecurity through Machine Learning: Bridging Gaps, Overcoming Challenges, and Enhancing Protection"
+        ],
+        "abstract_s": [
+          "The greatest technical achievement of the twenty-first century is machine learning (ML). The application of machine learning to detect cybersecurity vulnerabilities is a significant advancement in information security. A void exists in the field since the widespread application of machine learning technologies in cybersecurity remains distant. The primary cause of this gap is that contemporary technology has rendered it challenging for people to comprehend the role of machine learning in cybersecurity. The review seeks to furnish readers with a comprehensive analysis of machine learning's relevance across several facets of information security, especially for individuals interested in cybersecurity. It highlights the benefits of machine learning compared to human-operated detection methods and the diverse cybersecurity tasks it can do. This research elucidates various fundamental issues that impact real-world machine learning applications in cybersecurity. Ultimately, it examines how diverse businesses might advance machine learning in cybersecurity in the future, as this is crucial for the field's further growth. This study analyzes the contribution of machine learning to the enhancement of cybersecurity, highlighting the necessity of safeguarding sensitive information from theft and loss, as well as protecting critical assets against cyberattacks."
+        ],
+        "authFullName_s": [
+          "Redeer Avdal Saleh",
+          "Hajar Maseeh Yasin"
+        ],
+        "halId_s": "hal-04987097",
+        "uri_s": "https://hal.science/hal-04987097v1",
+        "docType_s": "ART",
+        "producedDate_s": "2025-02-05",
+        "fileMain_s": "https://hal.science/hal-04987097/document"
+      },
+      {
+        "title_s": [
+          "Application des techniques du machine Learning dans le routage dynamique du transport en commun dans la ville de Lubumbashi : Note de lecture",
+          "Application of Machine Learning Techniques in Dynamic Public Transport Routing in the City of Lubumbashi: Review Note"
+        ],
+        "abstract_s": [
+          "Résumé Avec l'essor des technologies sur le transport et la mobilité, il est essentiel d'analyser comment l’intelligence artificielle de façon spécifique le machine learning peuvent faciliter la mobilité dans la ville de Lubumbashi. Le transport urbain est un enjeu majeur dans les villes en développement comme Lubumbashi, où la démographie est croissante et l’augmentation du trafic pose des défis majeurs. Le routage dynamique dans la recherche du plus court chemin en termes de distance et de temps pour partir d’un arrêt vers un autre arrêt des bus en temps réel est un besoin concret des chauffeurs de transport en commun. Dans cet article nous présentons un bref aperçu de l’état de l’art sur l’application des techniques de machine learning qui va se présenter sur trois dimensions dont la première va nous aider à identifier les domaines connexes au machine learning, la deuxième qui va nous permettre d’identifier les différentes applications de machine learning et la dernière va nous permettre d’identifier les applications du machine learning dans le domaine de transport. Grace à cette revue de la littérature, nous serons à mesure de poser clairement notre problématique et notre hypothèse. Mots clés : Routage dynamique, Machine Learning, Transport urbain, Transport en commun, Intelligence Artificielle",
+          "Abstact With the rise of technologies in transportation and mobility, it is essential to analyze how artificial intelligence, specifically machine learning, can facilitate mobility in the city of Lubumbashi. Urban transport is a major challenge in developing cities like Lubumbashi, where a growing population and increasing traffic create significant challenges. Dynamic routing, in the search for the shortest path in terms of distance and time to travel from one bus stop to another in real time, is a concrete need for public transport drivers. In this article, we present a brief overview of the state of the art on the application of machine learning techniques. This review will be structured into three dimensions: the first will help us identify fields related to machine learning, the second will allow us to explore different applications of machine learning, and the third will focus on machine learning applications in the transportation sector. Through this literature review, we will be able to clearly define our research problem and hypothesis. Keywords : Dynamic Routing, Machine Learning, Urban Transport, Public Transport, Artifial Intelligence."
+        ],
+        "authFullName_s": [
+          "Pierre Muchapa Tujenge"
+        ],
+        "halId_s": "hal-04970677",
+        "uri_s": "https://hal.science/hal-04970677v1",
+        "docType_s": "UNDEFINED",
+        "producedDate_s": "2025-02-28"
+      }
+    ]
+  }
+}

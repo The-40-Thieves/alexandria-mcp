@@ -1,0 +1,29 @@
+[
+  {
+    "oci": "0629059472-06120344846",
+    "citing": "omid:br/0629059472 doi:10.1063/1.5011231 openalex:W3100592981",
+    "cited": "omid:br/06120344846 doi:10.1038/nature12373 openalex:W2159974629 pmid:23903748",
+    "creation": "2018-03-19",
+    "timespan": "P4Y7M19D",
+    "journal_sc": "no",
+    "author_sc": "no"
+  },
+  {
+    "oci": "06503976038-06120344846",
+    "citing": "omid:br/06503976038 doi:10.1021/acscentsci.2c00976 openalex:W4306861410",
+    "cited": "omid:br/06120344846 doi:10.1038/nature12373 openalex:W2159974629 pmid:23903748",
+    "creation": "2022-10-20",
+    "timespan": "P9Y2M20D",
+    "journal_sc": "no",
+    "author_sc": "no"
+  },
+  {
+    "oci": "061301773554-06120344846",
+    "citing": "omid:br/061301773554 doi:10.1021/acsphotonics.8b00946 openalex:W2894807143",
+    "cited": "omid:br/06120344846 doi:10.1038/nature12373 openalex:W2159974629 pmid:23903748",
+    "creation": "2018-10-01",
+    "timespan": "P5Y2M1D",
+    "journal_sc": "no",
+    "author_sc": "no"
+  }
+]

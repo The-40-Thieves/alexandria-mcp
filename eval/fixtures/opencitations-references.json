@@ -1,0 +1,29 @@
+[
+  {
+    "oci": "06120344846-06802139111",
+    "citing": "omid:br/06120344846 doi:10.1038/nature12373 openalex:W2159974629 pmid:23903748",
+    "cited": "omid:br/06802139111 doi:10.1038/nmeth818 openalex:W2147607085 pmid:16299478",
+    "creation": "2013-07-31",
+    "timespan": "P7Y8M13D",
+    "journal_sc": "no",
+    "author_sc": "no"
+  },
+  {
+    "oci": "06120344846-062203494886",
+    "citing": "omid:br/06120344846 doi:10.1038/nature12373 openalex:W2159974629 pmid:23903748",
+    "cited": "omid:br/062203494886 doi:10.1146/annurev.matsci.29.1.505 openalex:W2119089023",
+    "creation": "2013-07-31",
+    "timespan": "P13Y11M",
+    "journal_sc": "no",
+    "author_sc": "no"
+  },
+  {
+    "oci": "06120344846-061703064150",
+    "citing": "omid:br/06120344846 doi:10.1038/nature12373 openalex:W2159974629 pmid:23903748",
+    "cited": "omid:br/061703064150 doi:10.1073/pnas.0909350107 openalex:W2076028647 pmid:20080678",
+    "creation": "2013-07-31",
+    "timespan": "P3Y6M20D",
+    "journal_sc": "no",
+    "author_sc": "yes"
+  }
+]
