@@ -1,15 +1,20 @@
 // Shared in-process MCP server fixture for tests: McpServer +
-// StreamableHTTPServerTransport on an ephemeral port via Express, exactly
-// as src/index.ts's own HTTP transport (stateless: a fresh transport per
-// request), exposing a fake `search`/`read` tool pair whose behavior each
-// test controls. Not itself a *.test.ts file, so the test runner glob
-// skips it; mcpClientPool.test.ts and sources/kinds/mcp.test.ts both
-// import it so they exercise the pool and the mcp kind against a real (if
-// fake) MCP server instead of a mocked fetch.
-import type { Server } from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express from 'express';
+// NodeStreamableHTTPServerTransport on an ephemeral port via a plain
+// node:http server, stateless (a fresh transport per request) like
+// src/index.ts's own HTTP transport, exposing a fake `search`/`read` tool
+// pair whose behavior each test controls. One deliberate difference from
+// production: this calls `transport.handleRequest(req, res)` with no
+// parsedBody, letting the transport read+parse the body itself with no
+// size cap, rather than reimplementing index.ts's bounded readJsonBody() -
+// this is a loopback-only test fixture with no real attacker on the other
+// end, so the cap production needs (see index.ts's JSON_BODY_LIMIT_BYTES
+// comment) buys nothing here. Not itself a *.test.ts file, so the test
+// runner glob skips it; mcpClientPool.test.ts and sources/kinds/mcp.test.ts
+// both import it so they exercise the pool and the mcp kind against a real
+// (if fake) MCP server instead of a mocked fetch.
+import { createServer as createHttpServer, type Server } from 'node:http';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
 export type TestContentItem =
@@ -64,35 +69,37 @@ export async function startTestMcpServer(
     'search',
     {
       description: 'fake search',
-      inputSchema: { query: z.string(), limit: z.number().optional() },
+      inputSchema: z.object({ query: z.string(), limit: z.number().optional() }),
     },
     async (args) => (opts.search ? opts.search(args) : defaultResult('search', args)),
   );
   server.registerTool(
     'read',
-    { description: 'fake read', inputSchema: { id: z.string() } },
+    { description: 'fake read', inputSchema: z.object({ id: z.string() }) },
     async (args) => (opts.read ? opts.read(args) : defaultResult('read', args)),
   );
 
   let count = 0;
-  const app = express();
-  app.use(express.json());
-  app.post('/mcp', async (req, res) => {
-    count++;
-    if (opts.failAlways || (opts.failRequest && count === opts.failRequest)) {
-      res.status(opts.failStatus ?? 400).json({ error: 'simulated transport trouble' });
+  const httpServer: Server = createHttpServer(async (req, res) => {
+    if (req.method !== 'POST' || req.url !== '/mcp') {
+      res.writeHead(404).end();
       return;
     }
-    const transport = new StreamableHTTPServerTransport({
+    count++;
+    if (opts.failAlways || (opts.failRequest && count === opts.failRequest)) {
+      res.writeHead(opts.failStatus ?? 400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'simulated transport trouble' }));
+      return;
+    }
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
     res.on('close', () => transport.close());
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await transport.handleRequest(req, res);
   });
-
-  const httpServer: Server = app.listen(opts.port ?? 0);
+  httpServer.listen(opts.port ?? 0);
   await new Promise<void>((resolve, reject) => {
     httpServer.once('listening', resolve);
     httpServer.once('error', reject);

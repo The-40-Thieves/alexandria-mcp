@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express from 'express';
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { isJsonContentType, McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
 import { log } from './log.ts';
@@ -52,9 +57,9 @@ function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise
 /**
  * Build a fresh McpServer with the nine public tools registered.
  *
- * HTTP mode calls this once per request: SDK 1.30's Protocol.connect throws
- * "Already connected to a transport" if a second transport attaches to a server
- * that already has one, which a single shared instance hits as soon as two
+ * HTTP mode calls this once per request: Protocol.connect rejects a second
+ * transport attaching to a server that already has one (SdkErrorCode
+ * AlreadyConnected), which a single shared instance hits as soon as two
  * requests overlap. A server and transport per request is the SDK's documented
  * stateless pattern. stdio keeps one long-lived server for its single session.
  */
@@ -67,7 +72,7 @@ export function createServer(): McpServer {
     {
       title: 'List Available Library Sources',
       description: `List all ${listSources().length} library sources (count computed from the live registry at startup) with descriptions and capabilities.`,
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -104,7 +109,7 @@ export function createServer(): McpServer {
 
   Requires OPENAI_API_KEY (already set for embeddings).
   Returns: { query, intent, sources_searched, total_results, results[], routing[], stage1 ('embeddings'|'bm25'), stage2 ('llm'|'skipped'), errors[] }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z
           .string()
           .min(1)
@@ -124,7 +129,7 @@ export function createServer(): McpServer {
           .max(10)
           .default(5)
           .describe('Results to fetch per source (default 5)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -162,11 +167,11 @@ export function createServer(): McpServer {
   Sources marked [metadata] return discovery info and external URLs only.
 
   Returns: Array of { id, source, title, authors, year, language, subjects, hasFullText, previewUrl, description }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).max(300).describe('Title, author, subject, or keywords'),
         source: SourceSchema,
         limit: z.number().int().min(1).max(20).default(10).describe('Max results'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -202,10 +207,10 @@ export function createServer(): McpServer {
       description: `Fetch text from a library source. Full-text sources return cleaned text (truncated at 200k chars). Metadata sources return item details and an external URL.
 
   Returns: { title, authors, year?, language?, text?, charCount?, truncated?, metadataOnly?, externalUrl?, note? }`,
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().min(1).describe('Item identifier from library_search or library_ask'),
         source: SourceSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -239,7 +244,7 @@ export function createServer(): McpServer {
       title: 'Preview Chunking (Dry Run)',
       description: `Dry run: fetch text, chunk semantically, score OCR quality. No writes. Full-text sources only.
   Returns: { totalChunks, droppedChunks, avgQualityScore, estimatedTokens, sampleChunks[0..2] }`,
-      inputSchema: { id: z.string().min(1), source: SourceSchema },
+      inputSchema: z.object({ id: z.string().min(1), source: SourceSchema }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -293,7 +298,7 @@ export function createServer(): McpServer {
       title: 'Ingest Into Vector Database',
       description: `Chunk, embed, and store a text. Idempotent. Full-text sources only. Requires OPENAI_API_KEY + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
   Returns: { chunksWritten, chunksDropped, skippedDuplicate, title, sourceId }`,
-      inputSchema: { id: z.string().min(1), source: SourceSchema },
+      inputSchema: z.object({ id: z.string().min(1), source: SourceSchema }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -346,10 +351,10 @@ export function createServer(): McpServer {
     {
       title: 'Get Similar Papers (Semantic Scholar)',
       description: `Get papers similar to a given paper using Semantic Scholar's recommendation engine. Pass a paperId from a semanticscholar search result. Returns up to 500 similar papers.`,
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().min(1).describe('Semantic Scholar paperId'),
         limit: z.number().int().min(1).max(500).default(20),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -388,7 +393,7 @@ export function createServer(): McpServer {
 
   Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY).
   Returns: { answer, citations[], results[], routing[], warnings[] }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Natural language question'),
         max_sources: z
           .number()
@@ -411,7 +416,7 @@ export function createServer(): McpServer {
           .max(10)
           .default(4)
           .describe('How many top full-text results to read and cite (default 4)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -451,7 +456,7 @@ export function createServer(): McpServer {
 
   Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY).
   Returns: { report, citations[], rounds[], elapsedMs, warnings[] }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Research topic or question'),
         depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),
         breadth: z
@@ -467,7 +472,7 @@ export function createServer(): McpServer {
           .max(30)
           .default(6)
           .describe('Wall-clock time budget in minutes (default 6)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -475,13 +480,13 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, depth, breadth, max_minutes }, extra) =>
+    async ({ query, depth, breadth, max_minutes }, ctx) =>
       withRequestContext('library_research', async () => {
         try {
-          const progressToken = extra._meta?.progressToken;
+          const progressToken = ctx.mcpReq._meta?.progressToken;
           const onProgress: ProgressCallback = async (info) => {
             if (progressToken !== undefined) {
-              await extra.sendNotification({
+              await ctx.mcpReq.notify({
                 method: 'notifications/progress',
                 params: { progressToken, progress: info.round, message: info.message },
               });
@@ -513,20 +518,49 @@ export function createServer(): McpServer {
 }
 
 // ── HTTP / stdio transport ────────────────────────────────────────────────────
+
+// express.json()'s default: reject a body over 100kb before it reaches
+// JSON.parse, rather than buffering an unbounded request in memory. Dropping
+// Express (SDK v2's WebStandardStreamableHTTPServerTransport.handlePostRequest
+// calls `await req.json()` with no size cap of its own when no parsedBody is
+// supplied) means this repo now enforces that cap itself instead of getting
+// it for free from body-parser.
+const JSON_BODY_LIMIT_BYTES = 100 * 1024;
+
+// Reads req's body up to JSON_BODY_LIMIT_BYTES and JSON.parses it, mirroring
+// express.json()'s size-then-parse behavior. Only called for a JSON
+// content-type, gated on the SDK's own isJsonContentType() - the same
+// case-insensitive, parameter-tolerant check handlePostRequest itself uses
+// to decide whether to read the body at all. A hand-rolled case-sensitive
+// `includes('application/json')` here previously let a header like
+// `Application/JSON` skip this cap entirely and reach the SDK's own
+// unbounded read. GET/DELETE /mcp (no body) and any non-JSON content-type
+// still pass `undefined` through to the transport unchanged, same as
+// express.json() no-oping on those today.
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size > JSON_BODY_LIMIT_BYTES) {
+      throw new Error(`request entity too large (limit ${JSON_BODY_LIMIT_BYTES} bytes)`);
+    }
+    chunks.push(chunk);
+  }
+  if (size === 0) return undefined;
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
 /**
  * Handle one MCP HTTP request on its own server and transport.
  *
  * Stateless: nothing is shared between requests, so overlapping requests cannot
  * collide on a single Protocol instance. Errors are forwarded to the JSON-RPC
- * error handler below rather than to Express's default HTML renderer.
+ * error handler below rather than leaking an HTML page or a stack trace.
  */
-async function handleMcpRequest(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-): Promise<void> {
+async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const server = createServer();
-  const transport = new StreamableHTTPServerTransport({
+  const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
@@ -535,67 +569,114 @@ async function handleMcpRequest(
     void server.close();
   });
   try {
+    const body = isJsonContentType(req.headers['content-type'])
+      ? await readJsonBody(req)
+      : undefined;
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await transport.handleRequest(req, res, body);
   } catch (err) {
-    next(err);
+    jsonRpcErrorHandler(err, res);
   }
 }
 
 /**
- * Express error handler. Returns a JSON-RPC error object so a thrown error can
- * never leak an HTML page or a stack trace to the caller.
+ * Returns a JSON-RPC error object so a thrown error can never leak an HTML
+ * page or a stack trace to the caller.
  */
-function jsonRpcErrorHandler(
-  err: unknown,
-  _req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-): void {
+function jsonRpcErrorHandler(err: unknown, res: ServerResponse): void {
   const message = err instanceof Error ? err.message : String(err);
   log.error({ err: message }, 'request failed');
   if (res.headersSent) {
-    next(err);
+    res.end();
     return;
   }
-  res.status(500).json({
-    jsonrpc: '2.0',
-    error: { code: -32603, message },
-    id: null,
-  });
+  // JSON.stringify before writeHead, deliberately: if this throws (it
+  // shouldn't, `message` is always a string, but see sendJson's comment for
+  // why the ordering matters regardless), no headers have gone out yet and
+  // whatever called this can still fall back to a plain res.end().
+  const payload = JSON.stringify({ jsonrpc: '2.0', error: { code: -32603, message }, id: null });
+  res.writeHead(500, { 'content-type': 'application/json' });
+  res.end(payload);
 }
 
-/** Build the HTTP app without binding a port, so tests can drive it in process. */
-export function createHttpApp(): express.Express {
-  const app = express();
-  app.use(express.json());
-  app.post('/mcp', handleMcpRequest);
-  app.get('/mcp', handleMcpRequest);
-  app.delete('/mcp', handleMcpRequest);
-  app.get('/health', (_req, res) => {
-    const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
-    const { calls, errors } = sourceCallTotals();
-    res.json({
-      status: 'ok',
-      version: VERSION,
-      sources: { total: sources, visible, hidden, calls, errors },
-      byKind,
-      quota,
-      cache,
-      tools: TOOL_COUNT,
-    });
+// Serializes before writeHead, not after: writeHead commits the response's
+// status/headers immediately, so a JSON.stringify(body) that throws AFTER
+// writeHead(200, ...) has already run leaves a 200 response with no body on
+// the wire and nothing jsonRpcErrorHandler's `res.headersSent` check can
+// recover - the caller sees an empty 200, not a JSON-RPC error. Serializing
+// first means a throw here propagates to createHttpApp's try/catch before
+// any header has been sent, so jsonRpcErrorHandler can still send a clean
+// 500 envelope.
+function sendJson(res: ServerResponse, body: unknown): void {
+  const payload = JSON.stringify(body);
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(payload);
+}
+
+// Strips a query string from a raw request target - deliberately NOT via
+// `new URL(req.url, base)`: Node's own HTTP request-line parser is far more
+// lenient than the WHATWG URL parser and hands a target like `//[`,
+// `http://[`, or `http://%/` straight through as `req.url` verbatim; feeding
+// that into `new URL()` throws synchronously inside a plain node:http
+// request listener, which Node treats as an uncaught exception and exits
+// the process on a single unauthenticated request. A plain string split
+// never throws, whatever the target looks like.
+function requestPath(req: IncomingMessage): string {
+  return (req.url ?? '/').split('?', 1)[0] ?? '/';
+}
+
+/** Build the HTTP server without binding a port, so tests can drive it in process. */
+export function createHttpApp(): Server {
+  return createHttpServer((req, res) => {
+    // Guards the whole dispatch below, not just handleMcpRequest's own try
+    // block: a throw from requestPath (see its comment), or from
+    // healthSummary()/sourceCallTotals()/metricsSnapshot()/JSON.stringify
+    // while building /health or /metrics's response, would otherwise be an
+    // uncaught synchronous exception in this listener - fatal to the whole
+    // process - instead of a JSON-RPC error answer to the one request.
+    try {
+      const path = requestPath(req);
+      // /mcp alone gets Express's old case-insensitive, trailing-slash-
+      // tolerant matching back (`/MCP`, `/mcp/` both routed); /health and
+      // /metrics stay exact-match, as documented in the README.
+      const mcpPath = path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
+      if (
+        mcpPath.toLowerCase() === '/mcp' &&
+        ['POST', 'GET', 'DELETE'].includes(req.method ?? '')
+      ) {
+        void handleMcpRequest(req, res);
+        return;
+      }
+      if (path === '/health' && req.method === 'GET') {
+        const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
+        const { calls, errors } = sourceCallTotals();
+        sendJson(res, {
+          status: 'ok',
+          version: VERSION,
+          sources: { total: sources, visible, hidden, calls, errors },
+          byKind,
+          quota,
+          cache,
+          tools: TOOL_COUNT,
+        });
+        return;
+      }
+      if (path === '/metrics' && req.method === 'GET') {
+        sendJson(res, metricsSnapshot());
+        return;
+      }
+      res.writeHead(404, { 'content-type': 'text/plain' });
+      res.end('Not Found');
+    } catch (err) {
+      jsonRpcErrorHandler(err, res);
+    }
   });
-  app.get('/metrics', (_req, res) => {
-    res.json(metricsSnapshot());
-  });
-  app.use(jsonRpcErrorHandler);
-  return app;
 }
 
 async function runHTTP(): Promise<void> {
-  const app = createHttpApp();
+  const httpServer = createHttpApp();
   const port = config.PORT;
-  app.listen(port, () =>
+  httpServer.listen(port, () =>
     log.info(
       { sources: listSources().length, url: `http://localhost:${port}/mcp` },
       'alexandria started',

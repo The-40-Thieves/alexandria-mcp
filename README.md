@@ -231,6 +231,14 @@ load balancer.
 | `TRANSPORT` | `stdio` or `http` | `stdio` |
 | `PORT` | any port number, HTTP mode only | `3000` |
 
+Speaks the 2025-era MCP protocol on the wire (the `@modelcontextprotocol/*` v2
+SDK's default for a hand-wired `NodeStreamableHTTPServerTransport` /
+`StdioServerTransport`, which is what `src/index.ts` uses). Opting into the
+2026-07-28 revision is a server-construction change, not a config flag: swap
+the HTTP handler for `createMcpHandler(factory, { legacy: 'stateless' | 'reject' })`
+and the stdio one for `serveStdio(factory, { legacy: 'reject' })`, both from
+`@modelcontextprotocol/server`.
+
 Set those (plus any source keys) in the Railway dashboard and deploy:
 
 ```bash

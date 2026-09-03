@@ -1,14 +1,44 @@
 import assert from 'node:assert/strict';
-import type { AddressInfo } from 'node:net';
+import { type AddressInfo, connect as netConnect } from 'node:net';
 import test from 'node:test';
 import { createHttpApp, createServer } from './index.ts';
 import { resetMetricsForTests } from './utils/metrics.ts';
 
+// Writes a raw, hand-built HTTP/1.1 request line straight to a socket
+// (bypassing fetch/undici, which would themselves reject an invalid
+// request-target before anything reached the wire) and resolves with
+// whatever bytes come back, or '' if nothing arrives before timeoutMs.
+// Used to reproduce a request-line target the WHATWG URL parser rejects
+// but Node's own, more lenient HTTP parser accepts and hands straight
+// through as `req.url`.
+function rawRequest(port: number, requestLine: string, timeoutMs = 3000): Promise<string> {
+  return new Promise((resolve) => {
+    const socket = netConnect(port, '127.0.0.1', () => socket.write(requestLine));
+    let data = '';
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(data);
+    };
+    socket.on('data', (chunk) => {
+      data += chunk.toString();
+      finish();
+    });
+    socket.on('error', finish);
+    socket.on('close', finish);
+    setTimeout(finish, timeoutMs);
+  });
+}
+
 /**
  * Regression test for the shared-McpServer bug: a module-level McpServer that
- * every HTTP request connected to made SDK 1.30's Protocol.connect throw
- * "Already connected to a transport" as soon as two requests overlapped, and
- * Express answered with an HTML 500 carrying a stack trace.
+ * every HTTP request connected to made Protocol.connect reject a second
+ * transport attaching to a server that already has one as soon as two
+ * requests overlapped. The malformed-body case guards the same "never leak
+ * HTML or a stack trace" property src/index.ts's plain node:http listener
+ * is responsible for now that Express is gone.
  */
 test('HTTP transport handles concurrent requests', async (t) => {
   const app = createHttpApp();
@@ -59,6 +89,191 @@ test('HTTP transport handles concurrent requests', async (t) => {
     const parsed = JSON.parse(body) as { jsonrpc?: string; error?: { code?: number } };
     assert.equal(parsed.jsonrpc, '2.0');
     assert.equal(parsed.error?.code, -32603);
+  });
+});
+
+/**
+ * Regression test: `new URL(req.url, base)` throws synchronously on a
+ * request-target the WHATWG URL parser rejects but Node's own, more
+ * lenient HTTP request-line parser accepts and hands straight through as
+ * `req.url` - a synchronous throw in a plain node:http request listener is
+ * an uncaught exception that exits the whole process on one unauthenticated
+ * request. `requestPath()` in src/index.ts never parses a URL at all (a
+ * plain string split), so none of these can reach that code path.
+ */
+test('a request-target the WHATWG URL parser would reject does not crash the process', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const targets = [
+    'GET //[ HTTP/1.1\r\nHost: x\r\n\r\n',
+    'GET http://[ HTTP/1.1\r\nHost: x\r\n\r\n',
+    'GET http://%/ HTTP/1.1\r\nHost: x\r\n\r\n',
+  ];
+
+  for (const requestLine of targets) {
+    await t.test(`answers instead of crashing on ${JSON.stringify(requestLine)}`, async () => {
+      const response = await rawRequest(port, requestLine);
+      assert.ok(
+        response.startsWith('HTTP/1.1'),
+        `no HTTP response at all: ${response.slice(0, 200)}`,
+      );
+    });
+  }
+
+  await t.test('the process is still up and answering after all three', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/health`);
+    assert.equal(res.status, 200);
+  });
+});
+
+test('/mcp tolerates a trailing slash and mixed case, like the old Express defaults', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const post = (path: string) =>
+    fetch(`http://127.0.0.1:${port}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+
+  await t.test('/mcp/ (trailing slash) reaches the handler', async () => {
+    const res = await post('/mcp/');
+    assert.equal(res.status, 200);
+  });
+
+  await t.test('/MCP (uppercase) reaches the handler', async () => {
+    const res = await post('/MCP');
+    assert.equal(res.status, 200);
+  });
+});
+
+test('unknown paths and non-GET on /health or /metrics both 404', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  await t.test('an unrouted path 404s', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/nope`);
+    assert.equal(res.status, 404);
+  });
+
+  await t.test(
+    'POST /health 404s (no POST route registered, same as the old Express app)',
+    async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/health`, { method: 'POST' });
+      assert.equal(res.status, 404);
+    },
+  );
+
+  await t.test('POST /metrics 404s', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/metrics`, { method: 'POST' });
+    assert.equal(res.status, 404);
+  });
+});
+
+/**
+ * Regression test: `hasJsonContentType()`'s case-sensitive
+ * `includes('application/json')` let a header like `Application/JSON` skip
+ * the 100kb body cap entirely, reaching the SDK's own unbounded
+ * `await req.json()`. Both a lowercase and a mixed-case content-type must
+ * hit the same cap and answer with the same JSON-RPC error envelope.
+ */
+test('a body over the 100kb JSON cap is rejected regardless of content-type casing', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const oversizedBody = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/list',
+    params: { padding: 'x'.repeat(150 * 1024) },
+  });
+
+  for (const contentType of ['application/json', 'Application/JSON']) {
+    await t.test(`content-type: ${contentType}`, async () => {
+      const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: { 'content-type': contentType },
+        body: oversizedBody,
+      });
+      const body = await res.text();
+      const parsed = JSON.parse(body) as {
+        jsonrpc?: string;
+        error?: { code?: number };
+        id?: unknown;
+      };
+      assert.equal(parsed.jsonrpc, '2.0');
+      assert.equal(parsed.error?.code, -32603);
+      assert.equal(parsed.id, null);
+    });
+  }
+});
+
+/**
+ * Regression test: the try/catch inside handleMcpRequest only ever covered
+ * /mcp. A throw from healthSummary()/sourceCallTotals()/metricsSnapshot()
+ * or from JSON.stringify while building /health or /metrics's response body
+ * was an uncaught synchronous exception in the plain node:http listener -
+ * fatal to the whole process, not just that one request.
+ */
+test('a throw while building /health or /metrics is caught, not fatal', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  await t.test('/health', async (subtest) => {
+    // Only the /health response body itself (a plain object shaped like
+    // `{ status: 'ok', ..., tools: N }`) throws - undici's own client-side
+    // JSON.stringify calls (cloning Pool/Agent options on the way OUT to
+    // fetch() below) are left alone, or the client request never reaches
+    // the server at all.
+    const original = JSON.stringify;
+    subtest.mock.method(JSON, 'stringify', (...args: Parameters<typeof JSON.stringify>) => {
+      const [value] = args;
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        (value as { status?: unknown }).status === 'ok' &&
+        'tools' in value
+      ) {
+        throw new Error('stringify boom');
+      }
+      return original(...args);
+    });
+
+    const res = await fetch(`http://127.0.0.1:${port}/health`);
+    const body = await res.text();
+    const parsed = JSON.parse(body) as {
+      jsonrpc?: string;
+      error?: { code?: number };
+      id?: unknown;
+    };
+    assert.equal(parsed.jsonrpc, '2.0');
+    assert.equal(parsed.error?.code, -32603);
+    assert.equal(parsed.id, null);
+  });
+
+  await t.test('the process survived and /metrics still answers normally', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/metrics`);
+    assert.equal(res.status, 200);
   });
 });
 
