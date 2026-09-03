@@ -6,6 +6,7 @@ import test from 'node:test';
 import type { McpServer, ServerContext } from '@modelcontextprotocol/server';
 import { createHttpApp, createServer, progressReporter } from './index.ts';
 import { register } from './sources/registry.ts';
+import { TOOL_COUNT } from './toolCount.ts';
 import { resetMetricsForTests } from './utils/metrics.ts';
 import { dnsResolver } from './web/fetchTier.ts';
 
@@ -86,7 +87,7 @@ test('HTTP transport handles concurrent requests', async (t) => {
       assert.ok(!res.body.includes('<!DOCTYPE html>'), 'HTML error page leaked');
       const parsed = JSON.parse(res.body) as { result?: { tools?: unknown[] }; error?: unknown };
       assert.equal(parsed.error, undefined);
-      assert.equal(parsed.result?.tools?.length, 10);
+      assert.equal(parsed.result?.tools?.length, TOOL_COUNT);
     }
   });
 
@@ -312,7 +313,7 @@ test('GET /health and GET /metrics', async (t) => {
       assert.ok(body.sources.total > 0);
       assert.equal(typeof body.sources.calls, 'number');
       assert.equal(typeof body.sources.errors, 'number');
-      assert.equal(body.tools, 10);
+      assert.equal(body.tools, TOOL_COUNT);
     },
   );
 
@@ -475,7 +476,7 @@ test('createServer returns a fresh instance each call', () => {
  * server-wide `instructions` string. A client can't rely on any of these
  * MAY-level fields silently regressing back to undefined.
  */
-test('tools/list carries title/annotations/outputSchema for all 10 tools; initialize carries instructions', async (t) => {
+test('tools/list carries title/annotations/outputSchema for all 11 tools; initialize carries instructions', async (t) => {
   const app = createHttpApp();
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -497,7 +498,7 @@ test('tools/list carries title/annotations/outputSchema for all 10 tools; initia
   await t.test('tools/list', async () => {
     const { result } = await rpc('tools/list', {});
     const tools = result?.tools as Array<Record<string, unknown>> | undefined;
-    assert.equal(tools?.length, 10);
+    assert.equal(tools?.length, TOOL_COUNT);
     for (const tool of tools ?? []) {
       assert.ok(typeof tool.title === 'string' && tool.title.length > 0, `${tool.name}: no title`);
       assert.ok(
@@ -618,6 +619,126 @@ test('library_search structuredContent validates against outputSchema, concise a
     const row = result?.structuredContent?.results[0];
     assert.equal((row?.authors as string[] | undefined)?.[0], 'A. Author');
     assert.equal(row?.description, 'a fixture description');
+  });
+});
+
+/**
+ * Same regression as library_search's, above, for library_citations: its
+ * outputSchema (seed/direction/results/formatted) must validate against
+ * what libraryCitations() actually returns, on both response_format
+ * values. Routed through the OpenCitations fallback path (a stubbed
+ * global fetch: OpenAlex 404s, OpenCitations answers) rather than a real
+ * OpenAlex call, since libraryCitations.ts fetches OpenAlex directly
+ * (not through a registered, mockable adapter).
+ */
+test('library_citations structuredContent validates against outputSchema, concise and detailed', async (t) => {
+  register('t_citations_schema_fixture', {
+    description: 'fixture source for the outputSchema regression test',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read() {
+      return { title: 'x', authors: [], doi: '10.9999/fixture-schema' };
+    },
+  });
+
+  // Only OpenAlex/OpenCitations calls (libraryCitations.ts fetches both
+  // directly, not through a registered adapter) are stubbed; anything else
+  // - notably this test's own `call()` below, hitting the local /mcp server
+  // - passes through to the real fetch.
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    const u = String(url);
+    if (u.includes('api.openalex.org')) {
+      return new Response('not found', { status: 404 });
+    }
+    if (u.includes('api.opencitations.net/index/v2/citations/doi:10.9999/fixture-schema')) {
+      return new Response(
+        JSON.stringify([
+          {
+            oci: 'a-b',
+            citing: 'doi:10.5555/citer',
+            cited: 'doi:10.9999/fixture-schema',
+            creation: '2021-01-01',
+          },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    return originalFetch(url, init);
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const call = async (args: Record<string, unknown>) => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'library_citations', arguments: args },
+      }),
+    });
+    return (await res.json()) as {
+      result?: {
+        isError?: boolean;
+        structuredContent?: {
+          seed: Record<string, unknown>;
+          direction: string;
+          results: Array<Record<string, unknown>>;
+        };
+      };
+    };
+  };
+
+  await t.test('concise (default): validates and drops previewUrl from rows', async () => {
+    const { result } = await call({
+      id: 'x1',
+      source: 't_citations_schema_fixture',
+      direction: 'citations',
+    });
+    assert.equal(
+      result?.isError,
+      undefined,
+      'the concise payload must validate against outputSchema',
+    );
+    assert.equal(result?.structuredContent?.seed.doi, '10.9999/fixture-schema');
+    assert.equal(result?.structuredContent?.direction, 'citations');
+    const row = result?.structuredContent?.results[0];
+    assert.equal(row?.id, '10.5555/citer');
+    assert.equal(row?.source, 'opencitations');
+    assert.equal('previewUrl' in (row ?? {}), false);
+  });
+
+  await t.test('detailed: rows keep previewUrl', async () => {
+    const { result } = await call({
+      id: 'x1',
+      source: 't_citations_schema_fixture',
+      direction: 'citations',
+      response_format: 'detailed',
+    });
+    assert.equal(
+      result?.isError,
+      undefined,
+      'the detailed payload must validate against outputSchema',
+    );
+    assert.equal(
+      result?.structuredContent?.results[0]?.previewUrl,
+      'https://doi.org/10.5555/citer',
+    );
   });
 });
 

@@ -108,6 +108,43 @@ test('formatResult(answer, ..., concise): keeps only answer + citations', () => 
   assert.ok(!('warnings' in concise));
 });
 
+test('formatResult(citations, ..., concise): result rows collapse to ConciseResultRow, seed/direction/formatted pass through', () => {
+  const fixtureCitations = {
+    seed: { id: '10.1000/seed', source: 'crossref', doi: '10.1000/seed' },
+    direction: 'references' as const,
+    results: [fixtureResult],
+    formatted: '@article{x}',
+  };
+
+  const detailed = formatResult('citations', fixtureCitations, 'detailed');
+  const concise = formatResult('citations', fixtureCitations, 'concise');
+
+  assert.equal(detailed, fixtureCitations);
+  assert.deepEqual(concise.seed, fixtureCitations.seed);
+  assert.equal(concise.direction, 'references');
+  assert.equal(concise.formatted, '@article{x}');
+  assert.deepEqual(concise.results, [
+    {
+      title: fixtureResult.title,
+      source: fixtureResult.source,
+      id: fixtureResult.id,
+      hasFullText: fixtureResult.hasFullText,
+      year: fixtureResult.year,
+      url: fixtureResult.url,
+    },
+  ]);
+});
+
+test('formatResult(citations, ..., concise): omits formatted when the detailed payload never had one', () => {
+  const fixtureCitations = {
+    seed: { id: '10.1000/seed', source: 'crossref' },
+    direction: 'citations' as const,
+    results: [] as LibraryResult[],
+  };
+  const concise = formatResult('citations', fixtureCitations, 'concise');
+  assert.ok(!('formatted' in concise));
+});
+
 test('formatResult(research, ..., concise): keeps only report + citations', () => {
   const fixtureResearch = {
     report: 'A report, cited [1].',
