@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { listSources } from '../src/sources/registry.ts';
+import { TOOL_COUNT } from '../src/toolCount.ts';
 import {
   buildEnvBlock,
   buildHealthExample,
@@ -78,13 +79,25 @@ test('buildReadmeSourcesBlock', async (t) => {
 
 test('buildHealthExample', async (t) => {
   await t.test('reports total, visible, hidden, and per-kind counts', () => {
-    const example = buildHealthExample(FIXTURES);
+    const example = buildHealthExample(FIXTURES, TOOL_COUNT);
     assert.match(example, /sources: \{ total: 3, visible: 2, hidden: 1, calls: 0, errors: 0 \}/);
     assert.match(example, /rest: 1/);
     assert.match(example, /mcp: 1/);
     assert.match(example, /rss: 1/);
     assert.match(example, /hub: 0/);
     assert.match(example, /scrape: 0/);
+  });
+
+  // Task 2 review finding: this example's `tools:` value used to be a
+  // literal 9, hardcoded independently of src/index.ts's TOOL_COUNT, so
+  // `npm run docs -- --check` kept reporting the README up to date even
+  // after a tenth tool was registered and TOOL_COUNT bumped to 10. Both
+  // now read src/toolCount.ts; this asserts the generated example's
+  // `tools:` value always equals that shared constant, not a copy of
+  // whatever it happened to be when this test was written.
+  await t.test('tools: always equals the shared TOOL_COUNT constant', () => {
+    const example = buildHealthExample(FIXTURES, TOOL_COUNT);
+    assert.match(example, new RegExp(`tools: ${TOOL_COUNT} \\}$`));
   });
 });
 

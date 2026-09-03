@@ -83,7 +83,7 @@ test('HTTP transport handles concurrent requests', async (t) => {
       assert.ok(!res.body.includes('<!DOCTYPE html>'), 'HTML error page leaked');
       const parsed = JSON.parse(res.body) as { result?: { tools?: unknown[] }; error?: unknown };
       assert.equal(parsed.error, undefined);
-      assert.equal(parsed.result?.tools?.length, 9);
+      assert.equal(parsed.result?.tools?.length, 10);
     }
   });
 
@@ -309,7 +309,7 @@ test('GET /health and GET /metrics', async (t) => {
       assert.ok(body.sources.total > 0);
       assert.equal(typeof body.sources.calls, 'number');
       assert.equal(typeof body.sources.errors, 'number');
-      assert.equal(body.tools, 9);
+      assert.equal(body.tools, 10);
     },
   );
 
@@ -472,7 +472,7 @@ test('createServer returns a fresh instance each call', () => {
  * server-wide `instructions` string. A client can't rely on any of these
  * MAY-level fields silently regressing back to undefined.
  */
-test('tools/list carries title/annotations/outputSchema for all 9 tools; initialize carries instructions', async (t) => {
+test('tools/list carries title/annotations/outputSchema for all 10 tools; initialize carries instructions', async (t) => {
   const app = createHttpApp();
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -494,7 +494,7 @@ test('tools/list carries title/annotations/outputSchema for all 9 tools; initial
   await t.test('tools/list', async () => {
     const { result } = await rpc('tools/list', {});
     const tools = result?.tools as Array<Record<string, unknown>> | undefined;
-    assert.equal(tools?.length, 9);
+    assert.equal(tools?.length, 10);
     for (const tool of tools ?? []) {
       assert.ok(typeof tool.title === 'string' && tool.title.length > 0, `${tool.name}: no title`);
       assert.ok(
