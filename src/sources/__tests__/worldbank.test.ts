@@ -39,26 +39,39 @@ test('normalizeWorldbankIndicator', () => {
   assert.deepEqual(out.subjects, ['Economy & Growth']);
 });
 
-test('worldbankSearch', async (t) => {
+// worldbankSearch() shares one lazily-downloaded, module-level cached
+// catalog across every call in the process (see worldbank.ts's
+// downloadIndicators()) - the same lazy-cache convention as
+// peps.ts/w3c.ts/census.ts. This is one test, not several, on purpose:
+// the catalog module has no test-only reset hook (its siblings don't
+// either), so every call below deliberately runs against the SAME cache
+// populated by the first one, and the fetch-call counter proves the
+// second and third calls (different queries) never re-download it.
+test('worldbankSearch shares one catalog download across distinct queries', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {
     globalThis.fetch = originalFetch;
   });
 
-  await t.test('filters the full catalog client-side and applies limit', async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(indicatorsFixture), { status: 200 })) as typeof fetch;
-    const out = await worldbankSearch('inflation', 5);
-    assert.equal(out.length, 1);
-    assert.equal(out[0].id, 'FP.CPI.TOTL.ZG');
-  });
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response(JSON.stringify(indicatorsFixture), { status: 200 });
+  }) as typeof fetch;
 
-  await t.test('returns [] when nothing matches', async () => {
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify(indicatorsFixture), { status: 200 })) as typeof fetch;
-    const out = await worldbankSearch('zzznonexistentzzz', 5);
-    assert.deepEqual(out, []);
-  });
+  const inflation = await worldbankSearch('inflation', 5);
+  assert.equal(inflation.length, 1);
+  assert.equal(inflation[0].id, 'FP.CPI.TOTL.ZG');
+  assert.equal(calls, 1, 'the first call downloads the catalog once');
+
+  const population = await worldbankSearch('population', 5);
+  assert.equal(population.length, 1);
+  assert.equal(population[0].id, 'SP.POP.TOTL');
+  assert.equal(calls, 1, 'a second, different query reuses the cached catalog');
+
+  const nothing = await worldbankSearch('zzznonexistentzzz', 5);
+  assert.deepEqual(nothing, []);
+  assert.equal(calls, 1, 'a third, non-matching query still reuses the cached catalog');
 });
 
 test('worldbankRead', async (t) => {

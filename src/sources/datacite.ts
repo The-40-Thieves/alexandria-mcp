@@ -70,6 +70,8 @@ defineRest<DataciteListResponse>({
   homepage: 'https://datacite.org',
   supportsIngest: true,
   verifiedAt: '2026-09-03',
+  // 3,000 req / 5 min / IP == 10 rps.
+  pacing: { minIntervalMs: 100 },
   search: {
     url: (q, limit) => `${BASE}/dois?query=${encodeURIComponent(q)}&page[size]=${limit}`,
     pick: (raw) => raw.data ?? [],

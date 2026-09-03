@@ -82,6 +82,21 @@ test('secedgarRead', async (t) => {
     assert.match(result.text ?? '', /Risk factors and financial disclosures/);
   });
 
+  await t.test('percent-encodes cik/accession/filename path segments in the doc URL', async () => {
+    globalThis.fetch = (async (url: string | URL) => {
+      assert.equal(
+        String(url),
+        'https://www.sec.gov/Archives/edgar/data/815097/000081509723000012/risk%20factors%20%26%20disclosures.htm',
+      );
+      return new Response(FILING_HTML, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }) as typeof fetch;
+    const result = await secedgarRead('815097::000081509723000012::risk factors & disclosures.htm');
+    assert.equal(result.metadataOnly, undefined);
+  });
+
   await t.test('degrades to metadata-only when the fetch fails', async () => {
     globalThis.fetch = (async () => new Response('error', { status: 500 })) as typeof fetch;
     const result = await secedgarRead('815097::000081509723000012::ccl-20221130.htm');

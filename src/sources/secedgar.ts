@@ -56,7 +56,10 @@ function parseHitParts(hit: SecHit): FilingDocParts | null {
 }
 
 function docUrl(parts: FilingDocParts): string {
-  return `https://www.sec.gov/Archives/edgar/data/${parts.cik}/${parts.accessionNoDashes}/${parts.filename}`;
+  const cik = encodeURIComponent(parts.cik);
+  const accessionNoDashes = encodeURIComponent(parts.accessionNoDashes);
+  const filename = encodeURIComponent(parts.filename);
+  return `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNoDashes}/${filename}`;
 }
 
 // The three parts needed to rebuild the filing's document URL are encoded

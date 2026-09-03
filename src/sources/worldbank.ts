@@ -32,6 +32,26 @@ interface WBObservation {
 }
 type WBSeriesResponse = [{ total?: number }, WBObservation[] | null];
 
+// The ~15 MB catalog is downloaded once per process and reused by every
+// search() call, the same lazy-cached-promise convention as
+// peps.ts/w3c.ts/census.ts for a source with no server-side search: without
+// this, two distinct queries in the same process each re-download the whole
+// catalog. Reset on rejection so a failed download doesn't poison every
+// later call in the process.
+let cachedIndicators: Promise<WBIndicator[]> | undefined;
+
+function downloadIndicators(): Promise<WBIndicator[]> {
+  if (!cachedIndicators) {
+    cachedIndicators = fetchJSON<WBIndicatorListResponse>(INDICATOR_LIST_URL, {}, LIST_TIMEOUT_MS)
+      .then((data) => data[1] ?? [])
+      .catch((err) => {
+        cachedIndicators = undefined;
+        throw err;
+      });
+  }
+  return cachedIndicators;
+}
+
 export function matchesIndicator(item: WBIndicator, query: string): boolean {
   const haystack = `${item.name} ${item.sourceNote ?? ''}`.toLowerCase();
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -52,8 +72,7 @@ export function normalizeWorldbankIndicator(item: WBIndicator): LibraryResult {
 }
 
 export async function worldbankSearch(query: string, limit: number): Promise<LibraryResult[]> {
-  const data = await fetchJSON<WBIndicatorListResponse>(INDICATOR_LIST_URL, {}, LIST_TIMEOUT_MS);
-  const indicators = data[1] ?? [];
+  const indicators = await downloadIndicators();
   const matched = indicators.filter((item) => matchesIndicator(item, query));
   return matched.slice(0, limit).map(normalizeWorldbankIndicator);
 }

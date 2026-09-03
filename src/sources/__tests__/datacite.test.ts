@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { normalizeDatacite } from '../datacite.ts';
-import { getAdapter } from '../registry.ts';
+import { getAdapter, listSources } from '../registry.ts';
 
 function fixture(name: string): unknown {
   return JSON.parse(readFileSync(path.resolve(process.cwd(), `eval/fixtures/${name}`), 'utf8'));
@@ -13,6 +13,12 @@ type DataciteItem = Parameters<typeof normalizeDatacite>[0];
 
 const searchFixture = fixture('datacite-search.json') as { data: DataciteItem[] };
 const workFixture = fixture('datacite-work.json') as { data: DataciteItem };
+
+test('datacite adapter declares pacing for the 3,000 req/5min/IP limit', () => {
+  const meta = listSources().find((s) => s.name === 'datacite');
+  assert.ok(meta);
+  assert.equal(meta?.pacing?.minIntervalMs, 100);
+});
 
 test('normalizeDatacite', () => {
   const out = normalizeDatacite(searchFixture.data[0]);
