@@ -309,6 +309,72 @@ test('libraryResearch', async (t) => {
     );
   });
 
+  // Review round 2 (Minor): a mid-run updateCoverage() failure gets its
+  // own distinct message (the outline itself succeeded here - only this
+  // round's coverage check failed), and must not sink the run either.
+  await t.test(
+    'a failing objective coverage check does not sink the research run, objectives stay intact',
+    async () => {
+      function decide(system: string): unknown {
+        if (system.includes('planning a research pass')) return { queries: ['a single query'] };
+        if (system.includes('extract structured learnings')) {
+          return { learnings: ['a learning'], followUps: [] };
+        }
+        if (system.includes('write a research report')) {
+          return { report: 'Report body about the topic [1].' };
+        }
+        if (system.includes('scoping a research pass')) {
+          return { objectives: ['objective one', 'objective two'] };
+        }
+        // Wrong shape (coveredIndices must be an array of numbers) - fails
+        // CoverageSchema validation on both attempts, so chatJSON throws.
+        if (system.includes('track coverage of a research outline')) {
+          return { coveredIndices: 'not an array' };
+        }
+        throw new Error(`unexpected research prompt: ${system.slice(0, 80)}`);
+      }
+
+      const research = await startFakeChatServer(decide);
+      t.after(() => research.close());
+      const synth = await startFakeChatServer(decideSynthNoop);
+      t.after(() => synth.close());
+
+      process.env.ALEXANDRIA_RESEARCH_BASE_URL = research.url;
+      process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+      const answerFn = async (): Promise<LibraryAnswerResult> => fakeAnswer('id', 1);
+
+      const result = await libraryResearch(
+        'a topic whose coverage check fails mid-run',
+        { depth: 1, breadth: 1, maxMinutes: 6 },
+        undefined,
+        { answerFn },
+      );
+
+      assert.match(result.report, /Report body about the topic/, 'the report is still produced');
+      assert.deepEqual(
+        result.objectives,
+        ['objective one', 'objective two'],
+        'the outline is intact',
+      );
+      assert.deepEqual(result.coverage, [false, false], 'coverage falls back to not-yet-covered');
+      assert.ok(
+        result.warnings.includes(
+          'objective coverage check unavailable this round; stopping on depth, breadth, and time only',
+        ),
+        `expected the coverage-failure warning, got: ${JSON.stringify(result.warnings)}`,
+      );
+      assert.ok(
+        !result.warnings.includes(
+          'objective outline unavailable; stopping on depth, breadth, and time only',
+        ),
+        'the outline-failure message is distinct and must not also appear',
+      );
+    },
+  );
+
   await t.test('stops when the time budget is exhausted', async () => {
     // 30ms per LLM call: one round's generateQueries + several sequential
     // extractLearnings calls already exceeds a 60ms (0.001 min) budget, so

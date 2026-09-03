@@ -393,8 +393,13 @@ export async function libraryResearch(
         // coverage is left as whatever it was last round (unchanged), per
         // review round 1's ruling - not reset to all-false, which could
         // wrongly re-open an objective a previous round already covered.
+        // Review round 2 (Minor): a distinct message from the outline
+        // failure above - the outline itself is fine here, only this
+        // round's coverage check failed.
         if (!coverageFailureWarned) {
-          warnings.push('objective outline unavailable; stopping on depth, breadth, and time only');
+          warnings.push(
+            'objective coverage check unavailable this round; stopping on depth, breadth, and time only',
+          );
           coverageFailureWarned = true;
         }
       }

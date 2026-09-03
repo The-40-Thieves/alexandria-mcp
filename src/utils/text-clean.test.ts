@@ -132,13 +132,10 @@ Post-text`;
     // prose/data scoring below the 0.75 threshold (statistics prose 0.542,
     // a JSON object 0.400, finance prose 0.737) because the lexicon is
     // 19th-century Gutenberg vocabulary and the old sample-size floor
-    // looked only at raw token count, not how much of the chunk was even
-    // alphabetic. Fixed by (a) skipping the lexicon score entirely when
-    // alphabetic tokens are under 60% of all word-like tokens (numeric-
-    // heavy chunks lean on the character-class regex alone), and (b)
-    // crediting an out-of-lexicon token as a hit when it has a plausible
-    // word shape (vowel present, reasonable length, no absurd repeats or
-    // consonant runs, camelCase-aware).
+    // looked only at raw token count. Round 1's fix (skip the lexicon
+    // score below 60% alphabetic tokens) turned out to have its own
+    // bypasses - see Review round 2 below - so these three still exercise
+    // the same real-data categories, now against the round 2 formula.
     test('clean statistics prose clears the lexicon gate', () => {
       const raw =
         'The regression coefficient was 0.842 with a standard error of 0.031, yielding a ' +
@@ -150,11 +147,11 @@ Post-text`;
       assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
     });
 
-    test('a numeric-heavy JSON object clears the lexicon gate', () => {
+    test('a JSON object clears the lexicon gate', () => {
       const raw =
-        '{"id": 48291, "code": "SKU-2024-8871", "price": 149.99, "qty": 12, ' +
-        '"total": 1799.88, "tax": 8.25, "discount": 0.15, "shipping": 9.99, ' +
-        '"grandTotal": 1908.12, "timestamp": 1717029123, "lat": 37.7749, "lng": -122.4194}';
+        '{"orderId": 48291, "customerName": "Jane Smith", "totalAmount": 149.99, ' +
+        '"currency": "USD", "status": "completed", "createdAt": "2024-06-01T12:00:00Z", ' +
+        '"shippingAddress": {"city": "Springfield", "country": "USA"}, "isPriority": true}';
       const score = ocrQualityScore(raw);
       assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
     });
@@ -167,6 +164,29 @@ Post-text`;
         'up from $503 million in the prior-year period.';
       const score = ocrQualityScore(raw);
       assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
+
+    // Review round 2 (revised ruling, replaces round 1's 60%-alphabetic
+    // skip): the reviewer found two ways round 1's skip let real garbage
+    // through. (a) Padding a vowel-less letter-soup chunk with enough
+    // digits pushed the alphabetic share under 60%, skipping the lexicon
+    // check entirely and scoring the chunk 1.0 on the character-class
+    // regex alone.
+    test('digit-diluted vowel-less letter soup scores 0, no longer skipped', () => {
+      const raw = '1 2 3 4 5 6 7 8 9 10 11 12 zxcvbnm qwrtypl bcdfgh';
+      const score = ocrQualityScore(raw);
+      assert.strictEqual(score, 0);
+    });
+
+    // (b) The plausible-word-shape credit (Important 2, round 1) is
+    // PARTIAL (0.7), not a full hit - a chunk made entirely of unknown but
+    // plausibly-shaped tokens (no real words at all) still fails the 0.75
+    // threshold instead of passing outright.
+    test('a chunk of plausibly-shaped but unknown tokens scores 0.7 and fails', () => {
+      const raw = 'florbin wexatude glimberous plonitash fendrocal wistuvane brintolay quovendish';
+      const score = ocrQualityScore(raw);
+      assert.ok(Math.abs(score - 0.7) < 1e-9, `expected ~0.7, got ${score}`);
+      assert.ok(score < 0.75, 'still fails the quality threshold');
     });
   });
 
