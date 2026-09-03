@@ -4,6 +4,7 @@ import test from 'node:test';
 import { register } from '../sources/registry.ts';
 import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
 import { resetRoutingCacheForTests } from '../utils/resultCache.ts';
+import { formatResult } from './format.ts';
 import {
   dropDanglingCitations,
   escapeSourceText,
@@ -646,6 +647,105 @@ test('libraryAnswer', async (t) => {
       );
       // Grading/liveness still ran despite the claim-check outage.
       assert.ok(result.citations[0].grade);
+    },
+  );
+
+  await t.test(
+    'a retracted citation grades D and adds a warning, surfaced in concise output too',
+    async (t) => {
+      // A DOI-bearing fake source so citationGrade.ts's OpenAlex enrichment
+      // has something to look up. globalThis.fetch is wrapped rather than
+      // replaced outright: the openai SDK's own requests to the fake
+      // router/synth/verify servers below must still reach them over real
+      // loopback HTTP; only the OpenAlex URL is intercepted.
+      register('zzftest_retracted', {
+        description: `Test source with a retracted DOI about ${TOKEN} changes`,
+        supportsIngest: true,
+        async search() {
+          return [
+            {
+              id: 'r1',
+              source: 'zzftest_retracted',
+              title: 'Retracted Item',
+              authors: [],
+              hasFullText: true,
+            },
+          ];
+        },
+        async read() {
+          return {
+            title: 'Retracted Item',
+            authors: [],
+            text: `The ${TOKEN} API added rate limiting in November 2025.`,
+            doi: '10.1234/retracted-example',
+          };
+        },
+      });
+      resetCatalogCacheForTests();
+      // Keeps src/sources/openalex.ts's authParam() from warning on stderr
+      // about a missing CONTACT_EMAIL - harmless for grading, just noise.
+      process.env.CONTACT_EMAIL = 'test@example.org';
+
+      const originalFetch = globalThis.fetch;
+      t.after(() => {
+        globalThis.fetch = originalFetch;
+      });
+      globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+        if (String(url).includes('api.openalex.org')) {
+          return new Response(
+            JSON.stringify({
+              results: [
+                {
+                  doi: 'https://doi.org/10.1234/retracted-example',
+                  is_retracted: true,
+                  cited_by_count: 3,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return originalFetch(url, init);
+      }) as typeof fetch;
+
+      const router = await startFakeChatServer(() => ({
+        intent: `find info about ${TOKEN}`,
+        routes: [{ source: 'zzftest_retracted', query: TOKEN, reason: 'full text match' }],
+      }));
+      t.after(() => router.close());
+
+      const answerText = `The ${TOKEN} API added rate limiting [1].`;
+      const synth = await startFakeChatServer(() => answerText);
+      t.after(() => synth.close());
+      const verify = await startFakeChatServer(allSupportedVerifyDecide);
+      t.after(() => verify.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_VERIFY_BASE_URL = verify.url;
+      process.env.ALEXANDRIA_VERIFY_API_KEY = 'test-key';
+
+      const result = await libraryAnswer(`what changed in ${TOKEN}`, { readTop: 4 });
+
+      assert.equal(result.citations.length, 1);
+      assert.equal(result.citations[0].grade?.tier, 'D');
+      assert.equal(result.citations[0].grade?.signals.retracted, true);
+      const expectedWarning = 'citation [1] (Retracted Item) is marked retracted';
+      assert.ok(
+        result.warnings.includes(expectedWarning),
+        `expected ${JSON.stringify(expectedWarning)} in ${JSON.stringify(result.warnings)}`,
+      );
+
+      // The whole point: a concise caller never sees `grade`, so the
+      // warning is the only place this is visible to them.
+      const concise = formatResult('answer', result, 'concise');
+      assert.ok(!('grade' in concise.citations[0]), 'grade is detailed-only');
+      assert.ok(
+        concise.warnings?.includes(expectedWarning),
+        `expected the retraction warning in concise output, got: ${JSON.stringify(concise.warnings)}`,
+      );
     },
   );
 });

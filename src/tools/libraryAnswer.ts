@@ -11,6 +11,7 @@ import {
   type CitationGrade,
   type GradeCitationInput,
   gradeCitations,
+  retractedWarning,
 } from '../utils/citationGrade.ts';
 import { type ClaimVerdict, checkClaims } from '../utils/claimCheck.ts';
 import { llmRerank, rrf } from '../utils/fuse.ts';
@@ -352,7 +353,11 @@ function applyClaimVerdicts(answer: string, verdicts: ClaimVerdict[], warnings: 
 // text, so fullTextVerified is always true; chainSupported is left unset -
 // only library_research's own final fact-check pass (checkCitations) sets
 // that, on the union citations it re-grades after the report is written.
-async function attachCitationSignals(citations: Citation[], sources: ReadSource[]): Promise<void> {
+async function attachCitationSignals(
+  citations: Citation[],
+  sources: ReadSource[],
+  warnings: string[],
+): Promise<void> {
   if (citations.length === 0) return;
 
   const gradeInputs: GradeCitationInput[] = citations.map((c) => {
@@ -368,7 +373,14 @@ async function attachCitationSignals(citations: Citation[], sources: ReadSource[
     };
   });
   const grades = await gradeCitations(gradeInputs);
-  for (const c of citations) c.grade = grades.get(c.n);
+  for (const c of citations) {
+    c.grade = grades.get(c.n);
+    // "Retracted means tier D and a warning" - the brief is explicit that
+    // a retracted citation must be visible in warnings[] too, since grade
+    // itself is detailed-output-only (src/tools/format.ts) and a concise
+    // caller only ever sees warnings.
+    if (c.grade?.signals.retracted) warnings.push(retractedWarning(c.n, c.title));
+  }
 
   const urls = citations.map((c) => c.url).filter((u): u is string => Boolean(u));
   if (urls.length > 0) {
@@ -482,7 +494,7 @@ export async function libraryAnswer(
   }
 
   try {
-    await attachCitationSignals(citations, sources);
+    await attachCitationSignals(citations, sources, warnings);
   } catch (err) {
     // Grading/liveness are enrichment, not core to the answer - their own
     // internal calls already fail closed (best-effort), but this is a

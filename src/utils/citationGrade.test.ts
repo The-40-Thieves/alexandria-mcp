@@ -13,6 +13,7 @@ import {
   gradeCitations,
   gradeFromSignals,
   normalizeDoi,
+  retractedWarning,
   sourceTierFor,
 } from './citationGrade.ts';
 
@@ -109,6 +110,13 @@ test('gradeFromSignals', async (t) => {
 test('normalizeDoi', () => {
   assert.equal(normalizeDoi('https://doi.org/10.1000/Example'), '10.1000/example');
   assert.equal(normalizeDoi('10.1000/Example'), '10.1000/example');
+});
+
+test('retractedWarning', () => {
+  assert.equal(
+    retractedWarning(3, 'A Paper Title'),
+    'citation [3] (A Paper Title) is marked retracted',
+  );
 });
 
 // fetchOpenAlexGradeSignals and gradeCitations both call fetchJSON, which

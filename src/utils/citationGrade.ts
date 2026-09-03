@@ -118,6 +118,16 @@ export function gradeCitation(signals: GradeSignals): CitationGrade {
   return { tier: gradeFromSignals(signals), signals };
 }
 
+// Shared wording so a retracted citation reads identically whether it
+// surfaces from library_answer's own grading pass or library_research's
+// final union citations (both import this rather than inlining the
+// string independently). The brief is explicit: "Retracted means tier D
+// and a warning" - gradeFromSignals already sets the tier; this is that
+// warning.
+export function retractedWarning(n: number, title: string): string {
+  return `citation [${n}] (${title}) is marked retracted`;
+}
+
 // ─── OpenAlex batched DOI enrichment ─────────────────────────────────────
 
 const OPENALEX_BASE = 'https://api.openalex.org';

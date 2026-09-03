@@ -7,7 +7,7 @@
 // claims and trimmed.
 import pLimit from 'p-limit';
 import { z } from 'zod';
-import { gradeCitation } from '../utils/citationGrade.ts';
+import { gradeCitation, retractedWarning } from '../utils/citationGrade.ts';
 import { chatJSON, requireRoleForTool } from '../utils/providers.ts';
 import {
   type Citation,
@@ -322,6 +322,13 @@ export async function libraryResearch(
     report = checked.report;
     warnings = checked.warnings;
     applyChainSupport(finalCitations, draft, report);
+    // "Retracted means tier D and a warning" - each citation's own
+    // retracted signal was already set by whichever round's libraryAnswer()
+    // call graded it; surface it here too since library_research's final
+    // warnings[] (unlike grade) is not detailed-output-only.
+    for (const c of finalCitations) {
+      if (c.grade?.signals.retracted) warnings.push(retractedWarning(c.n, c.title));
+    }
   }
 
   return {

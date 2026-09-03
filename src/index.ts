@@ -792,7 +792,7 @@ export function createServer(): McpServer {
     'library_answer',
     {
       title: 'Answer With Cited Sources',
-      description: `Ask a question in plain English and get a synthesized answer with inline [n] citations, fused across sources with reciprocal rank fusion. Use this instead of library_ask when you want a cited answer rather than raw results. Every factual sentence is cited or dropped; an uncited or all-dropped answer is flagged in warnings[]. Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the full result set, routing, and warnings.`,
+      description: `Ask a question in plain English and get a synthesized answer with inline [n] citations, fused across sources with reciprocal rank fusion. Use this instead of library_ask when you want a cited answer rather than raw results. Every factual sentence is cited or dropped; an uncited or all-dropped answer is flagged in warnings[]. Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the full result set, routing, citation grades, and resolvability.`,
       inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Natural language question'),
         max_sources: z
@@ -868,7 +868,7 @@ export function createServer(): McpServer {
     'library_research',
     {
       title: 'Recursive Cited Research',
-      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the per-round breakdown and elapsed time.`,
+      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the per-round breakdown, elapsed time, citation grades, and resolvability.`,
       inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Research topic or question'),
         depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),
