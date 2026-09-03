@@ -10,8 +10,8 @@ import { isJsonContentType, McpServer, type ServerContext } from '@modelcontextp
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
-import { INSTRUCTIONS } from './instructions.ts';
-import { log } from './log.ts';
+import { buildInstructions } from './instructions.ts';
+import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
@@ -177,20 +177,36 @@ const ANSWER_STAGE_INDEX: Record<AnswerProgressInfo['stage'], number> = {
 // carried one (notifications/progress), otherwise fall back to a plain
 // logging message so a client with no progress token still sees the
 // updates. Used by library_answer (stages: routed, fetched, read,
-// synthesised), library_ingest (per chunk batch), and library_research.
-function progressReporter(
+// synthesised), library_ingest (a start and an end notification), and
+// library_research.
+//
+// A notification failure is swallowed here, never rethrown (task 1 review
+// finding 3): by the time library_ingest's second call fires, ingestText()
+// has already durably written its chunks, and by the time library_answer's
+// last call fires, chatText() has already produced the answer - letting a
+// transport hiccup on the notify itself turn either into a reported
+// isError would tell the caller a persisted write or a completed answer
+// failed when it did not.
+export function progressReporter(
   server: McpServer,
   ctx: ServerContext,
 ): (progress: number, message: string) => Promise<void> {
   const progressToken = ctx.mcpReq._meta?.progressToken;
   return async (progress, message) => {
-    if (progressToken !== undefined) {
-      await ctx.mcpReq.notify({
-        method: 'notifications/progress',
-        params: { progressToken, progress, message },
-      });
-    } else {
-      await server.sendLoggingMessage({ level: 'info', data: message });
+    try {
+      if (progressToken !== undefined) {
+        await ctx.mcpReq.notify({
+          method: 'notifications/progress',
+          params: { progressToken, progress, message },
+        });
+      } else {
+        await server.sendLoggingMessage({ level: 'info', data: message });
+      }
+    } catch (err) {
+      requestLogger().debug(
+        { err: err instanceof Error ? err.message : String(err) },
+        'progress notification failed',
+      );
     }
   };
 }
@@ -221,7 +237,7 @@ function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise
 export function createServer(): McpServer {
   const server = new McpServer(
     { name: 'alexandria', version: VERSION },
-    { instructions: INSTRUCTIONS },
+    { instructions: buildInstructions(listSources().length) },
   );
 
   // ── library_list_sources ─────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { type AddressInfo, connect as netConnect } from 'node:net';
 import test from 'node:test';
-import { createHttpApp, createServer } from './index.ts';
+import type { McpServer, ServerContext } from '@modelcontextprotocol/server';
+import { createHttpApp, createServer, progressReporter } from './index.ts';
 import { register } from './sources/registry.ts';
 import { resetMetricsForTests } from './utils/metrics.ts';
 
@@ -615,4 +616,43 @@ test('library_search structuredContent validates against outputSchema, concise a
     assert.equal((row?.authors as string[] | undefined)?.[0], 'A. Author');
     assert.equal(row?.description, 'a fixture description');
   });
+});
+
+/**
+ * Task 1 review finding 3: a progress/logging notification is best-effort.
+ * By the time library_ingest's second `report()` call fires, ingestText()
+ * has already durably written its chunks; by the time library_answer's
+ * last call fires, the answer has already been synthesised. A throwing
+ * `notify` must never turn either into a reported `isError` - this test
+ * drives `progressReporter` through the exact try/await-report/catch shape
+ * every progress-emitting handler in this file uses, with a `notify` that
+ * always rejects, and asserts the "tool" still completes normally.
+ */
+test('progressReporter swallows a notify failure so it can never turn a successful result into isError', async () => {
+  let notifyCalls = 0;
+  const ctx = {
+    mcpReq: {
+      _meta: { progressToken: 'tok-1' },
+      notify: async () => {
+        notifyCalls++;
+        throw new Error('simulated transport failure');
+      },
+    },
+  } as unknown as ServerContext;
+  const server = { sendLoggingMessage: async () => undefined } as unknown as McpServer;
+
+  const report = progressReporter(server, ctx);
+
+  let outcome: { ok: true; value: string } | { ok: false };
+  try {
+    await report(1, 'started; chunking and embedding');
+    const value = 'durable work already happened here'; // stands in for ingestText()'s write
+    await report(2, 'ingested chunk batch');
+    outcome = { ok: true, value };
+  } catch {
+    outcome = { ok: false };
+  }
+
+  assert.deepEqual(outcome, { ok: true, value: 'durable work already happened here' });
+  assert.equal(notifyCalls, 2, 'both notify attempts ran (and both failed) before this assertion');
 });
