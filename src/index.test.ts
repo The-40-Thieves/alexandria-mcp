@@ -383,13 +383,24 @@ test('HEAD /health and HEAD /metrics answer with headers and no body', async (t)
 });
 
 /**
- * Final wave, A10: readJsonBody() used to just throw on an oversized body,
- * leaving the request stream (and its socket) open to keep receiving
- * whatever the client still had queued up to its declared Content-Length.
- * It now destroys the request as soon as the cap is crossed - well before
- * this raw socket has sent anywhere near the (much larger) declared
- * length - so the connection closes instead of the server continuing to
- * read.
+ * Final wave, A10 (review round 2): readJsonBody() used to just throw on
+ * an oversized body, leaving the request stream (and its socket) open to
+ * keep receiving whatever the client still had queued up to its declared
+ * Content-Length. The first attempt at a fix (destroying `req` from
+ * inside the catch block) looked right and even passed a test - but the
+ * test's request line declared `Connection: close`, so Node's own HTTP
+ * server closes the socket after responding regardless of whether the
+ * fix does anything at all, and the fix itself was a no-op: by the time
+ * readJsonBody()'s `for await` throws, Node's async-iterator protocol has
+ * already destroyed `req`'s readable side as part of unwinding the loop
+ * (so `req.destroyed` is already true and `req.socket` already
+ * detached), so `if (!req.destroyed) req.destroy()` never runs, and even
+ * unguarded would have nothing left to close. This request line does NOT
+ * declare Connection: close, so an early close here can only be the
+ * server's own action (handleMcpRequest's captured `sock` +
+ * `res.on('finish', () => sock?.destroy())`), and the promise below has
+ * no soft "closed: true" fallback on timeout - if the server does not
+ * close the connection, this test fails instead of quietly passing.
  */
 test('an oversized POST body gets the 500 envelope and the server closes the connection', async (t) => {
   const app = createHttpApp();
@@ -401,45 +412,50 @@ test('an oversized POST body gets the 500 envelope and the server closes the con
   const oversizedChunk = 'x'.repeat(150 * 1024); // already over the 100kb cap alone
   const declaredLength = 10 * 1024 * 1024; // far more than what's actually sent
 
-  const result = await new Promise<{ data: string; closed: boolean }>((resolve) => {
-    let data = '';
-    let closed = false;
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve({ data, closed });
-    }, 3000);
-    const socket = netConnect(port, '127.0.0.1', () => {
-      socket.write(
-        `POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: ${declaredLength}\r\nConnection: close\r\n\r\n`,
-      );
-      socket.write(oversizedChunk); // never writes the rest of the declared length
-    });
-    socket.on('data', (chunk) => {
-      data += chunk.toString();
-    });
-    socket.on('close', () => {
-      closed = true;
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ data, closed });
-    });
-    socket.on('error', () => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ data, closed });
-    });
+  const socket = netConnect(port, '127.0.0.1');
+  t.after(() => {
+    if (!socket.destroyed) socket.destroy();
+  });
+  await new Promise<void>((resolve) => socket.once('connect', resolve));
+
+  let data = '';
+  socket.on('data', (chunk) => {
+    data += chunk.toString();
   });
 
-  assert.ok(
-    result.closed,
-    'the server closed the connection instead of waiting for the rest of the declared Content-Length',
+  // Deliberately NOT `Connection: close` - see the comment above for why
+  // that would make this test pass regardless of whether the production
+  // fix does anything.
+  socket.write(
+    `POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: ${declaredLength}\r\n\r\n`,
   );
-  assert.match(result.data, /"code":-32603/, result.data);
+  socket.write(oversizedChunk); // never writes the rest of the declared length
+
+  // No soft fallback: 'close', 'end', and 'error' all count as the
+  // connection being torn down; a plain timeout is a hard test failure
+  // (an unhandled rejection / the awaited promise never settling), not a
+  // silently-accepted "the server left it open".
+  await Promise.race([
+    new Promise<void>((resolve) => socket.once('close', () => resolve())),
+    new Promise<void>((resolve) => socket.once('end', () => resolve())),
+    new Promise<void>((resolve) => socket.once('error', () => resolve())),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('the server did not close the connection within 2000ms')),
+        2000,
+      ),
+    ),
+  ]);
+
+  assert.match(data, /"code":-32603/, data);
+
+  // No further bytes accepted: the socket must already be torn down, not
+  // merely half-closed and still willing to read more of the declared
+  // Content-Length.
+  assert.ok(
+    socket.destroyed || socket.readyState === 'closed',
+    `expected the socket to be destroyed/closed, got readyState=${socket.readyState}`,
+  );
 });
 
 test('createServer returns a fresh instance each call', () => {

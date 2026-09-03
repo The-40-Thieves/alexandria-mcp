@@ -568,6 +568,17 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
  * error handler below rather than leaking an HTML page or a stack trace.
  */
 async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // Captured up front, deliberately not read off `req` later (final wave,
+  // A10 review round 2): by the time readJsonBody()'s `for await` throws
+  // on an oversize body, Node's async-iterator protocol has already
+  // called the stream's own `.return()` as part of unwinding the loop,
+  // which destroys `req`'s readable side - so `req.destroyed` is already
+  // true by the catch block below, and calling req.destroy() there does
+  // NOT tear down the underlying TCP connection (req.socket has already
+  // been detached from req by then, so IncomingMessage#destroy() has
+  // nothing left to close). The raw net.Socket captured here, before any
+  // of that happens, is the one reference still guaranteed connected.
+  const sock = req.socket;
   const server = createServer();
   const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -586,14 +597,13 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Prom
   } catch (err) {
     jsonRpcErrorHandler(err, res);
     if (err instanceof PayloadTooLargeError) {
-      // req and res share one underlying socket, so destroying req here
-      // would sever the connection out from under jsonRpcErrorHandler's
-      // own res.end() above - res 'finish' fires once that response is
-      // fully handed off, only then is it safe to stop a peer that was
-      // still sending (possibly megabytes) more than this request needed.
-      res.on('finish', () => {
-        if (!req.destroyed) req.destroy();
-      });
+      // Destroying the socket immediately (before the 500 response is
+      // flushed) would sever the connection out from under
+      // jsonRpcErrorHandler's own res.end() above - res 'finish' fires
+      // once that response is fully handed off, only then is it safe to
+      // stop a peer that was still sending (possibly megabytes) more than
+      // this request needed.
+      res.on('finish', () => sock?.destroy());
     }
   }
 }

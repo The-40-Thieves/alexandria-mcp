@@ -1,5 +1,5 @@
 import type { LibraryResult } from '../types.ts';
-import { fetchWithRetry, retryAfterMs } from '../utils/http.ts';
+import { fetchWithRetry, redactUrl, retryAfterMs } from '../utils/http.ts';
 import { register, truncateText } from './registry.ts';
 
 const GRAPH = 'https://api.semanticscholar.org/graph/v1';
@@ -32,7 +32,7 @@ async function s2Fetch<T>(url: string): Promise<T> {
     await sleep(waitMs);
     res = await fetchWithRetry(url, { headers: headers() });
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}, url: ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}, url: ${redactUrl(url)}`);
   return res.json() as Promise<T>;
 }
 
