@@ -97,7 +97,7 @@ function chatCompletion(content: string) {
 }
 
 const ROLE_ENV_SUFFIXES = ['BASE_URL', 'API_KEY', 'MODEL', 'JSON_MODE'] as const;
-const ROLES = ['ROUTER', 'SYNTH', 'RESEARCH', 'EMBEDDINGS', 'RERANK'] as const;
+const ROLES = ['ROUTER', 'SYNTH', 'RESEARCH', 'EMBEDDINGS', 'RERANK', 'VERIFY'] as const;
 
 function clearAlexandriaEnv() {
   delete process.env.OPENAI_API_KEY;
@@ -228,6 +228,63 @@ test('roleConfig', async (t) => {
     clearAlexandriaEnv();
     process.env.OPENAI_API_KEY = 'sk-direct';
     assert.equal(roleConfig('router').fallback, undefined);
+  });
+});
+
+test('roleConfig: verify falls back to synth', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+
+  await t.test(
+    'with no ALEXANDRIA_VERIFY_* set, verify resolves to exactly what synth resolves to',
+    () => {
+      clearAlexandriaEnv();
+      process.env.ALEXANDRIA_BASE_URL = 'http://gateway.example/v1';
+      process.env.ALEXANDRIA_API_KEY = 'shared-key';
+      process.env.ALEXANDRIA_SYNTH_MODEL = 'custom-synth-model';
+
+      const synth = roleConfig('synth');
+      const verify = roleConfig('verify');
+      assert.deepEqual(verify, synth);
+      assert.equal(verify.model, 'custom-synth-model');
+    },
+  );
+
+  await t.test(
+    'setting ALEXANDRIA_VERIFY_MODEL alone opts back into normal per-role resolution',
+    () => {
+      clearAlexandriaEnv();
+      process.env.ALEXANDRIA_BASE_URL = 'http://gateway.example/v1';
+      process.env.ALEXANDRIA_API_KEY = 'shared-key';
+      process.env.ALEXANDRIA_SYNTH_MODEL = 'custom-synth-model';
+      process.env.ALEXANDRIA_VERIFY_MODEL = 'custom-verify-model';
+
+      const verify = roleConfig('verify');
+      assert.equal(verify.model, 'custom-verify-model');
+      // Still inherits the shared base URL/key - only the model differs.
+      assert.equal(verify.baseURL, 'http://gateway.example/v1');
+      assert.equal(verify.apiKey, 'shared-key');
+    },
+  );
+
+  await t.test('a full ALEXANDRIA_VERIFY_* override is used as-is, independent of synth', () => {
+    clearAlexandriaEnv();
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'synth-key';
+    process.env.ALEXANDRIA_VERIFY_BASE_URL = 'http://verify-only.example/v1';
+    process.env.ALEXANDRIA_VERIFY_API_KEY = 'verify-key';
+    process.env.ALEXANDRIA_VERIFY_MODEL = 'verify-model';
+
+    const verify = roleConfig('verify');
+    assert.equal(verify.baseURL, 'http://verify-only.example/v1');
+    assert.equal(verify.apiKey, 'verify-key');
+    assert.equal(verify.model, 'verify-model');
+  });
+
+  await t.test('with no key anywhere, verify (via synth) has an empty apiKey, not a throw', () => {
+    clearAlexandriaEnv();
+    assert.equal(roleConfig('verify').apiKey, '');
   });
 });
 

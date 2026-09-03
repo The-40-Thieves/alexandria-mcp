@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer } from 'node:http';
 import test from 'node:test';
 import '../src/sources/all.ts';
 import { listSources } from '../src/sources/registry.ts';
@@ -101,63 +101,14 @@ test('scoreAnswerQuery', async (t) => {
   });
 });
 
-// A local http.Server bound to 127.0.0.1, tracking which method reached
-// each route. Deliberately bound to a literal loopback address rather than
-// used through 'localhost': the point of these tests is to prove
-// checkResolvable pins the connection for an ORDINARY HOSTNAME target
-// (real citation URLs are hostnames, e.g. https://en.wikipedia.org/...),
-// which is exactly the case guardedDispatcher's connect.lookup fails
-// closed on without a pin in scope - a literal-IP URL would skip
-// connect.lookup entirely and never exercise the bug this guards against.
-interface ResolvabilityServer {
-  port: number;
-  // Every request actually received, in order - used to prove a `false`
-  // result came from a real HTTP response (a 404, say) and not from the
-  // guarded fetch failing to reach the server at all (e.g. the pinning bug
-  // this suite regression-tests for: without a pin, guardedDispatcher
-  // refuses the connection outright, which also surfaces as `false` and
-  // would otherwise make a "404 means unresolvable" assertion pass for the
-  // wrong reason).
-  requests: string[];
-  close(): Promise<void>;
-}
-function startResolvabilityServer(): Promise<ResolvabilityServer> {
-  const requests: string[] = [];
-  return new Promise((resolve, reject) => {
-    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      requests.push(`${req.method} ${req.url}`);
-      if (req.url === '/ok') {
-        res.writeHead(200);
-        res.end(req.method === 'HEAD' ? undefined : 'ok');
-        return;
-      }
-      if (req.url === '/notfound') {
-        res.writeHead(404);
-        res.end(req.method === 'HEAD' ? undefined : 'not found');
-        return;
-      }
-      if (req.url === '/head-blocked') {
-        if (req.method === 'HEAD') {
-          res.writeHead(405);
-          res.end();
-        } else {
-          res.writeHead(200);
-          res.end('ok via get');
-        }
-        return;
-      }
-      res.writeHead(404);
-      res.end();
-    });
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      resolve({ port, requests, close: () => new Promise((res) => server.close(() => res())) });
-    });
-  });
-}
-
+// checkResolvable is now a thin wrapper over src/utils/liveness.ts's
+// checkUrlLiveness (Task 9 moved the guarded-and-pinned HEAD/GET
+// implementation there so library_answer's Citation.resolves wiring and
+// this script share one copy instead of two). The exhaustive
+// guarded-fetch-pinning suite that used to live here (2xx/404/405/private-
+// address cases, with a request log proving the pin actually worked) now
+// lives in src/utils/liveness.test.ts against checkUrlLiveness directly;
+// this is a thin end-to-end check that the delegation itself is wired up.
 test('checkResolvable', async (t) => {
   const originalEnv = { ...process.env };
   const originalLookup = dnsResolver.lookup;
@@ -165,60 +116,25 @@ test('checkResolvable', async (t) => {
     process.env = originalEnv;
     dnsResolver.lookup = originalLookup;
   });
-  // The stubbed hostname below resolves to 127.0.0.1, which classifies as
-  // loopback - allowed here the same way fetchTier.test.ts's own guarded-
-  // fetch tests allow it, via ALEXANDRIA_ALLOW_LOOPBACK=1.
   process.env.ALEXANDRIA_ALLOW_LOOPBACK = '1';
   dnsResolver.lookup = (async () => [{ address: '127.0.0.1', family: 4 }]) satisfies DnsLookupAll;
 
-  await t.test('a 2xx response counts as resolvable', async () => {
-    const server = await startResolvabilityServer();
-    t.after(() => server.close());
-    const resolvable = await checkResolvable(`http://resolvable-ok.invalid:${server.port}/ok`);
+  await t.test('resolves true for a live 2xx target', async () => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    t.after(() => new Promise((res) => server.close(() => res(undefined))));
+    const address = server.address();
+    const port = typeof address === 'object' && address ? address.port : 0;
+
+    const resolvable = await checkResolvable(`http://eval-checkresolvable-ok.invalid:${port}/`);
     assert.equal(resolvable, true);
-    assert.deepEqual(
-      server.requests,
-      ['HEAD /ok'],
-      'the guarded fetch must actually have reached the server (proves the pin worked)',
-    );
   });
 
-  await t.test('a 404 response does not count as resolvable', async () => {
-    const server = await startResolvabilityServer();
-    t.after(() => server.close());
-    const resolvable = await checkResolvable(
-      `http://resolvable-404.invalid:${server.port}/notfound`,
-    );
+  await t.test('resolves false for a guard-rejected private address', async () => {
+    const resolvable = await checkResolvable('http://10.1.2.3/');
     assert.equal(resolvable, false);
-    // Both methods must have reached the server (a 404 falls back from
-    // HEAD to GET, and both come back 404) - this is what distinguishes
-    // "the server said 404" from "the connection never reached the server
-    // at all" (which also reads as `false`, but for the wrong reason - the
-    // exact way this test would have passed against the pinning bug this
-    // suite regression-tests for, without this assertion).
-    assert.deepEqual(server.requests, ['HEAD /notfound', 'GET /notfound']);
   });
-
-  await t.test('a HEAD 405 falls back to a GET, which counts as resolvable', async () => {
-    const server = await startResolvabilityServer();
-    t.after(() => server.close());
-    const resolvable = await checkResolvable(
-      `http://resolvable-head405.invalid:${server.port}/head-blocked`,
-    );
-    assert.equal(resolvable, true);
-    assert.deepEqual(server.requests, ['HEAD /head-blocked', 'GET /head-blocked']);
-  });
-
-  await t.test(
-    'the guard rejecting a private address counts as unresolvable, without throwing',
-    async () => {
-      // A literal RFC 1918 address: always blocked, no ALEXANDRIA_ALLOW_LOOPBACK
-      // override applies (that only ever covers loopback). No server is
-      // started - resolveFetchTarget must reject before any fetch is
-      // attempted, and checkResolvable must turn that rejection into
-      // `false` rather than letting it propagate.
-      const resolvable = await checkResolvable('http://10.1.2.3/');
-      assert.equal(resolvable, false);
-    },
-  );
 });

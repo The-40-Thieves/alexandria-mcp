@@ -7,9 +7,11 @@
 // claims and trimmed.
 import pLimit from 'p-limit';
 import { z } from 'zod';
+import { gradeCitation, retractedWarning } from '../utils/citationGrade.ts';
 import { chatJSON, requireRoleForTool } from '../utils/providers.ts';
 import {
   type Citation,
+  extractCitationNumbers,
   type LibraryAnswerOptions,
   type LibraryAnswerResult,
   libraryAnswer,
@@ -186,6 +188,26 @@ Return an empty array if every sentence is adequately supported.`;
   return { report: tidied, warnings };
 }
 
+// Task 9: refines chainSupported (src/utils/citationGrade.ts's signal for
+// "this citation's own claim(s) survived library_research's fact-check
+// pass") for every citation actually cited in the draft report, then
+// re-derives its tier from that plus its ALREADY-computed signals - the
+// sourceTier/retracted/citationCount/fullTextVerified each citation's
+// originating libraryAnswer() call already looked up, so this needs no new
+// network calls. A citation cited in the draft but no longer cited after
+// checkCitations() removed its (sole) supporting sentence gets
+// chainSupported: false; one still cited either way gets true. A citation
+// never cited in the draft at all is left alone (chainSupported stays
+// unset - "not applicable", not "failed").
+function applyChainSupport(citations: Citation[], draft: string, finalReport: string): void {
+  const citedInDraft = new Set(extractCitationNumbers(draft));
+  const citedInFinal = new Set(extractCitationNumbers(finalReport));
+  for (const c of citations) {
+    if (!citedInDraft.has(c.n) || !c.grade) continue;
+    c.grade = gradeCitation({ ...c.grade.signals, chainSupported: citedInFinal.has(c.n) });
+  }
+}
+
 function citationKey(c: Citation): string {
   return `${c.source}:${c.id}`;
 }
@@ -299,6 +321,14 @@ export async function libraryResearch(
     const checked = await checkCitations(draft, finalCitations);
     report = checked.report;
     warnings = checked.warnings;
+    applyChainSupport(finalCitations, draft, report);
+    // "Retracted means tier D and a warning" - each citation's own
+    // retracted signal was already set by whichever round's libraryAnswer()
+    // call graded it; surface it here too since library_research's final
+    // warnings[] (unlike grade) is not detailed-output-only.
+    for (const c of finalCitations) {
+      if (c.grade?.signals.retracted) warnings.push(retractedWarning(c.n, c.title));
+    }
   }
 
   return {

@@ -16,7 +16,12 @@ import { config } from '../config.ts';
 import { requestContext } from './http.ts';
 import { toolMetrics } from './metrics.ts';
 
-export type Role = 'router' | 'synth' | 'research' | 'embeddings' | 'rerank';
+// Task 9 adds 'verify' (claim/citation verification, src/utils/claimCheck.ts)
+// with its own env-var quartet (ALEXANDRIA_VERIFY_*), but falls all the way
+// back to the synth role's already-resolved config, not just the shared
+// ALEXANDRIA_BASE_URL/_API_KEY defaults every other role uses - see
+// roleConfig() below.
+export type Role = 'router' | 'synth' | 'research' | 'embeddings' | 'rerank' | 'verify';
 
 export interface RoleConfig {
   baseURL: string;
@@ -47,6 +52,8 @@ function defaultModel(role: Role): string {
       return 'text-embedding-3-small';
     case 'rerank':
       return 'gpt-4o-mini'; // same default as synth
+    case 'verify':
+      return 'gpt-4o-mini'; // same default as synth; only reached when ALEXANDRIA_VERIFY_MODEL is set without a matching base URL/key (see roleConfig's whole-config fallback below for the common case)
   }
 }
 
@@ -74,6 +81,24 @@ function configValue(key: string): string | undefined {
 // _API_KEY as shared defaults; then OPENAI_API_KEY with
 // https://api.openai.com/v1.
 export function roleConfig(role: Role): RoleConfig {
+  // Task 9's `verify` role (claim/citation entailment checks) is meant to
+  // be free to run out of the box once `synth` is configured, rather than
+  // needing its own ALEXANDRIA_VERIFY_* setup - dedicating a whole extra
+  // model just to double-check the first one is an opt-in, not a
+  // requirement. When NONE of ALEXANDRIA_VERIFY_BASE_URL/_API_KEY/_MODEL are
+  // set, `verify` resolves to exactly whatever `synth` resolves to
+  // (including synth's own fallback target), rather than falling through to
+  // the shared ALEXANDRIA_BASE_URL/_API_KEY/OPENAI_API_KEY chain every other
+  // role uses. Setting any one of the three opts back into that normal
+  // per-role resolution below (so, e.g., ALEXANDRIA_VERIFY_MODEL alone
+  // still inherits the shared base URL/key, only the model differs).
+  if (role === 'verify') {
+    const hasOwnVerifyConfig = ['BASE_URL', 'API_KEY', 'MODEL'].some((suffix) =>
+      configValue(envKey('verify', suffix as 'BASE_URL' | 'API_KEY' | 'MODEL')),
+    );
+    if (!hasOwnVerifyConfig) return roleConfig('synth');
+  }
+
   const roleBaseURL = configValue(envKey(role, 'BASE_URL'));
   const roleApiKey = configValue(envKey(role, 'API_KEY'));
   const roleModel = configValue(envKey(role, 'MODEL'));

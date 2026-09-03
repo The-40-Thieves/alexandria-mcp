@@ -49,21 +49,41 @@ export interface ConciseAskResult {
 interface AnswerLike {
   answer: string;
   citations: Citation[];
+  warnings?: string[];
+}
+
+// Task 9: a citation's `grade` and `resolves` (citationGrade.ts/
+// liveness.ts) are detailed-only, per the brief - the concise shape below
+// keeps only the fields library_answer already returned before Task 9
+// added them. `warnings`, by contrast, is NOT detailed-only: an unsupported
+// claim getting its citation marker stripped, or an overstated one getting
+// flagged, is safety-relevant information a concise caller still needs to
+// see, so it is carried through here (concise answer/research previously
+// dropped it entirely - a gap this task closes, not a new omission).
+export type ConciseCitation = Omit<Citation, 'grade' | 'resolves'>;
+
+function toConciseCitation(c: Citation): ConciseCitation {
+  const row: ConciseCitation = { n: c.n, source: c.source, id: c.id, title: c.title };
+  if (c.url !== undefined) row.url = c.url;
+  return row;
 }
 
 export interface ConciseAnswerLike {
   answer: string;
-  citations: Citation[];
+  citations: ConciseCitation[];
+  warnings?: string[];
 }
 
 interface ResearchLike {
   report: string;
   citations: Citation[];
+  warnings?: string[];
 }
 
 export interface ConciseResearchLike {
   report: string;
-  citations: Citation[];
+  citations: ConciseCitation[];
+  warnings?: string[];
 }
 
 interface CitationsSeed {
@@ -136,12 +156,20 @@ export function formatResult(kind: FormatKind, payload: unknown, format: Respons
     }
     case 'answer': {
       const p = payload as AnswerLike;
-      const concise: ConciseAnswerLike = { answer: p.answer, citations: p.citations };
+      const concise: ConciseAnswerLike = {
+        answer: p.answer,
+        citations: p.citations.map(toConciseCitation),
+      };
+      if (p.warnings !== undefined) concise.warnings = p.warnings;
       return concise;
     }
     case 'research': {
       const p = payload as ResearchLike;
-      const concise: ConciseResearchLike = { report: p.report, citations: p.citations };
+      const concise: ConciseResearchLike = {
+        report: p.report,
+        citations: p.citations.map(toConciseCitation),
+      };
+      if (p.warnings !== undefined) concise.warnings = p.warnings;
       return concise;
     }
     case 'citations': {

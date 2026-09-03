@@ -4,7 +4,12 @@ import { register, truncateText } from './registry.ts';
 
 const GRAPH = 'https://api.semanticscholar.org/graph/v1';
 const REC = 'https://api.semanticscholar.org/recommendations/v1';
-const FIELDS = 'paperId,title,authors,year,abstract,openAccessPdf,externalIds,fieldsOfStudy';
+// Task 9: citationCount/influentialCitationCount/isOpenAccess added so
+// src/utils/citationGrade.ts has real quality signals for a
+// semanticscholar-sourced citation without a second round-trip beyond
+// s2CitationSignals below (search/read responses now carry them too).
+const FIELDS =
+  'paperId,title,authors,year,abstract,openAccessPdf,externalIds,fieldsOfStudy,citationCount,influentialCitationCount,isOpenAccess';
 
 function headers(): Record<string, string> {
   const key = process.env.SEMANTIC_SCHOLAR_API_KEY;
@@ -45,6 +50,9 @@ interface S2Paper {
   openAccessPdf?: { url: string; status: string };
   externalIds?: { ArXiv?: string; DOI?: string; PubMed?: string };
   fieldsOfStudy?: string[];
+  citationCount?: number;
+  influentialCitationCount?: number;
+  isOpenAccess?: boolean;
 }
 
 interface S2SearchResponse {
@@ -101,6 +109,35 @@ export async function s2Read(id: string): Promise<{
     language: 'en',
     doi: p.externalIds?.DOI,
   };
+}
+
+// Task 9: the three citation-quality signals citationGrade.ts's grader
+// wants for a semanticscholar-sourced citation. A single paperId lookup
+// with a narrow `fields` list (the shared FIELDS constant already carries
+// these, but a dedicated call keeps the grading path from re-requesting
+// the abstract/authors/etc. it doesn't need). Never throws: a lookup
+// failure (paper withdrawn, rate limited) just means the grader falls back
+// to whatever other signals it has, exactly like citationGrade's OpenAlex
+// enrichment does on a failed batch.
+export interface S2CitationSignals {
+  citationCount?: number;
+  influentialCitationCount?: number;
+  isOpenAccess?: boolean;
+}
+
+export async function s2CitationSignals(id: string): Promise<S2CitationSignals | undefined> {
+  try {
+    const p = await s2Fetch<S2Paper>(
+      `${GRAPH}/paper/${id}?fields=citationCount,influentialCitationCount,isOpenAccess`,
+    );
+    return {
+      citationCount: p.citationCount,
+      influentialCitationCount: p.influentialCitationCount,
+      isOpenAccess: p.isOpenAccess,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function s2Recommend(paperId: string, limit = 20): Promise<LibraryResult[]> {

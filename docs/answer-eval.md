@@ -218,3 +218,95 @@ npm run eval:answer
 
 Without any roles configured, `npm run eval:answer` prints a short message
 and exits 0 (or 1 with `--gate`) instead of making any network calls.
+
+## 2026-09-03, Task 9: claim verification, citation liveness, and grades
+
+Task 9 (`src/utils/claimCheck.ts`, `src/utils/liveness.ts`,
+`src/utils/citationGrade.ts`) added a dedicated `verify` role for the
+citation-precision judgment above (`CLAIM_SUPPORT_ROLE` in
+`scripts/eval-answer.ts` flipped from `synth` to `verify` - `verify` falls
+back to `synth`'s own config when `ALEXANDRIA_VERIFY_*` is unset, so this
+run used the same model as before), fixed `buildCitations()` in
+`src/tools/libraryAnswer.ts` to fall back through `previewUrl` then
+`downloadUrl` when a source has no `url` (the structural gap the first
+baseline above found), and wired `Citation.resolves` through the new
+`src/utils/liveness.ts` (`checkLiveness`, moved out of
+`scripts/eval-answer.ts`'s own `checkResolvable`, which now just calls it).
+
+**Before**: the 2026-09-03 first-baseline run above -
+`citation_precision=0.5556 nugget_recall=0.1944 resolvability=NaN` (18 of
+20 questions completed; `Citation.url` populated by 40 of 125 adapters,
+`Citation.resolves` didn't exist yet).
+
+**After** (same gateway, same models, `ALEXANDRIA_STATE_DB=:memory:`,
+`OPENAI_API_KEY` unset so no local key could shadow the gateway
+credential; `LITELLM_AGENT_KEY` read from `/data/llm-stack/.env` via
+`grep '^LITELLM_AGENT_KEY=' | cut -d= -f2-` into a shell variable, passed
+only as `ALEXANDRIA_API_KEY`, never echoed/logged/committed):
+
+```
+"When was the Transformer architecture introduced and what problem does self-attention solve?" failed: Request timed out. Node.js fetch timed out waiting for response headers; configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.
+"What does AlphaFold do and what did it achieve at CASP14?" failed: Request timed out. Node.js fetch timed out waiting for response headers; configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.
+"What is a Python Enhancement Proposal (PEP) and what do PEP 8 and PEP 484 cover?" failed: Request timed out. Node.js fetch timed out waiting for response headers; configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.
+"What does the Case-Shiller home price index measure and who developed it?" failed: Request timed out. Node.js fetch timed out waiting for response headers; configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.
+"What is the FRED economic database and who maintains it?" failed: Request timed out. Node.js fetch timed out waiting for response headers; configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.
+"What is the Federal Register and what kinds of documents does it publish?" failed: Request timed out. Node.js fetch timed out waiting for response headers; configure a matching undici fetch and fetchOptions.dispatcher with an Agent whose headersTimeout is at least the SDK timeout.
+
+Answer/citation eval
+cluster             n  precision  nugget_recall  resolvability
+academic            0        NaN            NaN            NaN
+archives            1        NaN          0.000            NaN
+culture             1        NaN          0.000            NaN
+developer           0        NaN            NaN            NaN
+economics           0        NaN            NaN            NaN
+government          0        NaN            NaN            NaN
+law                 1        NaN          0.000            NaN
+literature          2      0.000          0.250          1.000
+markets             1      1.000          0.500            NaN
+news_global         1        NaN          0.000            NaN
+real_estate         1      1.000          0.000          1.000
+science             1      0.500          0.750          1.000
+security            1        NaN          0.000            NaN
+standards           2      0.000          0.000          1.000
+video               1      1.000          0.500          1.000
+web                 1        NaN          0.000            NaN
+OVERALL            14      0.583          0.161          1.000
+
+citation_precision=0.5833 nugget_recall=0.1607 resolvability=1.0000 roles_configured=true
+```
+
+Only 14 of 20 questions completed - 6 hit the same gateway-side "Request
+timed out... waiting for response headers" hiccup documented in the first
+baseline above and in `docs/routing-eval.md`'s "Gateway host gotcha"
+section, and 6 of them were among the 8 that finished sooner in the first
+run; this is the same unresolved, previously-investigated gateway issue,
+not a Task 9 regression - re-running showed a different subset of
+questions timing out each time, and the harness's own job (catch, log,
+keep scoring the rest, never silently drop a question) worked as intended.
+Because a different, smaller subset of questions completed than the first
+baseline's 18, citation precision (0.5556 -> 0.5833) and nugget recall
+(0.1944 -> 0.1607) are **not a clean before/after comparison on the same
+question set** - both stayed in the same small-`n`, noisy range, not a
+demonstrated regression or improvement from the `verify` role itself.
+
+**Resolvability is the number this task set out to fix, and it moved from
+having nothing to measure to a real, mostly-passing number**:
+`resolvability=1.0000` over 5 checkable citations (9 of 14 completed
+questions still had no citation carrying a `url` or DOI-shaped `id` -
+`markets`/`news_global`/others cite sources whose id/text genuinely has
+neither). Those 5 came from `literature`, `real_estate`, `science`,
+`standards`, and `video` - each resolved live, confirming both halves of
+the fix work end to end: `buildCitations()`'s `previewUrl`/`downloadUrl`
+fallback actually produces a checkable URL for these previously-URL-less
+citations, and `checkLiveness()`'s guarded, pinned HEAD/GET (through
+`src/utils/liveness.ts`, cached 24h in the state store under `live|<url>`)
+correctly reaches and confirms them.
+
+### To re-run (with claim verification and grading)
+
+Same env as "To re-run" above; claim verification is on by default (set
+`ALEXANDRIA_CLAIM_CHECK=off` to disable it) and uses the `verify` role,
+which needs no separate configuration - it falls back to whatever `synth`
+resolves to. To point verify at a different model, set
+`ALEXANDRIA_VERIFY_MODEL` (and `_BASE_URL`/`_API_KEY` if it's a different
+gateway) alongside the vars above.

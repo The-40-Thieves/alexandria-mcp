@@ -155,6 +155,13 @@ const rawFields = {
     .describe(
       'Set to "llm" to rerank fused results with a chat call (the rerank role); otherwise the fused order is kept.',
     ),
+  ...roleFields('VERIFY', 'verify'),
+  ALEXANDRIA_CLAIM_CHECK: z
+    .enum(['off'])
+    .optional()
+    .describe(
+      'Set to "off" to disable library_answer/library_research claim verification (the verify role checking each cited sentence against its source text). On by default; verify falls back to the synth role when ALEXANDRIA_VERIFY_* is unset.',
+    ),
 
   // ── Routing (src/tools/libraryAsk.ts, src/utils/catalogIndex.ts) ────────
   ALEXANDRIA_ROUTER_SKIP_MARGIN: optionalNumericString(

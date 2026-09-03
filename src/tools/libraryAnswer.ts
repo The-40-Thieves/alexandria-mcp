@@ -7,13 +7,26 @@ import { config } from '../config.ts';
 import { requestLogger } from '../log.ts';
 import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
+import {
+  type CitationGrade,
+  type GradeCitationInput,
+  gradeCitations,
+  retractedWarning,
+} from '../utils/citationGrade.ts';
+import { type ClaimVerdict, checkClaims } from '../utils/claimCheck.ts';
 import { llmRerank, rrf } from '../utils/fuse.ts';
+import { checkLiveness } from '../utils/liveness.ts';
 import { pool, type RemoteServerConfig } from '../utils/mcpClientPool.ts';
 import { chatText, requireRoleForTool } from '../utils/providers.ts';
 import { type RouteItem, runAsk } from './libraryAsk.ts';
 
 const READ_CHAR_LIMIT = 6000;
 const RERANK_POOL_CAP = 40;
+// Mirrors src/tools/libraryCitations.ts's own (unexported) DOI_RE and
+// scripts/eval-answer.ts's copy - a bare id shaped like a DOI (no adapter
+// gave us a ReadResult.doi, but the id itself already is one, e.g. some
+// crossref/openalex items).
+const DOI_RE = /^10\.\d{4,9}\/\S+$/i;
 
 export interface Citation {
   n: number;
@@ -21,6 +34,15 @@ export interface Citation {
   id: string;
   title: string;
   url?: string;
+  // Task 9: filled in by src/utils/citationGrade.ts's gradeCitations() and
+  // src/utils/liveness.ts's checkLiveness() respectively, both wired in
+  // after the answer is synthesized and claim-checked below. Declared
+  // optional here (matching src/index.ts's outputSchema, which Task 1
+  // already declared these on ahead of this task landing) so a citation
+  // that skipped grading/liveness (e.g. ALEXANDRIA_CLAIM_CHECK=off, or no
+  // URL to check) is still a valid Citation.
+  grade?: CitationGrade;
+  resolves?: boolean;
 }
 
 export interface LibraryAnswerOptions {
@@ -112,6 +134,10 @@ async function fetchKnowledgeResults(query: string, limit: number): Promise<Libr
 interface ReadSource {
   item: LibraryResult;
   text: string;
+  // Task 6's ReadResult.doi, carried through so citationGrade.ts can
+  // enrich this citation via a batched OpenAlex DOI lookup without a
+  // second read() call.
+  doi?: string;
 }
 
 // Reads the first `readTop` ranked results that claim hasFullText, skipping
@@ -126,7 +152,7 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
     try {
       const result = await getAdapter(item.source).read(item.id);
       if (result.metadataOnly || !result.text) continue;
-      sources.push({ item, text: result.text.slice(0, READ_CHAR_LIMIT) });
+      sources.push({ item, text: result.text.slice(0, READ_CHAR_LIMIT), doi: result.doi });
     } catch (err) {
       requestLogger().debug(
         { source: item.source, id: item.id, err: err instanceof Error ? err.message : String(err) },
@@ -238,12 +264,35 @@ export function dropDanglingCitations(answer: string, sourceCount: number): stri
   return kept.join(' ');
 }
 
+// Task 9's claimCheck.ts strips markers from a sentence claimCheck judged
+// unsupported (the sentence's prose stays; only its [n] marker(s) go),
+// rather than dropping the whole sentence the way dropDanglingCitations
+// does for a dangling reference. Exported so that module reuses the same
+// CITATION_BRACKET_RE this file's own marker extraction/removal already
+// uses, instead of re-deriving the marker shape.
+const CITATION_BRACKET_WITH_LEADING_SPACE_RE = new RegExp(
+  `[ \\t]*${CITATION_BRACKET_RE.source}`,
+  'g',
+);
+export function removeCitationMarkers(text: string): string {
+  return text
+    .replace(CITATION_BRACKET_WITH_LEADING_SPACE_RE, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 // Short, unsynthesized listing of the read sources, used as the answer
 // when every sentence the model wrote turned out to be uncited.
 function buildFallbackAnswer(sources: ReadSource[]): string {
   return `Sources: ${sources.map((s, i) => `[${i + 1}] ${s.item.title}`).join(', ')}`;
 }
 
+// Task 8's eval found that 85 of 125 source adapters set `previewUrl` (or
+// `downloadUrl`), not `url`, on the LibraryResult they return - so a
+// citation built from `url` alone was almost never resolvable. Falls back
+// through the same "best available link" order library_search's own
+// concise row (src/tools/format.ts) doesn't need to make, since library_
+// search still returns the full LibraryResult with all three fields intact.
 function buildCitations(sources: ReadSource[], usedNumbers: Set<number>): Citation[] {
   return sources
     .map((s, i) => ({
@@ -251,9 +300,95 @@ function buildCitations(sources: ReadSource[], usedNumbers: Set<number>): Citati
       source: s.item.source,
       id: s.item.id,
       title: s.item.title,
-      url: s.item.url,
+      url: s.item.url ?? s.item.previewUrl ?? s.item.downloadUrl,
     }))
     .filter((c) => usedNumbers.has(c.n));
+}
+
+// A DOI for citationGrade.ts's OpenAlex enrichment: the adapter's own
+// ReadResult.doi (Task 6) when present, else the id itself when it's
+// already DOI-shaped (some crossref/openalex/etc. ids are bare DOIs).
+function deriveDoi(source: ReadSource): string | undefined {
+  if (source.doi) return source.doi;
+  return DOI_RE.test(source.item.id) ? source.item.id : undefined;
+}
+
+// Task 9: applies checkClaims()'s per-sentence verdicts to the answer text.
+// An unsupported sentence has its citation marker(s) stripped (the prose
+// stays; only the claim of support goes) and a warning is added; an
+// over-strength sentence (supported, but not at its claimed strength/
+// scope/time) keeps its citation and only adds a warning. Conservative
+// like libraryResearch.ts's own checkCitations: a sentence is only edited
+// when it occurs EXACTLY ONCE in `answer` - a loose match risks shredding
+// unrelated prose that happens to share the same words.
+function applyClaimVerdicts(answer: string, verdicts: ClaimVerdict[], warnings: string[]): string {
+  let edited = answer;
+  for (const v of verdicts) {
+    const shown = JSON.stringify(
+      v.sentence.length > 80 ? `${v.sentence.slice(0, 77)}...` : v.sentence,
+    );
+    const suffix = v.note ? ` (${v.note})` : '';
+    if (!v.supported) {
+      const occurrences = edited.split(v.sentence).length - 1;
+      if (occurrences !== 1) {
+        warnings.push(
+          `kept a citation whose claim could not be verified as supported (matched ${occurrences} times in the answer): ${shown}${suffix}`,
+        );
+        continue;
+      }
+      edited = edited.split(v.sentence).join(removeCitationMarkers(v.sentence));
+      warnings.push(`removed citation marker(s) from an unsupported claim: ${shown}${suffix}`);
+    } else if (!v.strengthWarranted) {
+      warnings.push(
+        `citation may overstate its source (strength, scope, or time not fully warranted): ${shown}${suffix}`,
+      );
+    }
+  }
+  return edited.replace(/ {2,}/g, ' ').trim();
+}
+
+// Task 9: fills in Citation.grade (src/utils/citationGrade.ts) and
+// Citation.resolves (src/utils/liveness.ts) for every citation, mutating
+// them in place. Every citation here came from readTopSources with real
+// text, so fullTextVerified is always true; chainSupported is left unset -
+// only library_research's own final fact-check pass (checkCitations) sets
+// that, on the union citations it re-grades after the report is written.
+async function attachCitationSignals(
+  citations: Citation[],
+  sources: ReadSource[],
+  warnings: string[],
+): Promise<void> {
+  if (citations.length === 0) return;
+
+  const gradeInputs: GradeCitationInput[] = citations.map((c) => {
+    const source = sources[c.n - 1];
+    return {
+      n: c.n,
+      source: c.source,
+      id: c.id,
+      cluster: source?.item.cluster,
+      doi: source ? deriveDoi(source) : undefined,
+      year: source?.item.year,
+      fullTextVerified: true,
+    };
+  });
+  const grades = await gradeCitations(gradeInputs);
+  for (const c of citations) {
+    c.grade = grades.get(c.n);
+    // "Retracted means tier D and a warning" - the brief is explicit that
+    // a retracted citation must be visible in warnings[] too, since grade
+    // itself is detailed-output-only (src/tools/format.ts) and a concise
+    // caller only ever sees warnings.
+    if (c.grade?.signals.retracted) warnings.push(retractedWarning(c.n, c.title));
+  }
+
+  const urls = citations.map((c) => c.url).filter((u): u is string => Boolean(u));
+  if (urls.length > 0) {
+    const liveness = await checkLiveness(urls);
+    for (const c of citations) {
+      if (c.url) c.resolves = liveness.get(c.url)?.ok;
+    }
+  }
 }
 
 export async function libraryAnswer(
@@ -328,7 +463,47 @@ export async function libraryAnswer(
     }
   }
 
-  const citations = buildCitations(sources, usedNumbers);
+  let citations = buildCitations(sources, usedNumbers);
+
+  // Task 9: claim verification. ALEXANDRIA_CLAIM_CHECK=off skips it
+  // entirely; otherwise every cited sentence is checked against its
+  // source(s) via the `verify` role (falls back to `synth`), unsupported
+  // markers are stripped, and the citation list is rebuilt from whichever
+  // numbers the edited answer still actually cites.
+  if (config.ALEXANDRIA_CLAIM_CHECK !== 'off' && citations.length > 0) {
+    try {
+      const chunks = citations.map((c) => ({ n: c.n, text: sources[c.n - 1].text }));
+      const verdicts = await checkClaims(answer, citations, chunks);
+      if (verdicts.length > 0) {
+        answer = applyClaimVerdicts(answer, verdicts, warnings);
+        const survivingNumbers = new Set(
+          extractCitationNumbers(answer).filter((n) => n <= sources.length),
+        );
+        citations = buildCitations(sources, survivingNumbers);
+      }
+    } catch (err) {
+      // A verify-role outage (network error, invalid JSON twice) must not
+      // sink an otherwise-complete answer - the answer/citations are kept
+      // exactly as synthesized, unchecked, with a warning saying so.
+      requestLogger().debug(
+        { err: err instanceof Error ? err.message : String(err) },
+        'claim verification failed',
+      );
+      warnings.push('claim verification could not run; citations were not checked for support');
+    }
+  }
+
+  try {
+    await attachCitationSignals(citations, sources, warnings);
+  } catch (err) {
+    // Grading/liveness are enrichment, not core to the answer - their own
+    // internal calls already fail closed (best-effort), but this is a
+    // second line of defense against a genuinely unexpected throw.
+    requestLogger().debug(
+      { err: err instanceof Error ? err.message : String(err) },
+      'citation grading/liveness failed',
+    );
+  }
   await emit('synthesised', `synthesised answer with ${citations.length} citation(s)`);
 
   return { answer, citations, results: ranked, routing, warnings };
