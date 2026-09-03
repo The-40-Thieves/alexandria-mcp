@@ -129,3 +129,11 @@ import './medrxiv.ts';
 import './secedgar.ts';
 import './worldbank.ts';
 import './datacite.ts';
+// Task 5: new sources, batch 2.
+import './hal.ts';
+import './hansard.ts';
+import './eurlex.ts';
+import './bls.ts';
+import './dblp.ts';
+import './opencitations.ts';
+import './readthedocs.ts';

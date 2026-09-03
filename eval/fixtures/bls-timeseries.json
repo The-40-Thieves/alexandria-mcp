@@ -1,0 +1,53 @@
+{
+  "status": "REQUEST_SUCCEEDED",
+  "responseTime": 73,
+  "message": [],
+  "Results": {
+    "series": [
+      {
+        "seriesID": "LNS14000000",
+        "data": [
+          {
+            "year": "2025",
+            "period": "M12",
+            "periodName": "December",
+            "value": "4.4",
+            "footnotes": [
+              {}
+            ]
+          },
+          {
+            "year": "2025",
+            "period": "M11",
+            "periodName": "November",
+            "value": "4.5",
+            "footnotes": [
+              {}
+            ]
+          },
+          {
+            "year": "2025",
+            "period": "M10",
+            "periodName": "October",
+            "value": "-",
+            "footnotes": [
+              {
+                "code": "9",
+                "text": "Data unavailable due to the 2025 lapse in appropriations."
+              }
+            ]
+          },
+          {
+            "year": "2025",
+            "period": "M09",
+            "periodName": "September",
+            "value": "4.4",
+            "footnotes": [
+              {}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

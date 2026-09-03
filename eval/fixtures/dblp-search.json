@@ -1,0 +1,99 @@
+{
+  "result": {
+    "query": "transformer* attention*",
+    "status": {
+      "@code": "200",
+      "text": "OK"
+    },
+    "time": {
+      "@unit": "msecs",
+      "text": "31.06"
+    },
+    "hits": {
+      "@total": "4197",
+      "@computed": "100",
+      "@sent": "2",
+      "@first": "0",
+      "hit": [
+        {
+          "@score": "4",
+          "@id": "658050",
+          "info": {
+            "authors": {
+              "author": [
+                {
+                  "@pid": "412/4007",
+                  "text": "Gyanko Issah Yussif"
+                },
+                {
+                  "@pid": "170/9707",
+                  "text": "David Lagomasino"
+                },
+                {
+                  "@pid": "434/8793",
+                  "text": "Emi Uchida"
+                },
+                {
+                  "@pid": "26/11511",
+                  "text": "Abdeltawab M. Hendawi"
+                }
+              ]
+            },
+            "title": "Grid Attention Transformer (GAT): Attention Mechanisms in Grid-Based Transformers for Vegetation Risk Analysis.",
+            "venue": "GeoIndustry",
+            "pages": "35-44",
+            "year": "2025",
+            "type": "Conference and Workshop Papers",
+            "access": "closed",
+            "key": "conf/geoindustry/YussifLUH25",
+            "doi": "10.1145/3764919.3770876",
+            "ee": "https://doi.org/10.1145/3764919.3770876",
+            "url": "https://dblp.org/rec/conf/geoindustry/YussifLUH25"
+          },
+          "url": "URL#658050"
+        },
+        {
+          "@score": "4",
+          "@id": "904062",
+          "info": {
+            "authors": {
+              "author": [
+                {
+                  "@pid": "177/5677",
+                  "text": "Krati Saxena"
+                },
+                {
+                  "@pid": "418/0009",
+                  "text": "Federico Jurado Ruiz"
+                },
+                {
+                  "@pid": "368/7587",
+                  "text": "Guido Manzi"
+                },
+                {
+                  "@pid": "203/9126",
+                  "text": "Dianbo Liu"
+                },
+                {
+                  "@pid": "134/3546",
+                  "text": "Alex Lamb"
+                }
+              ]
+            },
+            "title": "Attention Schema-based Attention Control (ASAC): A Cognitive-Inspired Approach for Attention Management in Transformers.",
+            "venue": "CoRR",
+            "volume": "abs/2509.16058",
+            "year": "2025",
+            "type": "Informal and Other Publications",
+            "access": "open",
+            "key": "journals/corr/abs-2509-16058",
+            "doi": "10.48550/ARXIV.2509.16058",
+            "ee": "https://doi.org/10.48550/arXiv.2509.16058",
+            "url": "https://dblp.org/rec/journals/corr/abs-2509-16058"
+          },
+          "url": "URL#904062"
+        }
+      ]
+    }
+  }
+}

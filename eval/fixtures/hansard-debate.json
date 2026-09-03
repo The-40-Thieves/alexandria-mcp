@@ -1,0 +1,92 @@
+{
+  "Overview": {
+    "Id": 5396528,
+    "ExtId": "E5BC6258-F22B-45D9-8916-9CB564FA81B2",
+    "Title": "Direction of Government",
+    "HRSTag": "NewDebate",
+    "Date": "2026-09-02T00:00:00",
+    "Location": "Lords Chamber",
+    "House": "Lords",
+    "Source": 2,
+    "VolumeNo": 859,
+    "ContentLastUpdated": "2026-09-03T01:20:36.647",
+    "DebateTypeId": 1,
+    "SectionType": 1,
+    "NextDebateExtId": "9008A528-E8AB-445A-85B7-7FF912B79D85",
+    "NextDebateTitle": "Windsor Framework (Retail Movement Scheme: Plant Health) (Amendment) Regulations 2026",
+    "PreviousDebateExtId": "B02258F6-7B68-466D-ABF8-034ECE6A3D7E",
+    "PreviousDebateTitle": "Armed Forces Bill"
+  },
+  "Items": [
+    {
+      "ItemType": "Contribution",
+      "ItemId": 50293263,
+      "MemberId": null,
+      "AttributedTo": null,
+      "Value": "Statement",
+      "OrderInSection": 1,
+      "Timecode": null,
+      "ExternalId": "d32d8dd5-b0e2-422e-ae50-88b067c4cbd0",
+      "HRSTag": "hs_DebateType",
+      "HansardSection": "BL-BL",
+      "UIN": null,
+      "IsReiteration": false
+    },
+    {
+      "ItemType": "Contribution",
+      "ItemId": 50293264,
+      "MemberId": null,
+      "AttributedTo": null,
+      "Value": "The following Statement was made in the House of Commons on Tuesday 1 September.",
+      "OrderInSection": 3,
+      "Timecode": null,
+      "ExternalId": "26090298000219",
+      "HRSTag": "hs_Procedure",
+      "HansardSection": "BL-BL",
+      "UIN": null,
+      "IsReiteration": false
+    },
+    {
+      "ItemType": "Contribution",
+      "ItemId": 50293265,
+      "MemberId": null,
+      "AttributedTo": null,
+      "Value": "“With permission, Mr Speaker, I wish to make a Statement on the direction in which I will lead our country.",
+      "OrderInSection": 4,
+      "Timecode": null,
+      "ExternalId": "26090298000005",
+      "HRSTag": "hs_para",
+      "HansardSection": "BL-BL",
+      "UIN": null,
+      "IsReiteration": false
+    },
+    {
+      "ItemType": "Contribution",
+      "ItemId": 50293266,
+      "MemberId": null,
+      "AttributedTo": null,
+      "Value": "I come before this House having visited each of the regions and nations of the UK over the past six weeks, and Ukraine on the occasion of the 35th anniversary of its independence. The UK’s steadfast support has helped sustain Ukraine’s resolve over the past four and a half years, and particularly so in the last two. That was the achievement of my predecessor and, as he stands down from this place, I want to pay tribute to my right honourable and learned friend the Member for Holborn and St Pancras, Keir Starmer. He has given this country a lifetime of public service, particularly for those fighting for justice. When he delivered in this House on his promise to the Hillsborough families and everyone involved in the Hillsborough law campaign, it was a moment that I will never forget. His leadership took our party from one of its worst defeats to its best victories, and created a platform to change this country for the better. We will use it well, and we wish his family the very best for the future.",
+      "OrderInSection": 5,
+      "Timecode": null,
+      "ExternalId": "26090298000006",
+      "HRSTag": "hs_para",
+      "HansardSection": "BL-BL",
+      "UIN": null,
+      "IsReiteration": false
+    },
+    {
+      "ItemType": "Contribution",
+      "ItemId": 50293267,
+      "MemberId": null,
+      "AttributedTo": null,
+      "Value": "The position that my right honourable and learned friend took on Ukraine, building on the work of his predecessors as Prime Minister, is one that I will not change, whatever the threats that we face. We do not seek escalation, but instead will stand firm in providing what help we can to enable Ukraine to defend itself from this illegal invasion. Britain’s defence starts in Ukraine, and the defence of our nation will always be my first priority.",
+      "OrderInSection": 6,
+      "Timecode": null,
+      "ExternalId": "26090298000007",
+      "HRSTag": "hs_para",
+      "HansardSection": "BL-BL",
+      "UIN": null,
+      "IsReiteration": false
+    }
+  ]
+}

@@ -27,6 +27,12 @@
   expected: [pubmed]
 - query: find the DOI for a dataset deposited on Zenodo or Figshare
   expected: [datacite]
+- query: French academic archive full-text deposit with a PDF download
+  expected: [hal]
+- query: venue-precise computer science bibliography search
+  expected: [dblp]
+- query: which papers cite this DOI and what does it cite in turn
+  expected: [opencitations]
 
 # ── ai_research ─────────────────────────────────────────────────────────────
 - query: machine learning papers with their code implementations
@@ -69,6 +75,8 @@
   expected: [swiftevolution]
 - query: Stack Overflow question about async iterators
   expected: [stackexchange]
+- query: search a Python project's hosted documentation for a function
+  expected: [readthedocs]
 
 # ── economics ────────────────────────────────────────────────────────────────
 - query: Case-Shiller home price index last 12 months
@@ -85,6 +93,8 @@
   expected: [worldbank]
 - query: search SEC EDGAR 10-K filings for a public company
   expected: [secedgar]
+- query: US unemployment rate and CPI inflation time series from the BLS
+  expected: [bls]
 
 # ── geopolitical ─────────────────────────────────────────────────────────────
 - query: Hormuz shipping disruption this week
@@ -103,6 +113,8 @@
   expected: [ukparliament]
 - query: US government open data catalog
   expected: [datagov]
+- query: UK Parliament Hansard debate transcript on climate change
+  expected: [hansard]
 
 # ── law ──────────────────────────────────────────────────────────────────────
 - query: UK Acts of Parliament on data protection
@@ -111,6 +123,8 @@
   expected: [legislationscot]
 - query: US federal court opinions on patent law
   expected: [courtlistener]
+- query: EU directive or regulation text by CELEX number
+  expected: [eurlex]
 
 # ── literature ───────────────────────────────────────────────────────────────
 - query: Pride and Prejudice full text

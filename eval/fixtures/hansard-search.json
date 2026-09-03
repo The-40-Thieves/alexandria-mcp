@@ -1,0 +1,25 @@
+{
+  "TotalDebates": 545,
+  "SearchTerms": [
+    "climate",
+    "change"
+  ],
+  "Debates": [
+    {
+      "DebateSection": "Commons Chamber",
+      "SittingDate": "2026-09-01T00:00:00",
+      "House": "Commons",
+      "Title": "Climate Change: International Partners",
+      "Rank": 176,
+      "DebateSectionExtId": "46C38A5F-8CE5-493D-8508-5D98AA98E113"
+    },
+    {
+      "DebateSection": "Commons Chamber",
+      "SittingDate": "2026-09-01T00:00:00",
+      "House": "Commons",
+      "Title": "Climate Change: National Security",
+      "Rank": 176,
+      "DebateSectionExtId": "C1BDB47D-3AA5-4857-A80E-84FA257B80E8"
+    }
+  ]
+}

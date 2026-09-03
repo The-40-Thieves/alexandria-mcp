@@ -1,0 +1,64 @@
+{
+  "head": {
+    "link": [],
+    "vars": [
+      "work",
+      "title",
+      "celex"
+    ]
+  },
+  "results": {
+    "distinct": false,
+    "ordered": true,
+    "bindings": [
+      {
+        "work": {
+          "type": "uri",
+          "value": "http://publications.europa.eu/resource/cellar/654e27c6-6325-11e7-b2f2-01aa75ed71a1"
+        },
+        "title": {
+          "type": "literal",
+          "xml:lang": "en",
+          "value": "The Criminal Justice and Data Protection (Protocol No 36) (Amendment) Regulations 2014"
+        },
+        "celex": {
+          "type": "literal",
+          "datatype": "http://www.w3.org/2001/XMLSchema#string",
+          "value": "72008F0977GBR_226398"
+        }
+      },
+      {
+        "work": {
+          "type": "uri",
+          "value": "http://publications.europa.eu/resource/cellar/1def9774-e93e-4ec9-bafd-e8ee752f4584"
+        },
+        "title": {
+          "type": "literal",
+          "xml:lang": "en",
+          "value": "Data Protection Act 1998"
+        },
+        "celex": {
+          "type": "literal",
+          "datatype": "http://www.w3.org/2001/XMLSchema#string",
+          "value": "72002F0465GBR_226696"
+        }
+      },
+      {
+        "work": {
+          "type": "uri",
+          "value": "http://publications.europa.eu/resource/cellar/8d2ef7fd-6323-11e7-b2f2-01aa75ed71a1"
+        },
+        "title": {
+          "type": "literal",
+          "xml:lang": "mt",
+          "value": "Data Protection (Processing of Personal Data in the Police Sector) Regulations, Subsidiary Legislation 440.05"
+        },
+        "celex": {
+          "type": "literal",
+          "datatype": "http://www.w3.org/2001/XMLSchema#string",
+          "value": "72008D0616MLT_224608"
+        }
+      }
+    ]
+  }
+}
