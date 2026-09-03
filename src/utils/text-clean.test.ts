@@ -87,10 +87,25 @@ Post-text`;
 
   describe('ocrQualityScore', () => {
     test('scores near 1.0 for ASCII-only text', () => {
-      const raw = `Hello world, this is a clean sentence.`;
+      const raw = `Welcome world, this is a clean sentence.`;
       const score = ocrQualityScore(raw);
       assert.ok(score > 0.9);
       assert.ok(score <= 1.0);
+    });
+
+    test('scores low for letter soup that is not real words (the lexicon gate)', () => {
+      // Every character is a clean, in-alphabet letter (the pre-existing
+      // regex score alone would pass this), but none of the tokens are
+      // real English words - the failure mode the lexicon-hit ratio adds.
+      const raw = `kjhsdf oiuqwer zxcvbnm asdfgh qwerty poiuyt lkjhgf mnbvcx`;
+      const score = ocrQualityScore(raw);
+      assert.ok(score < 0.75, `expected a low score, got ${score}`);
+    });
+
+    test('a real English sentence clears the lexicon gate', () => {
+      const raw = `The old man came home with his dog and looked at the clean water near the great stone house.`;
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
     });
 
     test('scores correctly for Unicode text (Greek/Arabic/Chinese)', () => {
@@ -111,6 +126,67 @@ Post-text`;
       const raw = `^&*_+%^&*{}|<>\`~#@=\\/`;
       const score = ocrQualityScore(raw);
       assert.strictEqual(score, 0);
+    });
+
+    // Review round 1 (Important 2): the reviewer measured clean, real
+    // prose/data scoring below the 0.75 threshold (statistics prose 0.542,
+    // a JSON object 0.400, finance prose 0.737) because the lexicon is
+    // 19th-century Gutenberg vocabulary and the old sample-size floor
+    // looked only at raw token count. Round 1's fix (skip the lexicon
+    // score below 60% alphabetic tokens) turned out to have its own
+    // bypasses - see Review round 2 below - so these three still exercise
+    // the same real-data categories, now against the round 2 formula.
+    test('clean statistics prose clears the lexicon gate', () => {
+      const raw =
+        'The regression coefficient was 0.842 with a standard error of 0.031, yielding a ' +
+        't-statistic of 27.16 and a p-value below 0.001. The R-squared value of 0.756 ' +
+        'indicates that approximately 75.6% of the variance in the dependent variable is ' +
+        'explained by the model, while the adjusted R-squared of 0.748 accounts for the ' +
+        'number of predictors included in the analysis.';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
+
+    test('a JSON object clears the lexicon gate', () => {
+      const raw =
+        '{"orderId": 48291, "customerName": "Jane Smith", "totalAmount": 149.99, ' +
+        '"currency": "USD", "status": "completed", "createdAt": "2024-06-01T12:00:00Z", ' +
+        '"shippingAddress": {"city": "Springfield", "country": "USA"}, "isPriority": true}';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
+
+    test('clean finance prose clears the lexicon gate', () => {
+      const raw =
+        'Quarterly revenue increased 12.4% year-over-year to $4.2 billion, driven primarily ' +
+        'by a 340 basis point expansion in gross margin and a 7.8% reduction in operating ' +
+        'expenses. EBITDA rose to $912 million, while free cash flow reached $618 million, ' +
+        'up from $503 million in the prior-year period.';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
+
+    // Review round 2 (revised ruling, replaces round 1's 60%-alphabetic
+    // skip): the reviewer found two ways round 1's skip let real garbage
+    // through. (a) Padding a vowel-less letter-soup chunk with enough
+    // digits pushed the alphabetic share under 60%, skipping the lexicon
+    // check entirely and scoring the chunk 1.0 on the character-class
+    // regex alone.
+    test('digit-diluted vowel-less letter soup scores 0, no longer skipped', () => {
+      const raw = '1 2 3 4 5 6 7 8 9 10 11 12 zxcvbnm qwrtypl bcdfgh';
+      const score = ocrQualityScore(raw);
+      assert.strictEqual(score, 0);
+    });
+
+    // (b) The plausible-word-shape credit (Important 2, round 1) is
+    // PARTIAL (0.7), not a full hit - a chunk made entirely of unknown but
+    // plausibly-shaped tokens (no real words at all) still fails the 0.75
+    // threshold instead of passing outright.
+    test('a chunk of plausibly-shaped but unknown tokens scores 0.7 and fails', () => {
+      const raw = 'florbin wexatude glimberous plonitash fendrocal wistuvane brintolay quovendish';
+      const score = ocrQualityScore(raw);
+      assert.ok(Math.abs(score - 0.7) < 1e-9, `expected ~0.7, got ${score}`);
+      assert.ok(score < 0.75, 'still fails the quality threshold');
     });
   });
 

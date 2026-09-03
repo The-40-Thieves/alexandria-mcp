@@ -290,6 +290,12 @@ const rawFields = {
     .describe(
       'library_ingest vector store provider. Only "supabase" (the default) is implemented.',
     ),
+  ALEXANDRIA_CHUNK_PREFIX: z
+    .enum(['off'])
+    .optional()
+    .describe(
+      'Set to "off" to disable prepending the title and heading chain to each chunk\'s embedded text (src/pipeline/index.ts\'s chunkSemantic()). On by default; the raw chunk text stored and displayed is unaffected either way.',
+    ),
 
   // ── Ingest policy (src/sources/ingestPolicy.ts) ─────────────────────────
   ALEXANDRIA_INGEST_TIMEBOXED: z

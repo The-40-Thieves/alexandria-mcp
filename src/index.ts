@@ -868,7 +868,7 @@ export function createServer(): McpServer {
     'library_research',
     {
       title: 'Recursive Cited Research',
-      description: `Deep research on a topic: generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops at the given depth, the time budget, or once a round finds no new sources. Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the per-round breakdown, elapsed time, citation grades, and resolvability.`,
+      description: `Deep research on a topic: outlines 3 to 7 coverage objectives, generates search queries, answers each with library_answer, extracts learnings and follow-up questions, then recurses with half the breadth. Stops once every objective is covered by a learning, at the given depth, at the time budget, or once a round finds no new sources. Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY). Set response_format: "detailed" for the per-round breakdown, elapsed time, citation grades, resolvability, and the objectives/coverage outline.`,
       inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Research topic or question'),
         depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),
@@ -902,6 +902,8 @@ export function createServer(): McpServer {
           .optional(),
         elapsedMs: z.number().optional(),
         warnings: z.array(z.string()).optional(),
+        objectives: z.array(z.string()).optional(),
+        coverage: z.array(z.boolean()).optional(),
       }),
       annotations: {
         readOnlyHint: true,

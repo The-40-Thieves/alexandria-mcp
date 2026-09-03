@@ -22,6 +22,14 @@ export interface LibraryResult {
 
 export interface Chunk {
   text: string;
+  // Task 11 (brief 07): what actually gets embedded, when it differs from
+  // `text`. chunkSemantic() prepends the source title and its nearest
+  // markdown heading chain here to give the embedding model context a bare
+  // 350-word chunk doesn't carry on its own; `text` stays the raw chunk so
+  // storage/display/quality-scoring never show a reader a prefix they
+  // didn't write. Absent (ALEXANDRIA_CHUNK_PREFIX=off, or nothing to
+  // prepend) means embed `text` itself, same as before this field existed.
+  embedText?: string;
   metadata: ChunkMetadata;
 }
 

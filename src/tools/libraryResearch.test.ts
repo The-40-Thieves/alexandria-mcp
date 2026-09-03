@@ -68,6 +68,9 @@ function startFakeChatServer(decide: Decide, delayMs = 0): Promise<FakeServer> {
   });
 }
 
+// Task 11: never marks an objective covered, so decideResearch's callers
+// exercise only the pre-existing depth/breadth/time/no-new-sources stop
+// conditions, same as before this task added a fifth one.
 function decideResearch(system: string): unknown {
   if (system.includes('planning a research pass')) {
     const match = system.match(/up to (\d+) focused/);
@@ -79,6 +82,12 @@ function decideResearch(system: string): unknown {
   }
   if (system.includes('write a research report')) {
     return { report: 'Report body about the topic [1].' };
+  }
+  if (system.includes('scoping a research pass')) {
+    return { objectives: ['objective one', 'objective two', 'objective three'] };
+  }
+  if (system.includes('track coverage of a research outline')) {
+    return { coveredIndices: [] };
   }
   throw new Error(`unexpected research prompt: ${system.slice(0, 80)}`);
 }
@@ -182,6 +191,189 @@ test('libraryResearch', async (t) => {
     assert.equal(result.rounds[1].newSources, 0);
     assert.equal(result.citations.length, 1);
   });
+
+  // Task 11 (brief 07): objective-driven stopping. A round that finds
+  // fresh sources every time (so the pre-existing no-new-sources stop
+  // never fires) still has to stop once every outlined objective is
+  // covered - depth and breadth alone would otherwise run this out to 3
+  // rounds (4, then ceil(4/2)=2, then ceil(2/2)=1 queries), same shape as
+  // the "stops at depth 0" test above.
+  await t.test('stops early once every outlined objective is covered', async () => {
+    function decide(system: string): unknown {
+      if (system.includes('planning a research pass')) {
+        const match = system.match(/up to (\d+) focused/);
+        const n = match ? Number(match[1]) : 1;
+        return { queries: Array.from({ length: n }, (_, i) => `query ${i + 1}`) };
+      }
+      if (system.includes('extract structured learnings')) {
+        return { learnings: ['a learning'], followUps: [] };
+      }
+      if (system.includes('write a research report')) {
+        return { report: 'Report body about the topic [1].' };
+      }
+      if (system.includes('scoping a research pass')) {
+        return { objectives: ['objective one', 'objective two'] };
+      }
+      // Every objective is already covered as of round 1's learnings.
+      if (system.includes('track coverage of a research outline')) {
+        return { coveredIndices: [0, 1] };
+      }
+      throw new Error(`unexpected research prompt: ${system.slice(0, 80)}`);
+    }
+
+    const research = await startFakeChatServer(decide);
+    t.after(() => research.close());
+    const synth = await startFakeChatServer(decideSynthNoop);
+    t.after(() => synth.close());
+
+    process.env.ALEXANDRIA_RESEARCH_BASE_URL = research.url;
+    process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+    let counter = 0;
+    const answerFn = async (): Promise<LibraryAnswerResult> => {
+      counter += 1;
+      return fakeAnswer(`unique-${counter}`, counter);
+    };
+
+    const result = await libraryResearch(
+      'a topic whose outline is covered after one round',
+      { depth: 3, breadth: 4, maxMinutes: 6 },
+      undefined,
+      { answerFn },
+    );
+
+    assert.equal(result.rounds.length, 1, 'stops after round 1 despite depth 3 and new sources');
+    assert.deepEqual(result.objectives, ['objective one', 'objective two']);
+    assert.deepEqual(result.coverage, [true, true]);
+  });
+
+  // Review round 1 (Important 1): generateObjectives()'s chatJSON call is
+  // enrichment, not core to the loop - a failure there (two failed schema
+  // validations here; a network/gateway outage in production) must not
+  // sink the whole research run. Returning a structurally invalid shape
+  // for the "scoping a research pass" prompt makes chatJSON's own
+  // validate-retry-validate-throw path throw for real, rather than
+  // simulating the failure by other means.
+  await t.test('a failing objective outline call does not sink the research run', async () => {
+    function decide(system: string): unknown {
+      if (system.includes('planning a research pass')) return { queries: ['a single query'] };
+      if (system.includes('extract structured learnings')) {
+        return { learnings: ['a learning'], followUps: [] };
+      }
+      if (system.includes('write a research report')) {
+        return { report: 'Report body about the topic [1].' };
+      }
+      // Wrong shape (objectives must be an array of strings) - fails
+      // ObjectivesSchema validation on both the first attempt and
+      // chatJSON's one retry, so chatJSON throws for real.
+      if (system.includes('scoping a research pass')) return { objectives: 'not an array' };
+      // Never reached: with objectives === [], runRound's `if
+      // (objectives.length > 0)` guard skips updateCoverage entirely -
+      // if that guard regressed, this throw would fail the test with a
+      // clear message instead of silently passing.
+      if (system.includes('track coverage of a research outline')) {
+        throw new Error('updateCoverage must not run when the outline failed');
+      }
+      throw new Error(`unexpected research prompt: ${system.slice(0, 80)}`);
+    }
+
+    const research = await startFakeChatServer(decide);
+    t.after(() => research.close());
+    const synth = await startFakeChatServer(decideSynthNoop);
+    t.after(() => synth.close());
+
+    process.env.ALEXANDRIA_RESEARCH_BASE_URL = research.url;
+    process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+    const answerFn = async (): Promise<LibraryAnswerResult> => fakeAnswer('id', 1);
+
+    const result = await libraryResearch(
+      'a topic whose outline call fails',
+      { depth: 1, breadth: 1, maxMinutes: 6 },
+      undefined,
+      { answerFn },
+    );
+
+    assert.match(result.report, /Report body about the topic/, 'the report is still produced');
+    assert.deepEqual(result.objectives, []);
+    assert.deepEqual(result.coverage, []);
+    assert.ok(
+      result.warnings.includes(
+        'objective outline unavailable; stopping on depth, breadth, and time only',
+      ),
+      `expected the outline-failure warning, got: ${JSON.stringify(result.warnings)}`,
+    );
+  });
+
+  // Review round 2 (Minor): a mid-run updateCoverage() failure gets its
+  // own distinct message (the outline itself succeeded here - only this
+  // round's coverage check failed), and must not sink the run either.
+  await t.test(
+    'a failing objective coverage check does not sink the research run, objectives stay intact',
+    async () => {
+      function decide(system: string): unknown {
+        if (system.includes('planning a research pass')) return { queries: ['a single query'] };
+        if (system.includes('extract structured learnings')) {
+          return { learnings: ['a learning'], followUps: [] };
+        }
+        if (system.includes('write a research report')) {
+          return { report: 'Report body about the topic [1].' };
+        }
+        if (system.includes('scoping a research pass')) {
+          return { objectives: ['objective one', 'objective two'] };
+        }
+        // Wrong shape (coveredIndices must be an array of numbers) - fails
+        // CoverageSchema validation on both attempts, so chatJSON throws.
+        if (system.includes('track coverage of a research outline')) {
+          return { coveredIndices: 'not an array' };
+        }
+        throw new Error(`unexpected research prompt: ${system.slice(0, 80)}`);
+      }
+
+      const research = await startFakeChatServer(decide);
+      t.after(() => research.close());
+      const synth = await startFakeChatServer(decideSynthNoop);
+      t.after(() => synth.close());
+
+      process.env.ALEXANDRIA_RESEARCH_BASE_URL = research.url;
+      process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+      const answerFn = async (): Promise<LibraryAnswerResult> => fakeAnswer('id', 1);
+
+      const result = await libraryResearch(
+        'a topic whose coverage check fails mid-run',
+        { depth: 1, breadth: 1, maxMinutes: 6 },
+        undefined,
+        { answerFn },
+      );
+
+      assert.match(result.report, /Report body about the topic/, 'the report is still produced');
+      assert.deepEqual(
+        result.objectives,
+        ['objective one', 'objective two'],
+        'the outline is intact',
+      );
+      assert.deepEqual(result.coverage, [false, false], 'coverage falls back to not-yet-covered');
+      assert.ok(
+        result.warnings.includes(
+          'objective coverage check unavailable this round; stopping on depth, breadth, and time only',
+        ),
+        `expected the coverage-failure warning, got: ${JSON.stringify(result.warnings)}`,
+      );
+      assert.ok(
+        !result.warnings.includes(
+          'objective outline unavailable; stopping on depth, breadth, and time only',
+        ),
+        'the outline-failure message is distinct and must not also appear',
+      );
+    },
+  );
 
   await t.test('stops when the time budget is exhausted', async () => {
     // 30ms per LLM call: one round's generateQueries + several sequential
@@ -369,6 +561,8 @@ test('libraryResearch: chainSupported wiring after checkCitations', async (t) =>
     if (system.includes('extract structured learnings')) return { learnings: [], followUps: [] };
     if (system.includes('write a research report')) return { report: draftReport };
     if (system.includes('fact-check')) return { unsupported: [unsupportedSentence] };
+    if (system.includes('scoping a research pass')) return { objectives: ['an objective'] };
+    if (system.includes('track coverage of a research outline')) return { coveredIndices: [] };
     throw new Error(`unexpected prompt: ${system.slice(0, 80)}`);
   }
 
@@ -443,6 +637,8 @@ test('libraryResearch: a retracted citation adds a warning, surfaced in concise 
       return { report: 'A retracted claim, cited anyway [1].' };
     }
     if (system.includes('fact-check')) return { unsupported: [] };
+    if (system.includes('scoping a research pass')) return { objectives: ['an objective'] };
+    if (system.includes('track coverage of a research outline')) return { coveredIndices: [] };
     throw new Error(`unexpected prompt: ${system.slice(0, 80)}`);
   }
 
@@ -484,6 +680,8 @@ test('libraryResearch: a retracted citation adds a warning, surfaced in concise 
 
   const concise = formatResult('research', result, 'concise');
   assert.ok(!('grade' in concise.citations[0]), 'grade is detailed-only');
+  assert.ok(!('objectives' in concise), 'objectives is detailed-only (task 11)');
+  assert.ok(!('coverage' in concise), 'coverage is detailed-only (task 11)');
   assert.ok(
     concise.warnings?.includes(expectedWarning),
     `expected the retraction warning in concise output, got: ${JSON.stringify(concise.warnings)}`,
