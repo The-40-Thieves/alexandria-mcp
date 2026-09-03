@@ -136,6 +136,50 @@ function startFakeEmbeddingServer(
   });
 }
 
+// Same shape as startFakeEmbeddingServer, but returns a 500 whenever the
+// request's input batch contains a text `failsOn` accepts - used to
+// simulate an embed() call throwing mid-request (a network error, a
+// gateway 5xx) for one specific query while every other embed call on the
+// same server still succeeds normally.
+function startFlakyEmbeddingServer(
+  failsOn: (text: string) => boolean,
+): Promise<FakeEmbeddingServer> {
+  return new Promise((resolve) => {
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      let raw = '';
+      req.on('data', (chunk) => {
+        raw += chunk;
+      });
+      req.on('end', () => {
+        const body = raw ? JSON.parse(raw) : {};
+        const input = (body.input as string[]) ?? [];
+        if (input.some(failsOn)) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: { message: 'simulated gateway failure' } }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            data: input.map((_text: string, i: number) => ({
+              embedding: toBase64Float32([1, 0, 0]),
+              index: i,
+            })),
+          }),
+        );
+      });
+    });
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      resolve({
+        url: `http://127.0.0.1:${port}/v1`,
+        close: () => new Promise((res) => server.close(() => res())),
+      });
+    });
+  });
+}
+
 test('detectFreshnessPreference', async (t) => {
   await t.test('a strong recency term prefers realtime', () => {
     assert.equal(detectFreshnessPreference('latest news on the strike'), 'realtime');
@@ -316,6 +360,139 @@ test('runAsk / libraryAsk', async (t) => {
     delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
     delete process.env.ALEXANDRIA_ROUTER_API_KEY;
   });
+});
+
+// Task 10: margin-gated multi-query, against planRoute() directly (same
+// shape as the router-skip-margin block below) - reachable only from the
+// stage-2 branch, so ALEXANDRIA_ROUTER_SKIP_MARGIN is pinned high enough
+// that this BM25-mode run never skips.
+test('multi-query candidate expansion', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+  resetCatalogCacheForTests();
+  resetRoutingCacheForTests();
+
+  await t.test(
+    'ALEXANDRIA_MULTI_QUERY=1 unions stage-1 shortlists from two alternate phrasings, deduped by source',
+    async () => {
+      const router = await startFakeRouter((system) => {
+        if (system.includes('alternate phrasings')) {
+          return { queries: ['astronomy telescopes', 'space observation research'] };
+        }
+        return { intent: 'x', routes: [] };
+      });
+      t.after(() => router.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+      process.env.ALEXANDRIA_MULTI_QUERY = '1';
+      const withMultiQuery = await planRoute('nasa telescope discoveries', { maxSources: 5 });
+
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      resetRoutingCacheForTests();
+      const withoutMultiQuery = await planRoute('nasa telescope discoveries', { maxSources: 5 });
+
+      const names = [...withMultiQuery.clusterBySource.keys()];
+      assert.equal(new Set(names).size, names.length, 'the union has no duplicate source names');
+      assert.ok(
+        withMultiQuery.clusterBySource.size >= withoutMultiQuery.clusterBySource.size,
+        'the expanded shortlist is at least as large as the single-query shortlist',
+      );
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+    },
+  );
+
+  await t.test(
+    'a failure embedding an alternate query degrades to the plain single-query shortlist, not a thrown error',
+    async () => {
+      // Only the two alternate-phrasing texts are poisoned; the original
+      // query still embeds fine, so stage 1 itself succeeds in embeddings
+      // mode and only expandCandidatesWithAlternates()'s own embed calls
+      // (one per alternate, inside candidates()) fail.
+      const embedServer = await startFlakyEmbeddingServer(
+        (text) => text === 'alt query one' || text === 'alt query two',
+      );
+      t.after(() => embedServer.close());
+
+      const router = await startFakeRouter((system) => {
+        if (system.includes('alternate phrasings')) {
+          return { queries: ['alt query one', 'alt query two'] };
+        }
+        return { intent: 'x', routes: [] };
+      });
+      t.after(() => router.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL = embedServer.url;
+      process.env.ALEXANDRIA_EMBEDDINGS_API_KEY = 'test-key';
+      resetCatalogCacheForTests();
+      resetRoutingCacheForTests();
+
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      const plain = await planRoute('deep space telescope missions', { maxSources: 5 });
+      assert.equal(plain.stage1, 'embeddings', 'sanity check: stage 1 itself is unaffected');
+
+      resetRoutingCacheForTests();
+      process.env.ALEXANDRIA_MULTI_QUERY = '1';
+      // Must not throw: before the Task 10 fix round, an alternate's own
+      // candidates() call throwing (this flaky embed) propagated all the
+      // way out of planRoute() uncaught, turning an opt-in quality
+      // feature into a routing outage.
+      const expanded = await planRoute('deep space telescope missions', { maxSources: 5 });
+
+      assert.equal(expanded.stage2, 'llm');
+      assert.equal(
+        expanded.clusterBySource.size,
+        plain.clusterBySource.size,
+        'falls back to the plain stage-1 shortlist size, not a partial or thrown expansion',
+      );
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+      delete process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL;
+      delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      resetCatalogCacheForTests();
+      resetRoutingCacheForTests();
+    },
+  );
+
+  await t.test(
+    'off by default: no alternate-phrasing call, shortlist is stage 1 alone',
+    async () => {
+      let calls = 0;
+      const router = await startFakeRouter((system) => {
+        calls++;
+        assert.ok(!system.includes('alternate phrasings'), 'never asks for alternates when unset');
+        return { intent: 'x', routes: [] };
+      });
+      t.after(() => router.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      resetRoutingCacheForTests();
+
+      await planRoute('satellite imagery archives', { maxSources: 5 });
+      assert.equal(calls, 1, 'exactly one router call: the routing decision itself');
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+    },
+  );
 });
 
 // Task 6: the router-skip margin and the routing decision cache, both
@@ -737,4 +914,77 @@ test('a routing decision cached under one stage-1 mode is a cache miss under ano
   delete process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL;
   delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
   delete process.env.ALEXANDRIA_CATALOG_CACHE;
+});
+
+// Task 10 fix round (review finding): routingCacheKey() did not fold in
+// ALEXANDRIA_MULTI_QUERY, so a decision cached with the flag off was
+// silently replayed once the flag was flipped on for the identical
+// query/maxSources - the alternate-phrasings call never ran, exactly as
+// if multi-query had never been enabled. Mirrors the stage-1-mode-flip
+// test above, but flips ALEXANDRIA_MULTI_QUERY instead of the embeddings
+// key, and deliberately does NOT reset the routing cache between the two
+// calls (a reset would hide the bug this reproduces).
+test('a routing decision cached with multi-query off is a cache miss once multi-query is on', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  const query = 'npm package left-pad maintainers';
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  // Force the stage-2 branch every time (never skip the router), the only
+  // branch expandCandidatesWithAlternates() is ever reached from.
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+  delete process.env.ALEXANDRIA_MULTI_QUERY;
+  resetCatalogCacheForTests();
+  resetRoutingCacheForTests();
+
+  const router = await startFakeRouter((system) => {
+    if (system.includes('alternate phrasings')) {
+      return { queries: ['left-pad npm package', 'left-pad maintainer controversy'] };
+    }
+    return { intent: 'x', routes: [{ source: 'depsdev', query: 'left-pad', reason: 'r' }] };
+  });
+  t.after(() => router.close());
+  process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+  process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+  // First call: multi-query off, cached under multiQuery=false. Exactly
+  // one router call (the routing decision itself); no alternate-phrasings
+  // request at all.
+  const off = await planRoute(query, { maxSources: 3 });
+  assert.equal(off.stage2, 'llm');
+  assert.equal(router.systemPrompts.length, 1, 'first call is a genuine cache miss');
+  assert.ok(
+    !router.systemPrompts[0].includes('alternate phrasings'),
+    'multi-query is off: no alternate-phrasings call yet',
+  );
+
+  // Second call: SAME query and maxSources, routing cache left untouched
+  // (no resetRoutingCacheForTests() call here - that is the point of this
+  // test), only ALEXANDRIA_MULTI_QUERY flipped on. Before the fix, this
+  // replayed the first call's cached decision verbatim: no new router
+  // call of any kind, and router.systemPrompts.length stayed at 1.
+  process.env.ALEXANDRIA_MULTI_QUERY = '1';
+  const on = await planRoute(query, { maxSources: 3 });
+  assert.equal(on.stage2, 'llm');
+  assert.equal(
+    router.systemPrompts.length,
+    3,
+    'a genuine cache miss: one alternate-phrasings call plus one routing-decision call were made, not zero',
+  );
+  assert.ok(
+    router.systemPrompts.slice(1).some((s) => s.includes('alternate phrasings')),
+    'the alternate-phrasings call actually happened this time',
+  );
+
+  delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+  delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+  delete process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN;
+  delete process.env.ALEXANDRIA_MULTI_QUERY;
 });

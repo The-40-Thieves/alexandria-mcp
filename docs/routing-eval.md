@@ -322,3 +322,48 @@ rows) `ALEXANDRIA_EMBEDDINGS_*` at a real provider, set
 `ALEXANDRIA_ROUTER_SKIP_MARGIN` to the margin under test (or leave it
 unset for the shipped default, or set it above 1 for "always route"), and
 run `npm run eval:routing`.
+
+## 2026-09-03, Task 10: margin-gated multi-query
+
+`ALEXANDRIA_MULTI_QUERY=1` (off by default): whenever stage 1's margin is
+below the router-skip margin (i.e. stage 2 is about to make an LLM call
+anyway - `src/tools/libraryAsk.ts`'s `planRoute()`), the router role is
+asked for two alternate phrasings of the query, stage 1
+(`candidates()`) reruns for each, and the three shortlists (original plus
+two alternates) are unioned by catalog entry name before stage 2 sees
+them. Two runs against the same golden set, same gateway/models as the
+Task 6/8 rows above (`http://cave.tail3f4c45.ts.net:4001/v1` - the
+Tailscale MagicDNS name for the same host CLAUDE.md documents as
+`100.78.123.100`, since the literal-IP form hung on the embed call this
+run, reproducing the "Gateway host gotcha" noted above; `ALEXANDRIA_API_KEY`
+read from `/data/llm-stack/.env`'s `LITELLM_AGENT_KEY` via `grep | cut`,
+never echoed/logged/committed; `ALEXANDRIA_EMBEDDINGS_MODEL=BAAI/bge-m3`,
+`ALEXANDRIA_ROUTER_MODEL=ALEXANDRIA_SYNTH_MODEL=openai/gpt-4o-mini`, both
+`_JSON_MODE=1`), default `ALEXANDRIA_ROUTER_SKIP_MARGIN` (0.4, embeddings
+mode), `ALEXANDRIA_STATE_DB=:memory:`:
+
+| Multi-query | Stage 1+2 nDCG@5 | Stage 1+2 recall@5 | LLM calls (total / avg per query) |
+|---|---|---|---|
+| off | 0.944 | 0.967 | 147 / 1.934 |
+| on (`ALEXANDRIA_MULTI_QUERY=1`) | 0.951 | 0.980 | 360 / 4.737 |
+
+Both runs scored the identical 76 of 96 golden queries (20 excluded, same
+as every row above, for having every `expected` source hidden), and stage
+1's own numbers (nDCG@5 0.9021, recall@20 0.9956) are unchanged between
+the two rows by construction - multi-query only widens what stage 2 sees
+when it was already going to run (`stage2_llm=71` of 76 in both runs; the
+5 that skip the router at this margin never reach the multi-query branch
+at all). +0.007 nDCG@5 and +0.013 recall@5 on this golden set, at 2.45x
+the LLM call volume (360/147, exact via `calc`) - each of the 71
+stage2-llm queries costs one extra router call (the alternate-phrasings
+request) plus two extra embed calls (one per alternate query's stage-1
+rerun), on top of the one routing-decision call and one stage-1 embed
+call every query already made. Whether that trade is worth it in
+production depends on how much a deployment values the last ~1-3 points
+of routing quality against roughly 2.5x the router-role token spend on
+already-ambiguous queries (the margin gate means confident queries never
+pay this cost at all); it ships default-off pending a decision from
+whoever operates the deployment, per the brief.
+
+To re-run: same env as above, `ALEXANDRIA_MULTI_QUERY=1` for the "on"
+row, unset (or `0`) for "off".

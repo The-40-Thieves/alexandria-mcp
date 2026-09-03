@@ -106,14 +106,23 @@ export const routingCache = new ResultCache<CachedRoutingDecision>(
 // decision cached under one router model must not be replayed once
 // ALEXANDRIA_ROUTER_MODEL changes - all three are cheap to read
 // synchronously (no network call), so there is no cost to including them.
+// multiQuery joins them (Task 10 fix round): ALEXANDRIA_MULTI_QUERY changes
+// what stage2Pool planRoute() builds (src/tools/libraryAsk.ts's
+// expandCandidatesWithAlternates()) for the identical query/maxSources, so
+// a decision cached with the flag off must not be replayed once it's on
+// (or vice versa) - reproduced: two planRoute() calls for the same query
+// and maxSources, flag unset then '1', no cache reset in between, and the
+// second silently replayed the first's decision with no alternate-
+// phrasings call at all.
 export function routingCacheKey(
   query: string,
   maxSources: number,
   stage1: 'embeddings' | 'bm25',
   skipMargin: number,
   routerModel: string,
+  multiQuery: boolean,
 ): string {
-  return `${ROUTING_CACHE_KEY_PREFIX}${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${maxSources}|${stage1}|${skipMargin}|${routerModel}`;
+  return `${ROUTING_CACHE_KEY_PREFIX}${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${maxSources}|${stage1}|${skipMargin}|${routerModel}|${multiQuery}`;
 }
 
 // Test-only: clears every entry in the shared stateStore cache table (both

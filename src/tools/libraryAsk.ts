@@ -27,6 +27,7 @@ import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
 import {
   type CatalogEntry,
+  candidates,
   candidatesWithMargin,
   type Stage1Mode,
   stage1ModeHint,
@@ -203,6 +204,52 @@ async function selectRoutes(
   return chatJSON('router', system, query, RoutingDecisionSchema);
 }
 
+const MULTI_QUERY_ALTERNATE_COUNT = 2;
+
+const AlternateQueriesSchema = z.object({
+  queries: z.array(z.string().min(1)).length(MULTI_QUERY_ALTERNATE_COUNT),
+});
+
+// Task 10: asks the `router` role for two alternate phrasings of `query`,
+// reruns stage 1 (candidates(), not candidatesWithMargin() - only the
+// shortlist is needed here, not a second margin) for each, and unions the
+// resulting shortlists with `pool` by catalog entry name, so a source
+// surfaced by any of the three phrasings appears exactly once in the
+// result, in first-seen order (original pool first, then each alternate's
+// new entries). On any failure - no router key, a network error, a
+// malformed alternate-phrasings response, or an alternate's own stage-1
+// rerun throwing (e.g. an embed() timeout in embeddings mode) - this
+// returns `pool` unchanged: the same "degrade to the plain single-query
+// path" shape every other optional step in this file uses. The whole
+// function body is one try/catch, not just the chatJSON call, so a
+// mid-expansion failure never turns an opt-in quality feature into a
+// routing outage.
+async function expandCandidatesWithAlternates(
+  query: string,
+  pool: CatalogEntry[],
+  freshness: 'realtime' | 'daily' | undefined,
+): Promise<CatalogEntry[]> {
+  try {
+    const decision = await chatJSON(
+      'router',
+      'Given a user search query, propose two alternate phrasings that capture the same intent using different terms, emphasis, or angle - the way a librarian would try a second and third search when the first one might be too narrow.\n\nReturn JSON with this exact structure: {"queries": ["alternate phrasing 1", "alternate phrasing 2"]}',
+      query,
+      AlternateQueriesSchema,
+    );
+
+    const union = new Map(pool.map((c) => [c.name, c]));
+    for (const alt of decision.queries) {
+      const altPool = await candidates(alt, CANDIDATE_POOL_SIZE, { freshness });
+      for (const c of altPool) {
+        if (!union.has(c.name)) union.set(c.name, c);
+      }
+    }
+    return [...union.values()];
+  } catch {
+    return pool;
+  }
+}
+
 export interface PlannedRoute {
   intent: string;
   routes: RouteItem[];
@@ -221,17 +268,27 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
   // A cache hit replays a previously computed decision (router or
   // margin-skip) verbatim - no stage 1 or stage 2 work at all, so no LLM
   // call of any kind, not even the query embed() cosine ranking needs.
-  // The key folds in stage1ModeHint(), the effective skip margin, and the
-  // router model - all cheap, synchronous reads - so a decision cached
-  // under one mode/margin/model is never replayed once any of the three
-  // changes (final wave, A2).
+  // The key folds in stage1ModeHint(), the effective skip margin, the
+  // router model, and (Task 10 fix round) whether ALEXANDRIA_MULTI_QUERY
+  // is on - all cheap, synchronous reads - so a decision cached under one
+  // mode/margin/model/multi-query setting is never replayed once any of
+  // the four changes (final wave, A2; multi-query added after review
+  // caught it replaying a pre-flag decision once the flag was flipped).
   const stage1Hint = stage1ModeHint();
   const skipMarginHint = parseSkipMargin(
     config.ALEXANDRIA_ROUTER_SKIP_MARGIN,
     stage1Hint === 'embeddings' ? DEFAULT_ROUTER_SKIP_MARGIN : Number.POSITIVE_INFINITY,
   );
   const routerModel = roleConfig('router').model;
-  const key = routingCacheKey(query, maxSources, stage1Hint, skipMarginHint, routerModel);
+  const multiQueryHint = config.ALEXANDRIA_MULTI_QUERY === '1';
+  const key = routingCacheKey(
+    query,
+    maxSources,
+    stage1Hint,
+    skipMarginHint,
+    routerModel,
+    multiQueryHint,
+  );
   const cached = routingCache.get(key);
   if (cached) {
     return {
@@ -255,7 +312,11 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
     'library_ask: stage-1 routing margin',
   );
 
-  const clusterBySource = new Map(pool.map((c) => [c.name, c.cluster]));
+  // let, not const: the multi-query branch below (Task 10) rebuilds this
+  // against the expanded pool, and everything after the if/else - route
+  // validation, the cache write, and PlannedRoute's own clusterBySource
+  // field - must see that expanded map, not stage 1's original one.
+  let clusterBySource = new Map(pool.map((c) => [c.name, c.cluster]));
   // Review 3.5 ruling (docs/routing-eval.md): the skip only applies by
   // default in embeddings mode - BM25's margin measured 0.024 nDCG@5 below
   // always-router at every tested threshold (outside the brief's 0.01
@@ -291,7 +352,16 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
     }));
   } else {
     stage2 = 'llm';
-    const decision = await selectRoutes(query, pool, maxSources);
+    // Task 10: margin-gated multi-query, opt-in via ALEXANDRIA_MULTI_QUERY.
+    // Only reached here - stage 1's margin was too low to skip the router
+    // (the branch above) - so this is exactly the "unsure enough that a
+    // second angle on the query might help" case the brief gates on.
+    let stage2Pool = pool;
+    if (config.ALEXANDRIA_MULTI_QUERY === '1') {
+      stage2Pool = await expandCandidatesWithAlternates(query, pool, freshness);
+      clusterBySource = new Map(stage2Pool.map((c) => [c.name, c.cluster]));
+    }
+    const decision = await selectRoutes(query, stage2Pool, maxSources);
     intent = decision.intent;
     // Only keep routes whose source names actually appear in the shortlist
     // the model was given; a hallucinated or out-of-shortlist name is

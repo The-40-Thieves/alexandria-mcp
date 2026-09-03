@@ -58,36 +58,43 @@ test('resultCache', async (t) => {
 
   await t.test('routingCacheKey normalizes whitespace and case', () => {
     assert.equal(
-      routingCacheKey('  Attention   Is All  ', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
-      routingCacheKey('attention is all', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('  Attention   Is All  ', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
+      routingCacheKey('attention is all', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
     );
   });
 
   await t.test('routingCacheKey distinguishes max_sources', () => {
     assert.notEqual(
-      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
-      routingCacheKey('q', 6, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
+      routingCacheKey('q', 6, 'embeddings', 0.4, 'gpt-4o-mini', false),
     );
   });
 
   await t.test('routingCacheKey distinguishes stage1 mode', () => {
     assert.notEqual(
-      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
-      routingCacheKey('q', 5, 'bm25', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
+      routingCacheKey('q', 5, 'bm25', 0.4, 'gpt-4o-mini', false),
     );
   });
 
   await t.test('routingCacheKey distinguishes the effective skip margin', () => {
     assert.notEqual(
-      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
-      routingCacheKey('q', 5, 'embeddings', 0.3, 'gpt-4o-mini'),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
+      routingCacheKey('q', 5, 'embeddings', 0.3, 'gpt-4o-mini', false),
     );
   });
 
   await t.test('routingCacheKey distinguishes the router model', () => {
     assert.notEqual(
-      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
-      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o'),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o', false),
+    );
+  });
+
+  await t.test('routingCacheKey distinguishes multi-query on vs off', () => {
+    assert.notEqual(
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', true),
     );
   });
 
@@ -103,7 +110,7 @@ test('resultCache', async (t) => {
     // in src/sources/*.ts).
     for (const source of ['route', 'router', 'arxiv', 'gutenberg', 'routing', 'decision']) {
       assert.notEqual(
-        routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+        routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini', false),
         cacheKey(source, 'q', 5),
       );
     }

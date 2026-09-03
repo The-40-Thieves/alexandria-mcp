@@ -310,3 +310,95 @@ which needs no separate configuration - it falls back to whatever `synth`
 resolves to. To point verify at a different model, set
 `ALEXANDRIA_VERIFY_MODEL` (and `_BASE_URL`/`_API_KEY` if it's a different
 gateway) alongside the vars above.
+
+## 2026-09-03, Task 10: cross-encoder rerank backends and margin-gated multi-query
+
+`src/utils/rerank.ts` (new) replaces `fuse.ts`'s `llmRerank` with a single
+`rerank(query, candidates, { backend, top })` entry point behind
+`ALEXANDRIA_RERANK: off | llm | cohere | workers-ai`. `library_answer`
+hands it the RRF-fused pool capped to `ALEXANDRIA_RERANK_POOL` (default
+60, was a fixed 40); the `llm` backend further caps its own listwise input
+to the top 20 of that pool, shuffled before the prompt (position-bias
+mitigation per `research/retrieval-sota.md` section 1). `cohere` POSTs
+`<rerank base>/rerank` in the Cohere/Jina/Voyage/LiteLLM-shared request
+shape; `workers-ai` POSTs Cloudflare's `{query, contexts}` shape straight
+to `ALEXANDRIA_RERANK_BASE_URL` (already the full per-account model run
+URL for that backend). Both are covered by stubbed-endpoint tests in
+`src/utils/rerank.test.ts`, not by a live run here - see below.
+
+### Cohere-shape backend: not measured live
+
+The brief asked for one live run with `ALEXANDRIA_RERANK=cohere` against
+the Cave LiteLLM gateway's `/rerank`, fronting
+`nvidia_nim/nvidia/llama-3_2-nv-rerankqa-1b-v2`. Before wiring anything,
+that exact model was probed directly:
+
+```
+POST http://100.78.123.100:4001/v1/rerank {"model":"nvidia_nim/nvidia/llama-3_2-nv-rerankqa-1b-v2", ...}
+-> 410 {"detail":"This endpoint has reached its end of life on 2026-05-18T00:00:00Z and is no longer available."}
+POST http://100.78.123.100:4001/rerank   (same body) -> identical 410
+```
+
+Both paths reach LiteLLM's rerank handler correctly (it parses the
+request and reports "Received Model Group=..." before forwarding) -
+confirming the request shape itself is accepted at either `/rerank` or
+`/v1/rerank` - but the specific NVIDIA NIM-hosted reranker model is
+permanently gone upstream, not a network or routing problem this repo
+can work around. The gateway's other two rerank-named models fail closed
+too:
+
+```
+nvidia_nim/nvidia/nv-rerankqa-mistral-4b-v3          -> 404 Not Found (function id not found for account)
+nvidia_nim/ranking/nvidia/llama-3.2-nv-rerankqa-1b-v2 -> 404 page not found
+```
+
+No rerank endpoint on the configured gateway is reachable, so **the
+`cohere` backend's effect on citation precision/nugget recall/
+resolvability is not measured** in this environment. Running
+`eval:answer` with `ALEXANDRIA_RERANK=cohere` anyway would be
+scientifically meaningless here: every call would hit `cohereRerank()`'s
+catch block (confirmed by `src/utils/rerank.test.ts`'s stubbed-server
+tests) and fall back to the plain fused order, producing numbers
+indistinguishable from the `off` baseline below modulo ordinary run-to-run
+LLM/gateway noise - not a test of reranking quality at all. Workers AI
+cannot be probed here either (no Cloudflare account/token in this
+environment); its `{query, contexts}` request/response shape is
+implemented against the documented API and exercised only by
+`rerank.test.ts`'s stub.
+
+### Margin-gated multi-query: measured
+
+`ALEXANDRIA_MULTI_QUERY=1` only touches which sources `library_ask`'s
+stage 2 sees (docs/routing-eval.md's Task 10 section has the routing-level
+numbers); its effect on `library_answer`'s own citation quality flows
+through indirectly, via which sources get searched, read, and cited. Two
+runs, same gateway/models/env as "To re-run" above
+(`ALEXANDRIA_STATE_DB=:memory:`, `ALEXANDRIA_RERANK` unset/off in both):
+
+```
+off:                citation_precision=0.5000 nugget_recall=0.1944 resolvability=0.8125 (18/20 completed)
+ALEXANDRIA_MULTI_QUERY=1: citation_precision=0.7143 nugget_recall=0.1974 resolvability=0.8095 (19/20 completed)
+```
+
+As with Task 9's before/after, **this is not a clean same-question-set
+comparison**: 2 questions timed out in the `off` run and a different 1
+timed out in the `on` run (the same gateway-side "Request timed out...
+waiting for response headers" hiccup `docs/routing-eval.md`'s "Gateway
+host gotcha" section already documents - not chased as a bug here), so 18
+and 19 questions respectively were actually scored, not the same 18. The
+precision jump (0.5000 -> 0.7143) is consistent with multi-query
+surfacing better sources for the previously-hardest routing cases, but at
+n=18-19 with a different question set each time it is not strong evidence
+on its own - nugget recall (0.1944 -> 0.1974) and resolvability (0.8125 ->
+0.8095) barely moved, which is the more representative signal at this
+sample size. Combined with the LLM-cost finding in docs/routing-eval.md
+(2.45x router-role calls on already-ambiguous queries), this is
+consistent with "does no harm, plausibly helps, costs more" rather than a
+confirmed answer-quality win - hence still shipping default-off.
+
+### To re-run
+
+Same env as "To re-run (with claim verification and grading)" above, plus
+`ALEXANDRIA_RERANK=cohere|workers-ai|llm` (pointed at a reachable
+`/rerank`-shaped endpoint for `cohere`, or a Workers AI model run URL for
+`workers-ai`) and/or `ALEXANDRIA_MULTI_QUERY=1`.
