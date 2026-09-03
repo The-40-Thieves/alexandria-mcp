@@ -42,6 +42,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { Config } from '../config.ts';
 import { config } from '../config.ts';
 import { log } from '../log.ts';
+import { SECURE_DIR_MODE, secureSqliteFile } from './fileMode.ts';
 
 export interface StateStore {
   /** Current reserved count for `source` on `day` (0 if never reserved). */
@@ -157,7 +158,7 @@ export class SqliteStateStore implements StateStore {
   constructor(dbPath: string, cacheMax = DEFAULT_CACHE_MAX) {
     this.cacheMax = cacheMax;
     if (dbPath !== ':memory:') {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: SECURE_DIR_MODE });
     }
     this.db = new DatabaseSync(dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
@@ -176,6 +177,12 @@ export class SqliteStateStore implements StateStore {
         expiresAt INTEGER NOT NULL
       )
     `);
+    // alexandria.db holds the quota ledger and cached search/routing
+    // decisions; DatabaseSync creates the file (and, once the CREATE
+    // TABLE statements above have written under WAL mode, its -wal/-shm
+    // siblings) with the process umask, so tighten all of them to
+    // owner-only here, after they exist (final wave, A5).
+    secureSqliteFile(dbPath);
   }
 
   getQuota(source: string, day: string): number {

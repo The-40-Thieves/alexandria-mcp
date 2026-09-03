@@ -20,46 +20,15 @@
 import pino from 'pino';
 import { config } from './config.ts';
 import { requestContext } from './utils/http.ts';
+import { isSensitiveKey } from './utils/secretWords.ts';
 
-// Word-tokenized rather than one regex: `\bkey\b` does NOT work here
-// because `_` is a word character, so there is no word boundary between
-// "_" and "K" in "ROLE_KEY" - a real gap this fixes (SUPABASE_SERVICE_ROLE_KEY
-// went unredacted under the previous substring-anchored regex, which only
-// matched "key" when immediately preceded by "api"). Splitting on
-// camelCase transitions and any run of non-alphanumeric characters, then
-// comparing whole lowercase words against SENSITIVE_WORDS, catches a
-// standalone "key"/"token"/... segment wherever it sits - ROLE_KEY,
-// api_key, apiKey, Authorization - without a bare substring match also
-// catching an unrelated field that merely contains one as a fragment
-// (monkeyPatch, keyboardLayout).
-const SENSITIVE_WORDS = new Set([
-  'key',
-  'token',
-  'secret',
-  'password',
-  'passwd',
-  'credential',
-  'bearer',
-  'auth',
-  'authorization',
-  'authorised',
-  'authorized',
-]);
+// The word-based credential-name test (isSensitiveKey) lives in
+// utils/secretWords.ts, shared with http.ts's URL query-string redaction -
+// see that module's comment for why "key"/"token"/... are matched as whole
+// words, not a substring.
 const REDACTED = '[Redacted]';
 const TRUNCATED = '[Truncated]';
 const MAX_DEPTH = 6;
-
-function fieldWords(name: string): string[] {
-  return name
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .split(/[^a-zA-Z0-9]+/)
-    .map((word) => word.toLowerCase())
-    .filter(Boolean);
-}
-
-function isSensitiveKey(name: string): boolean {
-  return fieldWords(name).some((word) => SENSITIVE_WORDS.has(word));
-}
 
 function redactDeep(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   if (value === null || typeof value !== 'object') return value;

@@ -12,6 +12,7 @@ import {
   type CatalogEntry,
   candidates,
   candidatesWithMargin,
+  cosineSimilarity,
   marginFromScores,
   resetCatalogCacheForTests,
   withClusterFloor,
@@ -417,4 +418,67 @@ test('buildCatalog matches the registry catalog', async () => {
   );
   assert.deepEqual(names, registryNames);
   resetCatalogCacheForTests();
+});
+
+test('cosineSimilarity', async (t) => {
+  await t.test('equal-length vectors score normally', () => {
+    assert.equal(cosineSimilarity([1, 0], [1, 0]), 1);
+  });
+
+  await t.test(
+    'a shorter query vector against a longer entry vector scores 0, not a truncated dot product',
+    () => {
+      assert.equal(cosineSimilarity([1], [1, 0, 0]), 0);
+    },
+  );
+
+  await t.test('a longer query vector against a shorter entry vector scores 0, not NaN', () => {
+    const score = cosineSimilarity([1, 0, 0], [1]);
+    assert.equal(score, 0);
+    assert.ok(!Number.isNaN(score));
+  });
+});
+
+test('the disk embedding cache is keyed by embeddings model, not text alone', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+  });
+
+  const server = await startFakeEmbeddingServer();
+  t.after(() => server.close());
+
+  const cacheDir = mkdtempSync(path.join(tmpdir(), 'alexandria-catalog-model-cache-'));
+  const cachePath = path.join(cacheDir, 'catalog-embeddings.json');
+  t.after(() => rmSync(cacheDir, { recursive: true, force: true }));
+
+  process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL = server.url;
+  process.env.ALEXANDRIA_EMBEDDINGS_API_KEY = 'test-key';
+  process.env.ALEXANDRIA_CATALOG_CACHE = cachePath;
+
+  process.env.ALEXANDRIA_EMBEDDINGS_MODEL = 'model-a';
+  resetCatalogCacheForTests();
+  await buildCatalog();
+  const callsAfterModelA = server.embedCalls;
+  assert.ok(callsAfterModelA > 0);
+
+  // Same text, different model: must NOT reuse model-a's cached vectors, so
+  // it re-embeds every entry against the fake server instead of reading a
+  // stale hit off disk.
+  process.env.ALEXANDRIA_EMBEDDINGS_MODEL = 'model-b';
+  resetCatalogCacheForTests();
+  await buildCatalog();
+  assert.ok(
+    server.embedCalls > callsAfterModelA,
+    'a model change must re-embed rather than reuse the other model cached vectors',
+  );
+
+  const onDisk = JSON.parse(
+    await import('node:fs/promises').then((fs) => fs.readFile(cachePath, 'utf8')),
+  );
+  assert.ok(
+    Object.keys(onDisk).length >= 2,
+    'both models vectors are persisted under distinct keys, not overwriting each other',
+  );
 });

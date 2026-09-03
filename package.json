@@ -20,7 +20,7 @@
     "test": "ALEXANDRIA_STATE_DB=:memory: NODE_ENV=test node --test --test-reporter=spec --test-concurrency=4 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
     "probe": "node scripts/probe.ts",
     "probe:baseline": "node scripts/probe.ts --baseline",
-    "eval:routing": "node scripts/eval-routing.ts",
+    "eval:routing": "ALEXANDRIA_STATE_DB=:memory: node scripts/eval-routing.ts",
     "docs": "node scripts/gen-docs.ts",
     "lint": "biome check .",
     "knip": "knip",

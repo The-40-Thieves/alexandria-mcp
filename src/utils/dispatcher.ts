@@ -79,6 +79,7 @@ import path from 'node:path';
 import { Agent, cacheStores, type Dispatcher, interceptors, setGlobalDispatcher } from 'undici';
 import { config } from '../config.ts';
 import { log } from '../log.ts';
+import { SECURE_DIR_MODE, secureSqliteFile } from './fileMode.ts';
 
 const CONNECTIONS = 64;
 const KEEP_ALIVE_TIMEOUT_MS = 30_000;
@@ -147,12 +148,17 @@ export function buildCacheStore(
   | InstanceType<typeof cacheStores.SqliteCacheStore>
   | InstanceType<typeof cacheStores.MemoryCacheStore> {
   try {
-    fs.mkdirSync(path.dirname(location), { recursive: true });
-    return new cacheStores.SqliteCacheStore({
+    fs.mkdirSync(path.dirname(location), { recursive: true, mode: SECURE_DIR_MODE });
+    const store = new cacheStores.SqliteCacheStore({
       location,
       maxCount: SQLITE_MAX_COUNT,
       maxEntrySize: CACHE_MAX_ENTRY_SIZE_BYTES,
     });
+    // http-cache.db holds third-party response bodies; the store creates
+    // its own file (and WAL/SHM siblings) with the process umask, so tighten
+    // it to owner-only after open (final wave, A5).
+    secureSqliteFile(location);
+    return store;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     warnFallbackOnce(`${location}: ${message}`);

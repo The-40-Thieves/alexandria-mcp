@@ -614,3 +614,88 @@ test('the default router-skip margin only applies in embeddings mode', async (t)
     },
   );
 });
+
+// Final wave, A2: routingCacheKey now folds in stage1ModeHint() (plus the
+// effective skip margin and router model), so a decision the routing
+// cache stored while running BM25-only must not be replayed once the
+// process is configured with embeddings - the two modes can legitimately
+// pick different sources for the identical query text.
+test('a routing decision cached under one stage-1 mode is a cache miss under another', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  const query = 'npm package left-pad maintainers';
+
+  // First call: BM25 mode (no embeddings configured), routed to depsdev
+  // and cached under stage1ModeHint()==='bm25'.
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN;
+  resetCatalogCacheForTests();
+  resetRoutingCacheForTests();
+
+  const bm25Router = await startFakeRouter(() => ({
+    intent: 'bm25 decision',
+    routes: [{ source: 'depsdev', query: 'left-pad', reason: 'r' }],
+  }));
+  t.after(() => bm25Router.close());
+  process.env.ALEXANDRIA_ROUTER_BASE_URL = bm25Router.url;
+  process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+  const bm25Planned = await planRoute(query, { maxSources: 3 });
+  assert.equal(bm25Planned.stage1, 'bm25');
+  assert.equal(bm25Router.systemPrompts.length, 1, 'first call is a genuine cache miss');
+
+  delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+  delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+
+  // Second call, same query, same maxSources, routing cache untouched:
+  // switch to embeddings mode. If the cache keyed only on query+maxSources
+  // (pre-A2 behavior), this would replay the BM25 decision verbatim - no
+  // router call, and a stage1 that lies about how the result was produced.
+  // Every text (query and every catalog entry alike) gets the identical
+  // vector, so every candidate ties on cosine similarity: the stage-1
+  // margin is 0, below the skip threshold, so this exercises the real
+  // stage-2 router call rather than a margin-skip.
+  const embedServer = await startFakeEmbeddingServer(() => false);
+  t.after(() => embedServer.close());
+
+  const cacheDir = mkdtempSync(path.join(tmpdir(), 'alexandria-libraryask-mode-flip-'));
+  t.after(() => rmSync(cacheDir, { recursive: true, force: true }));
+
+  process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL = embedServer.url;
+  process.env.ALEXANDRIA_EMBEDDINGS_API_KEY = 'test-key';
+  process.env.ALEXANDRIA_CATALOG_CACHE = path.join(cacheDir, 'catalog-embeddings.json');
+  resetCatalogCacheForTests();
+
+  const embedRouter = await startFakeRouter(() => ({
+    intent: 'embeddings decision',
+    routes: [{ source: 'arxiv', query: 'left-pad', reason: 'r' }],
+  }));
+  t.after(() => embedRouter.close());
+  process.env.ALEXANDRIA_ROUTER_BASE_URL = embedRouter.url;
+  process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+  const embeddingsPlanned = await planRoute(query, { maxSources: 3 });
+  assert.equal(
+    embeddingsPlanned.stage1,
+    'embeddings',
+    'the BM25-cached entry must not be replayed once running in embeddings mode',
+  );
+  assert.equal(
+    embedRouter.systemPrompts.length,
+    1,
+    'a real stage-1/stage-2 pass ran again instead of replaying the other mode cached decision',
+  );
+
+  delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+  delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.ALEXANDRIA_CATALOG_CACHE;
+});

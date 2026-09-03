@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -148,6 +148,22 @@ test('buildCacheStore: memory fallback', async (t) => {
     } finally {
       destinationOverride.value = undefined;
     }
+  });
+
+  // Final wave, A5: http-cache.db holds third-party response bodies, and
+  // used to be created with the process umask (typically 644, in a 775
+  // data/ directory). Both the parent directory and the db file must be
+  // owner-only.
+  await t.test('creates the parent directory and the db file as owner-only', () => {
+    const base = mkdtempSync(path.join(tmpdir(), 'alexandria-http-cache-mode-'));
+    t.after(() => rmSync(base, { recursive: true, force: true }));
+    const nested = path.join(base, 'nested');
+    const location = path.join(nested, 'http-cache.db');
+
+    buildCacheStore(location);
+
+    assert.equal(statSync(nested).mode & 0o777, 0o700);
+    assert.equal(statSync(location).mode & 0o777, 0o600);
   });
 });
 

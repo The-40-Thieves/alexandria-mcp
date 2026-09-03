@@ -100,6 +100,29 @@ test('loadConfig', async (t) => {
     const result = loadConfig({ ALEXANDRIA_CACHE_TTL_MS: '' } as NodeJS.ProcessEnv);
     assert.equal(result.ALEXANDRIA_CACHE_TTL_MS, undefined);
   });
+
+  // Final wave, A6: an env-file loader emits every declared-but-unset key
+  // as KEY= (empty string), not merely the two numeric fields the previous
+  // preprocess covered. Before this fix, TRANSPORT=, LOG_LEVEL=,
+  // ALEXANDRIA_LEDGER=, ALEXANDRIA_RERANK= (any optional enum) failed the
+  // WHOLE parse (an invalid enum value), not just that one field - this
+  // builds exactly that shape (every CONFIG_FIELDS name set to '') and
+  // asserts it loads cleanly with every field's default/undefined.
+  await t.test('an env with every optional key set to the empty string loads with defaults', () => {
+    const allEmpty = Object.fromEntries(
+      CONFIG_FIELDS.map((f) => [f.name, '']),
+    ) as NodeJS.ProcessEnv;
+
+    const result = loadConfig(allEmpty);
+
+    assert.equal(result.TRANSPORT, 'stdio');
+    assert.equal(result.PORT, 3000);
+    assert.equal(result.LOG_LEVEL, undefined);
+    assert.equal(result.ALEXANDRIA_LEDGER, undefined);
+    assert.equal(result.ALEXANDRIA_RERANK, undefined);
+    assert.equal(result.ALEXANDRIA_ROUTER_SKIP_MARGIN, undefined);
+    assert.equal(result.OPENAI_API_KEY, undefined);
+  });
 });
 
 test('config singleton', async (t) => {

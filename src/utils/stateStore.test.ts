@@ -187,6 +187,27 @@ test('SqliteStateStore', async (t) => {
     store.close();
     assert.ok(!fs.existsSync(`${dbPath}-wal`));
   });
+
+  // Final wave, A5: alexandria.db holds the quota ledger and cached
+  // search/routing decisions; the parent directory and the db file (plus
+  // its WAL sidecar) must be owner-only, not the process umask's default
+  // (typically 775/644).
+  await t.test('creates the parent directory as owner-only (0700)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'alexandria-state-mode-'));
+    const nested = path.join(dir, 'nested', 'alexandria.db');
+    const store = new SqliteStateStore(nested);
+    assert.equal(fs.statSync(path.dirname(nested)).mode & 0o777, 0o700);
+    store.close();
+  });
+
+  await t.test('opens the db file (and its WAL sidecar) as owner-only (0600)', () => {
+    const dbPath = tmpDbPath('mode.db');
+    const store = new SqliteStateStore(dbPath);
+    store.reserveQuota('src', '2026-09-01', 10);
+    assert.equal(fs.statSync(dbPath).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(`${dbPath}-wal`).mode & 0o777, 0o600);
+    store.close();
+  });
 });
 
 test('createStateStore selection', async (t) => {

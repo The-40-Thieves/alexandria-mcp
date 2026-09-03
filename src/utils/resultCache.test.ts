@@ -58,13 +58,37 @@ test('resultCache', async (t) => {
 
   await t.test('routingCacheKey normalizes whitespace and case', () => {
     assert.equal(
-      routingCacheKey('  Attention   Is All  ', 5),
-      routingCacheKey('attention is all', 5),
+      routingCacheKey('  Attention   Is All  ', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('attention is all', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
     );
   });
 
   await t.test('routingCacheKey distinguishes max_sources', () => {
-    assert.notEqual(routingCacheKey('q', 5), routingCacheKey('q', 6));
+    assert.notEqual(
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('q', 6, 'embeddings', 0.4, 'gpt-4o-mini'),
+    );
+  });
+
+  await t.test('routingCacheKey distinguishes stage1 mode', () => {
+    assert.notEqual(
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('q', 5, 'bm25', 0.4, 'gpt-4o-mini'),
+    );
+  });
+
+  await t.test('routingCacheKey distinguishes the effective skip margin', () => {
+    assert.notEqual(
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('q', 5, 'embeddings', 0.3, 'gpt-4o-mini'),
+    );
+  });
+
+  await t.test('routingCacheKey distinguishes the router model', () => {
+    assert.notEqual(
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+      routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o'),
+    );
   });
 
   await t.test('routingCacheKey cannot collide with a cacheKey for a plausible source name', () => {
@@ -78,7 +102,10 @@ test('resultCache', async (t) => {
     // name shape (registry names are single short words, per every source
     // in src/sources/*.ts).
     for (const source of ['route', 'router', 'arxiv', 'gutenberg', 'routing', 'decision']) {
-      assert.notEqual(routingCacheKey('q', 5), cacheKey(source, 'q', 5));
+      assert.notEqual(
+        routingCacheKey('q', 5, 'embeddings', 0.4, 'gpt-4o-mini'),
+        cacheKey(source, 'q', 5),
+      );
     }
   });
 });
