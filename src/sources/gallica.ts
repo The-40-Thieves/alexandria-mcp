@@ -1,21 +1,11 @@
-import { XMLParser } from 'fast-xml-parser';
 import type { LibraryResult } from '../types.ts';
 import { fetchText } from '../utils/http.ts';
 import { normaliseWhitespace, stripHtml } from '../utils/text-clean.ts';
+import { asArray, parseXml } from '../utils/xml.ts';
 import { register, truncateText } from './registry.ts';
 
 const SRU = 'https://gallica.bnf.fr/services/engine/search/sru';
 const FULLTEXT = 'https://gallica.bnf.fr/services/engine/fulltext';
-
-// removeNSPrefix strips namespace prefixes uniformly, so "srw:record"
-// parses as "record" and "dc:title" (inside the oai_dc:dc wrapper) parses
-// as "title": both prefixes collapse to the same unprefixed keys below.
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  textNodeName: '#text',
-  removeNSPrefix: true,
-});
 
 interface GallicaDc {
   title?: string | string[];
@@ -26,38 +16,36 @@ interface GallicaDc {
   identifier?: string | string[];
 }
 
-function toArray(val: unknown): unknown[] {
-  if (val == null) return [];
-  return Array.isArray(val) ? val : [val];
-}
-
 function extractYear(dateStr: string): number | undefined {
   const m = dateStr.match(/\b(1[0-9]{3}|20[0-2][0-9])\b/);
   return m ? parseInt(m[1], 10) : undefined;
 }
 
 export function normalizeGallica(xml: string, limit: number): LibraryResult[] {
-  const doc = parser.parse(xml) as Record<string, unknown>;
+  // removeNSPrefix strips namespace prefixes uniformly, so "srw:record"
+  // parses as "record" and "dc:title" (inside the oai_dc:dc wrapper) parses
+  // as "title": both prefixes collapse to the same unprefixed keys below.
+  const doc = parseXml<Record<string, unknown>>(xml, { removeNSPrefix: true });
   const root = (doc.searchRetrieveResponse ?? doc) as Record<string, unknown>;
-  const records = toArray((root.records as Record<string, unknown> | undefined)?.record);
+  const records = asArray((root.records as Record<string, unknown> | undefined)?.record);
 
   return records.slice(0, limit).flatMap((r) => {
     const rec = r as Record<string, unknown>;
     const dc = (rec.recordData as Record<string, unknown> | undefined)?.dc as GallicaDc | undefined;
     if (!dc) return [];
 
-    const identifiers = toArray(dc.identifier).map(String);
+    const identifiers = asArray(dc.identifier).map(String);
     const ark = identifiers.find((i) => i.includes('ark:')) ?? identifiers[0] ?? '';
 
     return [
       {
         id: ark,
         source: 'gallica' as const,
-        title: String(toArray(dc.title)[0] ?? ''),
-        authors: toArray(dc.creator).map(String),
-        year: extractYear(String(toArray(dc.date)[0] ?? '')),
-        language: String(toArray(dc.language)[0] ?? ''),
-        subjects: toArray(dc.subject).map(String).slice(0, 5),
+        title: String(asArray(dc.title)[0] ?? ''),
+        authors: asArray(dc.creator).map(String),
+        year: extractYear(String(asArray(dc.date)[0] ?? '')),
+        language: String(asArray(dc.language)[0] ?? ''),
+        subjects: asArray(dc.subject).map(String).slice(0, 5),
         hasFullText: true,
         previewUrl: ark || undefined,
       },

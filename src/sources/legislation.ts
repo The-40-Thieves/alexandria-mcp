@@ -1,25 +1,34 @@
 import type { LibraryResult } from '../types.ts';
 import { fetchText } from '../utils/http.ts';
+import { asArray, findDeep, parseXml, textOf } from '../utils/xml.ts';
 import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://www.legislation.gov.uk';
 
-function xmlField(xml: string, tag: string): string {
-  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i'));
-  return m ? m[1].replace(/<[^>]+>/g, '').trim() : '';
+interface AtomEntry {
+  id?: string;
+  title?: string;
+  updated?: string;
+  category?: unknown[];
 }
 
-function xmlAll(xml: string, tag: string): string[] {
-  const out: string[] = [];
-  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'gi');
-  let m = re.exec(xml);
-  while (m !== null) {
-    out.push(m[1].replace(/<[^>]+>/g, '').trim());
-    m = re.exec(xml);
-  }
-  return out;
+interface AtomFeed {
+  feed?: { entry?: AtomEntry | AtomEntry[] };
 }
 
+// self-closing `<category term="x"/>` parses to `{ '@_term': 'x' }` with no
+// text at all; the shared textOf() covers that (attribute-only) case and
+// the plain-string case alike, returning '' when there's no text content.
+// findDeep/textOf are the shared xml.ts versions (this used to carry its
+// own copy, same as legislationscot.ts and ndl.ts each did).
+function cleanField(s: string | undefined): string {
+  return (s ?? '').trim();
+}
+
+// legislation.gov.uk's full-text data.xml documents can run to hundreds of
+// KB of nested Akoma-Ntoso-style markup; the caller only wants the readable
+// text, not a structured tree, so this stays a flat regex strip rather than
+// a parseXml() walk of the whole document.
 function stripXml(xml: string): string {
   return xml
     .replace(/<[^>]+>/g, ' ')
@@ -37,19 +46,27 @@ function parseIdFromUri(uri: string): string {
   return uri.replace(/^https?:\/\/www\.legislation\.gov\.uk\//, '').replace(/\/$/, '');
 }
 
-export async function legislationSearch(query: string, limit = 10): Promise<LibraryResult[]> {
-  const atom = await fetchText(
-    `${BASE}/search?q=${encodeURIComponent(query)}&results-count=${limit}`,
-  );
+// Title from a data.xml document's own metadata: dc:title (usually two, an
+// English one first and a Welsh one under xml:lang="cy") wins over the
+// plain Title element used by older schema versions.
+export function extractTitle(xml: string): string {
+  const doc = parseXml<Record<string, unknown>>(xml);
+  const dcTitle = textOf(asArray(findDeep(doc, 'dc:title'))[0]);
+  const plainTitle = textOf(asArray(findDeep(doc, 'Title'))[0]);
+  return dcTitle || plainTitle;
+}
 
-  const entries = atom.split('<entry>').slice(1);
+export function normalizeLegislation(atom: string): LibraryResult[] {
+  const doc = parseXml<AtomFeed>(atom, { isArray: ['entry', 'category'] });
+  const entries = asArray(doc.feed?.entry);
+
   return entries
     .map((entry) => {
-      const rawId = xmlField(entry, 'id');
+      const rawId = cleanField(entry.id);
       const id = parseIdFromUri(rawId);
-      const title = xmlField(entry, 'title');
-      const updated = xmlField(entry, 'updated');
-      const categories = xmlAll(entry, 'category');
+      const title = cleanField(entry.title);
+      const updated = cleanField(entry.updated);
+      const categories = asArray(entry.category).map(textOf).filter(Boolean);
       const year = updated ? parseInt(updated.substring(0, 4), 10) : undefined;
 
       return {
@@ -64,6 +81,13 @@ export async function legislationSearch(query: string, limit = 10): Promise<Libr
       };
     })
     .filter((r) => r.id);
+}
+
+export async function legislationSearch(query: string, limit = 10): Promise<LibraryResult[]> {
+  const atom = await fetchText(
+    `${BASE}/search?q=${encodeURIComponent(query)}&results-count=${limit}`,
+  );
+  return normalizeLegislation(atom);
 }
 
 export async function legislationRead(id: string): Promise<{
@@ -83,8 +107,7 @@ export async function legislationRead(id: string): Promise<{
     );
   }
 
-  // Extract title from XML
-  const title = xmlField(xml, 'dc:title') || xmlField(xml, 'Title') || id;
+  const title = extractTitle(xml) || id;
   const yearMatch = id.match(/(\d{4})/);
 
   return {
