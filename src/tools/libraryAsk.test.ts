@@ -259,6 +259,45 @@ test('runAsk / libraryAsk', async (t) => {
     delete process.env.ALEXANDRIA_ROUTER_API_KEY;
   });
 
+  await t.test('onRouted fires with the final routing before the fan-out searches', async () => {
+    const router = await startFakeRouter(() => ({
+      intent: 'find astronomy papers',
+      routes: [{ source: 'arxiv', query: 'astronomy', reason: 'r1' }],
+    }));
+    t.after(() => router.close());
+
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('https://export.arxiv.org/api/query')) {
+        return new Response('<feed></feed>', {
+          status: 200,
+          headers: { 'Content-Type': 'application/atom+xml' },
+        });
+      }
+      return originalFetch(input as string, init);
+    }) as typeof fetch;
+
+    let routedCalledBeforeReturn = false;
+    let capturedSources: string[] = [];
+    const result = await runAsk('astronomy papers', { maxSources: 1 }, (routing) => {
+      routedCalledBeforeReturn = true;
+      capturedSources = routing.map((r) => r.source);
+    });
+
+    assert.ok(routedCalledBeforeReturn, 'onRouted was called at all');
+    assert.deepEqual(capturedSources, ['arxiv']);
+    assert.deepEqual(
+      result.routing.map((r) => r.source),
+      capturedSources,
+    );
+
+    delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+    delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+  });
+
   await t.test('stage 2 candidates are tagged with cluster and freshness', async () => {
     let capturedSystem = '';
     const router = await startFakeRouter((system) => {

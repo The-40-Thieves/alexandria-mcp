@@ -29,6 +29,16 @@ export interface LibraryAnswerOptions {
   readTop?: number;
 }
 
+// Task 1's progress notifications (src/index.ts's progressReporter). Four
+// stages, in order: routing decided, per-source results fetched, top
+// full-text sources read, and the LLM answer synthesised.
+export interface AnswerProgressInfo {
+  stage: 'routed' | 'fetched' | 'read' | 'synthesised';
+  message: string;
+}
+
+export type AnswerProgressCallback = (info: AnswerProgressInfo) => void | Promise<void>;
+
 export interface LibraryAnswerResult {
   answer: string;
   citations: Citation[];
@@ -247,6 +257,7 @@ function buildCitations(sources: ReadSource[], usedNumbers: Set<number>): Citati
 export async function libraryAnswer(
   query: string,
   opts: LibraryAnswerOptions = {},
+  onProgress?: AnswerProgressCallback,
 ): Promise<LibraryAnswerResult> {
   requireRoleForTool('library_answer', 'synth');
 
@@ -254,7 +265,17 @@ export async function libraryAnswer(
   const resultsPerSource = opts.resultsPerSource ?? 5;
   const readTop = opts.readTop ?? 4;
 
-  const { routing, perSource } = await runAsk(query, { maxSources, resultsPerSource });
+  const emit = async (stage: AnswerProgressInfo['stage'], message: string): Promise<void> => {
+    if (onProgress) await onProgress({ stage, message });
+  };
+
+  const { routing, perSource } = await runAsk(query, { maxSources, resultsPerSource }, (routed) =>
+    emit(
+      'routed',
+      `routed to ${routed.length} source(s): ${routed.map((r) => r.source).join(', ')}`,
+    ),
+  );
+  await emit('fetched', `fetched results from ${Object.keys(perSource).length} source(s)`);
 
   const lists = Object.values(perSource);
   const knowledgeResults = await fetchKnowledgeResults(query, resultsPerSource);
@@ -267,6 +288,7 @@ export async function libraryAnswer(
   >;
 
   const sources = await readTopSources(ranked, readTop);
+  await emit('read', `read ${sources.length} full-text source(s)`);
 
   if (sources.length === 0) {
     return {
@@ -305,6 +327,7 @@ export async function libraryAnswer(
   }
 
   const citations = buildCitations(sources, usedNumbers);
+  await emit('synthesised', `synthesised answer with ${citations.length} citation(s)`);
 
   return { answer, citations, results: ranked, routing, warnings };
 }

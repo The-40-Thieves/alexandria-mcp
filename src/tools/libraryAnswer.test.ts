@@ -291,6 +291,34 @@ test('libraryAnswer', async (t) => {
     },
   );
 
+  await t.test('emits a progress notification per stage, in order', async () => {
+    registerFakeSources();
+    resetCatalogCacheForTests();
+
+    const router = await startFakeChatServer(() => ({
+      intent: `find info about ${TOKEN}`,
+      routes: [{ source: 'zzftest_full', query: TOKEN, reason: 'full text match' }],
+    }));
+    t.after(() => router.close());
+
+    const synth = await startFakeChatServer(
+      () => `The ${TOKEN} API added rate limiting in November 2025 [1].`,
+    );
+    t.after(() => synth.close());
+
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+    const stages: string[] = [];
+    await libraryAnswer(`what changed in ${TOKEN}`, { readTop: 4 }, (info) => {
+      stages.push(info.stage);
+    });
+
+    assert.deepEqual(stages, ['routed', 'fetched', 'read', 'synthesised']);
+  });
+
   await t.test('warns and keeps the raw answer when the model cites nothing at all', async () => {
     registerFakeSources();
     resetCatalogCacheForTests();
