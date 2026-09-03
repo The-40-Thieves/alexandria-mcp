@@ -1,0 +1,214 @@
+<Legislation xmlns="http://www.legislation.gov.uk/namespaces/legislation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3" NumberOfProvisions="2" xsi:schemaLocation="http://www.legislation.gov.uk/namespaces/legislation http://www.legislation.gov.uk/schema/legislation.xsd" SchemaVersion="1.0"><ukm:Metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dct="http://purl.org/dc/terms/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:ukm="http://www.legislation.gov.uk/namespaces/metadata">
+					<dc:identifier>http://www.legislation.gov.uk/wsi/2023/3/made</dc:identifier><dc:title>The Non-Domestic Rating (Demand Notices) (Wales) (Amendment) Regulations 2023</dc:title><dc:language>en</dc:language><dc:publisher>King's Printer of Acts of Parliament</dc:publisher><dc:modified>2023-01-09</dc:modified><dc:subject scheme="SIheading">RATING AND VALUATION, WALES</dc:subject>
+					<dc:description>The Non-Domestic Rating (Demand Notices) (Wales) Regulations 2017 (“the 2017 Regulations”) (S.I. 2017/113 (W. 39)) provide for the contents of non-domestic rates demand notices which are served by or on behalf of billing authorities in Wales.</dc:description>
+					<atom:link rel="self" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.xml" type="application/xml"/><atom:link rel="http://www.legislation.gov.uk/def/navigation/resources" href="http://www.legislation.gov.uk/wsi/2023/3/resources" title="More Resources"/>
+					
+					
+					
+					<atom:link rel="http://www.legislation.gov.uk/def/navigation/act" href="http://www.legislation.gov.uk/wsi/2023/3/made" title="whole act"/><atom:link rel="http://www.legislation.gov.uk/def/navigation/introduction" href="http://www.legislation.gov.uk/wsi/2023/3/introduction/made" title="introduction"/><atom:link rel="http://www.legislation.gov.uk/def/navigation/signature" href="http://www.legislation.gov.uk/wsi/2023/3/signature/made" title="signature"/><atom:link rel="http://www.legislation.gov.uk/def/navigation/note" href="http://www.legislation.gov.uk/wsi/2023/3/note/made" title="note"/>
+					<atom:link rel="http://www.legislation.gov.uk/def/navigation/body" href="http://www.legislation.gov.uk/wsi/2023/3/body/made" title="body"/>
+					
+					
+										
+					
+					
+					<atom:link rel="alternate" hreflang="cy" href="http://www.legislation.gov.uk/wsi/2023/3/made/welsh"/><atom:link rel="http://purl.org/dc/terms/tableOfContents" hreflang="cy" href="http://www.legislation.gov.uk/wsi/2023/3/contents/made/welsh" title="Table of Contents"/>
+					<atom:link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.rdf" title="RDF/XML"/><atom:link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.akn" title="AKN"/><atom:link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.xht" title="HTML snippet"/><atom:link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.htm" title="Website (XHTML) Default View"/><atom:link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.csv" title="CSV"/><atom:link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.pdf" title="PDF"/>
+					<atom:link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/wsi/2023/3/made/data.html" title="HTML5 snippet"/>
+
+					<atom:link rel="alternate" href="http://www.legislation.gov.uk/wsi/2023/3/pdfs/wsi_20230003_mi.pdf" type="application/pdf" title="Original PDF"/>
+					<atom:link rel="http://purl.org/dc/terms/tableOfContents" hreflang="en" href="http://www.legislation.gov.uk/wsi/2023/3/contents/made" title="Table of Contents"/>
+					
+					
+					
+					
+					<ukm:SecondaryMetadata><ukm:DocumentClassification>
+<ukm:DocumentCategory Value="secondary"/>
+<ukm:DocumentMainType Value="WelshStatutoryInstrument"/>
+<ukm:DocumentStatus Value="final"/>
+<ukm:DocumentMinorType Value="regulation"/>
+</ukm:DocumentClassification><ukm:Year Value="2023"/><ukm:Number Value="3"/><ukm:AlternativeNumber Value="2" Category="W"/><ukm:Made Date="2023-01-05"/><ukm:Laid Date="2023-01-09" Class="WelshParliament"/><ukm:ComingIntoForce>
+<ukm:DateTime Date="2023-01-31"/>
+</ukm:ComingIntoForce><ukm:ISBN Value="9780348394054"/></ukm:SecondaryMetadata>
+					
+
+                    
+									 
+					<ukm:Alternatives><ukm:Alternative URI="http://www.legislation.gov.uk/wsi/2023/3/pdfs/wsi_20230003_mi.pdf" Date="2023-01-09" Size="949465" Language="Mixed"/></ukm:Alternatives>
+					
+					<ukm:Statistics>
+									<ukm:TotalParagraphs Value="2"/>
+									<ukm:BodyParagraphs Value="2"/>
+									<ukm:ScheduleParagraphs Value="0"/>
+									<ukm:AttachmentParagraphs Value="0"/>
+									<ukm:TotalImages Value="0"/>
+								</ukm:Statistics>
+				</ukm:Metadata><Secondary>
+<SecondaryPrelims DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/introduction/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/introduction">
+<Number>2023 No. 3 (W. 2)</Number>
+<SubjectInformation>
+<Subject>
+<Title>Rating And Valuation, Wales</Title>
+</Subject>
+</SubjectInformation>
+<Title>The Non-Domestic Rating (Demand Notices) (Wales) (Amendment) Regulations 2023</Title>
+<MadeDate>
+<Text>Made</Text>
+<DateText>5 January 2023</DateText>
+</MadeDate>
+<LaidDate>
+<Text>Laid before Senedd Cymru</Text>
+<DateText>9 January 2023</DateText>
+</LaidDate>
+<ComingIntoForce>
+<Text>Coming into force</Text>
+<DateText>31 January 2023</DateText>
+</ComingIntoForce>
+<SecondaryPreamble>
+<EnactingText>
+<Para>
+<Text>The Welsh Ministers make the following Regulations in exercise of the powers conferred on the Secretary of State by section 62 of, and paragraphs 1 and 2(2)(h) of Schedule 9 to, the Local Government Finance Act 1988<FootnoteRef Ref="f00001"/>, and now vested in them<FootnoteRef Ref="f00002"/>.</Text>
+</Para>
+</EnactingText>
+</SecondaryPreamble>
+</SecondaryPrelims>
+<Body DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/body/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/body" NumberOfProvisions="2">
+<P1group>
+<Title>Title, commencement and application</Title>
+<P1 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/1/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/1" id="regulation-1">
+<Pnumber>1</Pnumber>
+<P1para>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/1/1/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/1/1" id="regulation-1-1">
+<Pnumber>1</Pnumber>
+<P2para>
+<Text>The title of these Regulations is the Non-Domestic Rating (Demand Notices) (Wales) (Amendment) Regulations 2023.</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/1/2/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/1/2" id="regulation-1-2">
+<Pnumber>2</Pnumber>
+<P2para>
+<Text>These Regulations come into force on 31 January 2023.</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/1/3/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/1/3" id="regulation-1-3">
+<Pnumber>3</Pnumber>
+<P2para>
+<Text>These Regulations apply to demand notices which relate to financial years beginning on or after 1 April 2023 and are issued by or on behalf of Welsh billing authorities.</Text>
+</P2para>
+</P2>
+</P1para>
+</P1>
+</P1group>
+<P1group>
+<Title>Amendments to the Non-Domestic Rating (Demand Notices) (Wales) Regulations 2017</Title>
+<P1 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2" id="regulation-2">
+<Pnumber>2</Pnumber>
+<P1para>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/1/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/1" id="regulation-2-1">
+<Pnumber>1</Pnumber>
+<P2para>
+<Text>Paragraph 1 of Schedule 2 (explanatory notes) to the Non-Domestic Rating (Demand Notices) (Wales) Regulations 2017<FootnoteRef Ref="f00003"/> is amended as follows.</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/2/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/2" id="regulation-2-2">
+<Pnumber>2</Pnumber>
+<P2para>
+<Text>In the paragraph entitled Rateable value, for “2017” substitute <InlineAmendment>“2023”</InlineAmendment> and for “2015” substitute <InlineAmendment>“2021”</InlineAmendment>.</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/3/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/3" id="regulation-2-3">
+<Pnumber>3</Pnumber>
+<P2para>
+<Text>In the paragraph entitled Revaluation, for “2017” substitute <InlineAmendment>“2023”</InlineAmendment> and for “2015” substitute <InlineAmendment>“2021”</InlineAmendment>.</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/4/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/4" id="regulation-2-4">
+<Pnumber>4</Pnumber>
+<P2para>
+<Text>In the paragraph entitled Alteration of rateable value, omit the words “If the ratepayer and the valuation officer do not agree the valuation within 3 months of the proposal being made, the matter is referred by the valuation officer as an appeal by the proposer to the Valuation Tribunal for Wales.”</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/5/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/5" id="regulation-2-5">
+<Pnumber>5</Pnumber>
+<P2para>
+<Text>In the paragraph entitled Non-domestic rating multiplier, omit the words “and except in a revaluation year cannot rise by more than the rate of the increase in the retail prices index”.</Text>
+</P2para>
+</P2>
+<P2 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/6/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/6" id="regulation-2-6">
+<Pnumber>6</Pnumber>
+<P2para>
+<Text>In the paragraph entitled Transitional rate relief—</Text>
+<P3 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/6/a/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/6/a" id="regulation-2-6-a">
+<Pnumber>a</Pnumber>
+<P3para>
+<Text>for “2016” substitute <InlineAmendment>“2022”</InlineAmendment>;</Text>
+</P3para>
+</P3>
+<P3 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/6/b/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/6/b" id="regulation-2-6-b">
+<Pnumber>b</Pnumber>
+<P3para>
+<Text>omit the word “small”;</Text>
+</P3para>
+</P3>
+<P3 DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/regulation/2/6/c/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/regulation/2/6/c" id="regulation-2-6-c">
+<Pnumber>c</Pnumber>
+<P3para>
+<Text>for “2017” substitute <InlineAmendment>“2023”</InlineAmendment>.</Text>
+</P3para>
+</P3>
+</P2para>
+</P2>
+</P1para>
+</P1>
+</P1group>
+<SignedSection DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/signature/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/signature">
+<Signatory>
+<Signee>
+<PersonName>Rebecca Evans</PersonName>
+<JobTitle>Minister for Finance and Local Government, one of the Welsh Ministers</JobTitle>
+<DateSigned Date="2023-01-05">
+<DateText>5 January 2023</DateText>
+</DateSigned>
+</Signee>
+</Signatory>
+</SignedSection>
+</Body>
+<ExplanatoryNotes DocumentURI="http://www.legislation.gov.uk/wsi/2023/3/note/made" IdURI="http://www.legislation.gov.uk/id/wsi/2023/3/note">
+<Title>EXPLANATORY NOTE</Title>
+<Comment>
+<Para>
+<Text>(This note is not part of the Regulations)</Text>
+</Para>
+</Comment>
+<P>
+<Text Hanging="indented">The Non-Domestic Rating (Demand Notices) (Wales) Regulations 2017 (“<Term>the 2017 Regulations</Term>”) (<Citation URI="http://www.legislation.gov.uk/id/wsi/2017/113" id="c00001" Class="WelshStatutoryInstrument" Year="2017" Number="113" AlternativeNumber="W. 39">S.I. 2017/113 (W. 39)</Citation>) provide for the contents of non-domestic rates demand notices which are served by or on behalf of billing authorities in Wales.</Text>
+</P>
+<P>
+<Text Hanging="indented">Schedule 2 to the 2017 Regulations prescribes the information which must be included in the explanatory notes that must accompany a demand notice.</Text>
+</P>
+<P>
+<Text Hanging="indented">These Regulations amend Schedule 2 to the 2017 Regulations in consequence of the non-domestic rating revaluation which takes effect from 1 April 2023 and the prescribed rules for chargeable amounts which fall within the descriptions prescribed in the Non-Domestic Rating (Chargeable Amounts) (Wales) Regulations 2022 (<Citation URI="http://www.legislation.gov.uk/id/wsi/2022/1350" id="c00002" Class="WelshStatutoryInstrument" Year="2022" Number="1350" AlternativeNumber="W. 272">S.I. 2022/1350 (W. 272)</Citation>).</Text>
+</P>
+<P>
+<Text Hanging="indented">The Welsh Ministers’ code of practice on the carrying out of regulatory impact assessments was considered in relation to these Regulations. As a result, it was not considered necessary to carry out a regulatory impact assessment as to the likely costs and benefits of complying with these Regulations.</Text>
+</P>
+</ExplanatoryNotes>
+</Secondary><Footnotes><Footnote id="f00001">
+<FootnoteText>
+<Para>
+<Text><Citation URI="http://www.legislation.gov.uk/id/ukpga/1998/41" id="c00003" Year="1998" Number="41" Class="UnitedKingdomPublicGeneralAct">1998 c. 41</Citation>. <Emphasis>See</Emphasis> section 146(6) for the definition of “prescribed”. Paragraph 1 of Schedule 9 was amended by paragraph 89(2) of Schedule 13 to the Tribunals, Courts and Enforcement Act <Citation URI="http://www.legislation.gov.uk/id/ukpga/2007/15" id="c00004" Year="2007" Number="15" Class="UnitedKingdomPublicGeneralAct">2007 (c. 15)</Citation>. Paragraph 2(2)(h) of Schedule 9 was amended by sections 139 and 194(4) of, and paragraphs 1, 44(1) and (3) of Schedule 5 and Part 2 of Schedule 12 to, the Local Government and Housing Act <Citation URI="http://www.legislation.gov.uk/id/ukpga/1989/42" id="c00005" Year="1989" Number="42" Class="UnitedKingdomPublicGeneralAct">1989 (c. 42)</Citation> and section 8(1) and (3) of the Local Government Finance Act <Citation URI="http://www.legislation.gov.uk/id/ukpga/2012/17" id="c00006" Year="2012" Number="17" Class="UnitedKingdomPublicGeneralAct">2012 (c. 17)</Citation>.</Text>
+</Para>
+</FootnoteText>
+</Footnote><Footnote id="f00002">
+<FootnoteText>
+<Para>
+<Text>The powers of the Secretary of State were transferred, in relation to Wales, to the National Assembly for Wales by the National Assembly for Wales (Transfer of Functions) Order 1999 (<Citation URI="http://www.legislation.gov.uk/id/uksi/1999/672" id="c00007" Year="1999" Number="672" Class="UnitedKingdomStatutoryInstrument">S.I. 1999/672</Citation>). The functions of the National Assembly for Wales subsequently transferred to the Welsh Ministers by virtue of section 162 of, and paragraph 30 of Schedule 11 to, the Government of Wales Act <Citation URI="http://www.legislation.gov.uk/id/ukpga/2006/32" id="c00008" Year="2006" Number="32" Class="UnitedKingdomPublicGeneralAct">2006 (c. 32)</Citation>.</Text>
+</Para>
+</FootnoteText>
+</Footnote><Footnote id="f00003">
+<FootnoteText>
+<Para>
+<Text><Citation URI="http://www.legislation.gov.uk/id/wsi/2017/113" id="c00009" Class="WelshStatutoryInstrument" Year="2017" Number="113" AlternativeNumber="W. 39">S.I. 2017/113 (W. 39)</Citation>, amended by <Citation URI="http://www.legislation.gov.uk/id/wsi/2018/122" id="c00010" Class="WelshStatutoryInstrument" Year="2018" Number="122" AlternativeNumber="W. 28">S.I. 2018/122 (W. 28)</Citation> and <Citation URI="http://www.legislation.gov.uk/id/wsi/2020/1250" id="c00011" Class="WelshStatutoryInstrument" Year="2020" Number="1250" AlternativeNumber="W. 283">S.I. 2020/1250 (W. 283)</Citation>.</Text>
+</Para>
+</FootnoteText>
+</Footnote></Footnotes></Legislation>

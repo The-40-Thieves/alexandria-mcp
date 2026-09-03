@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:leg="http://www.legislation.gov.uk/namespaces/legislation" xmlns:ukm="http://www.legislation.gov.uk/namespaces/metadata" xmlns:theme="http://www.legislation.gov.uk/namespaces/theme" xmlns:openSearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:parameters="http://a9.com/-/spec/opensearch/extensions/parameters/1.0/">
+			<id>http://www.legislation.gov.uk/search/data.feed?text=climate</id>
+			<link rel="self" type="application/atom+xml" href="http://www.legislation.gov.uk/search/data.feed?text=climate&amp;results-count=3"/>
+			
+			<link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/search/data.csv?text=climate&amp;results-count=3"/>
+			<updated>2026-09-02T23:59:59+01:00</updated>
+			<title>Search Results</title>
+			<openSearch:Query role="request" searchTerms="climate" leg:type="all"> </openSearch:Query>
+			<openSearch:itemsPerPage>3</openSearch:itemsPerPage>
+			<openSearch:startIndex>1</openSearch:startIndex>
+			<leg:page>1</leg:page>
+			<leg:morePages>12</leg:morePages>
+			<leg:facets>
+								
+								<leg:facetTypes/>
+								<leg:facetYears/>
+								<leg:facetHundreds/>
+								
+							</leg:facets>
+			<leg:text><leg:term>climate</leg:term></leg:text>
+			
+			<link rel="first" type="application/atom+xml" href="http://www.legislation.gov.uk/search/data.feed?text=climate&amp;results-count=3"/><link rel="next" type="application/atom+xml" href="http://www.legislation.gov.uk/search/data.feed?text=climate&amp;results-count=3&amp;page=2"/><entry>
+			<id>http://www.legislation.gov.uk/id/uksi/2012/1976</id>
+			<title>The Climate Change Agreements (Administration) Regulations 2012</title>
+			<link rel="self" href="http://www.legislation.gov.uk/id/uksi/2012/1976"/>
+			<link href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01"/>
+			<link rel="alternate" type="application/xml" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.xml" title="XML"/><link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.rdf" title="RDF/XML"/><link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.akn" title="AKN"/><link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.xht" title="HTML snippet"/><link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.html" title="HTML5"/><link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.htm" title="Website (XHTML) Default View"/><link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.csv" title="CSV"/><link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/uksi/2012/1976/2026-01-01/data.pdf" title="PDF"/>
+			<link rel="http://purl.org/dc/terms/tableOfContents" type="application/xml" href="http://www.legislation.gov.uk/uksi/2012/1976/contents?text=climate" title="Table of Contents"/>
+			<author><name/></author>
+			<updated>2026-06-12T10:23:01+01:00</updated>
+			<published>2012-08-06T14:30:06.657+01:00</published>
+			<ukm:DocumentMainType Value="UnitedKingdomStatutoryInstrument"/><ukm:Year Value="2012"/><ukm:Number Value="1976"/><ukm:ISBN Value="9780111527856"/><ukm:CreationDate Date="2012-07-25"/><ukm:Subject Value="CLIMATE CHANGE LEVY"/>
+			
+			
+			<category term="CLIMATE CHANGE LEVY"/>
+			<summary>These Regulations appoint the Environment Agency to administer climate change agreements entered into under Part IV of Schedule 6 to the Finance Act 2000 and set out procedures for the administration of climate change agreements. These regulations come into force on 1st October 2012.</summary>
+		</entry><entry>
+			<id>http://www.legislation.gov.uk/id/eudn/2018/210</id>
+			<title>Commission Implementing Decision (EU) 2018/210 of 12 February 2018 on the adoption of the LIFE multiannual work programme for 2018-2020 (Text with EEA relevance)</title>
+			<link rel="self" href="http://www.legislation.gov.uk/id/eudn/2018/210"/>
+			<link href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12"/>
+			<link rel="alternate" type="application/xml" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.xml" title="XML"/><link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.rdf" title="RDF/XML"/><link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.akn" title="AKN"/><link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.xht" title="HTML snippet"/><link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.html" title="HTML5"/><link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.htm" title="Website (XHTML) Default View"/><link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.csv" title="CSV"/><link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/eudn/2018/210/2018-02-12/data.pdf" title="PDF"/>
+			<link rel="http://purl.org/dc/terms/tableOfContents" type="application/xml" href="http://www.legislation.gov.uk/eudn/2018/210/contents?text=climate" title="Table of Contents"/>
+			<author><name/></author>
+			<updated>2025-10-04T03:42:17+01:00</updated>
+			<published>2018-11-10T00:02:56+01:00</published>
+			<ukm:DocumentMainType Value="EuropeanUnionDecision"/><ukm:Year Value="2018"/><ukm:Number Value="210"/><ukm:CreationDate Date="2018-02-12"/>
+			
+			
+			
+			<summary>Commission Implementing Decision (EU) 2018/210 of 12 February 2018 on the adoption of the LIFE multiannual work programme for 2018-2020 (Text with EEA relevance)</summary>
+		</entry><entry>
+			<id>http://www.legislation.gov.uk/id/eur/2013/1293</id>
+			<title>Regulation (EU) No 1293/2013 of the European Parliament and of the Council of 11 December 2013 on the establishment of a Programme for the Environment and Climate Action (LIFE) and repealing Regulation (EC) No 614/2007 (Text with EEA relevance)</title>
+			<link rel="self" href="http://www.legislation.gov.uk/id/eur/2013/1293"/>
+			<link href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05"/>
+			<link rel="alternate" type="application/xml" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.xml" title="XML"/><link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.rdf" title="RDF/XML"/><link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.akn" title="AKN"/><link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.xht" title="HTML snippet"/><link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.html" title="HTML5"/><link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.htm" title="Website (XHTML) Default View"/><link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.csv" title="CSV"/><link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/eur/2013/1293/2018-10-05/data.pdf" title="PDF"/>
+			<link rel="http://purl.org/dc/terms/tableOfContents" type="application/xml" href="http://www.legislation.gov.uk/eur/2013/1293/contents?text=climate" title="Table of Contents"/>
+			<author><name/></author>
+			<updated>2025-10-19T00:31:43+01:00</updated>
+			<published>2018-11-10T18:33:32+01:00</published>
+			<ukm:DocumentMainType Value="EuropeanUnionRegulation"/><ukm:Year Value="2013"/><ukm:Number Value="1293"/><ukm:CreationDate Date="2013-12-11"/>
+			
+			
+			
+			<summary>Regulation (EU) No 1293/2013 of the European Parliament and of the Council of 11 December 2013 on the establishment of a Programme for the Environment and Climate Action (LIFE) and repealing Regulation (EC) No 614/2007 (Text with EEA relevance)</summary>
+		</entry>
+		</feed>

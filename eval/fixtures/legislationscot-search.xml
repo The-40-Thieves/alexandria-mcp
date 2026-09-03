@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:leg="http://www.legislation.gov.uk/namespaces/legislation" xmlns:ukm="http://www.legislation.gov.uk/namespaces/metadata" xmlns:theme="http://www.legislation.gov.uk/namespaces/theme" xmlns:openSearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:parameters="http://a9.com/-/spec/opensearch/extensions/parameters/1.0/">
+			<id>http://www.legislation.gov.uk/search/data.feed?type=asp+ssi&amp;text=climate</id>
+			<link rel="self" type="application/atom+xml" href="http://www.legislation.gov.uk/search/data.feed?type=asp+ssi&amp;text=climate&amp;results-count=3"/>
+			
+			<link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/search/data.csv?type=asp+ssi&amp;text=climate&amp;results-count=3"/>
+			<updated>2026-09-01T23:59:59+01:00</updated>
+			<title>Search Results</title>
+			<openSearch:Query role="request" searchTerms="climate" leg:type="asp+ssi"> </openSearch:Query>
+			<openSearch:itemsPerPage>3</openSearch:itemsPerPage>
+			<openSearch:startIndex>1</openSearch:startIndex>
+			<leg:page>1</leg:page>
+			<leg:morePages>12</leg:morePages>
+			<leg:facets>
+								
+								<leg:facetTypes remove="http://www.legislation.gov.uk/search/data.feed?text=climate&amp;results-count=3"/>
+								<leg:facetYears/>
+								<leg:facetHundreds/>
+								
+							</leg:facets>
+			<leg:text><leg:term>climate</leg:term></leg:text>
+			
+			<link rel="first" type="application/atom+xml" href="http://www.legislation.gov.uk/search/data.feed?type=asp+ssi&amp;text=climate&amp;results-count=3"/><link rel="next" type="application/atom+xml" href="http://www.legislation.gov.uk/search/data.feed?type=asp+ssi&amp;text=climate&amp;results-count=3&amp;page=2"/><entry>
+			<id>http://www.legislation.gov.uk/id/ssi/2020/281</id>
+			<title>The Climate Change (Duties of Public Bodies: Reporting Requirements) (Scotland) Amendment Order 2020</title>
+			<link rel="self" href="http://www.legislation.gov.uk/id/ssi/2020/281"/>
+			<link href="http://www.legislation.gov.uk/ssi/2020/281/made"/>
+			<link rel="alternate" type="application/xml" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.xml" title="XML"/><link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.rdf" title="RDF/XML"/><link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.akn" title="AKN"/><link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.xht" title="HTML snippet"/><link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.html" title="HTML5"/><link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.htm" title="Website (XHTML) Default View"/><link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.csv" title="CSV"/><link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/ssi/2020/281/made/data.pdf" title="PDF"/>
+			<link rel="http://purl.org/dc/terms/tableOfContents" type="application/xml" href="http://www.legislation.gov.uk/ssi/2020/281/contents/made?text=climate" title="Table of Contents"/>
+			<author><name/></author>
+			<updated>2023-04-24T10:08:27+01:00</updated>
+			<published>2020-09-14T08:27:27.281555+01:00</published>
+			<ukm:DocumentMainType Value="ScottishStatutoryInstrument"/><ukm:Year Value="2020"/><ukm:Number Value="281"/><ukm:ISBN Value="9780111046456"/><ukm:CreationDate Date="2020-09-11"/><ukm:Subject Value="CLIMATE CHANGE"/>
+			
+			
+			<category term="CLIMATE CHANGE"/>
+			<summary>This Order updates the list of public bodies in schedule 1 of the Climate Change (Duties of Public Bodies: Reporting Requirements) (Scotland) Order 2015. Bodies listed in that schedule are required to prepare reports on compliance with climate change duties imposed under (or by virtue of) section 44 of the Climate Change (Scotland) Act 2009.</summary>
+		</entry><entry>
+			<id>http://www.legislation.gov.uk/id/ssi/2015/197</id>
+			<title>The Climate Change (Additional Greenhouse Gas) (Scotland) Order 2015</title>
+			<link rel="self" href="http://www.legislation.gov.uk/id/ssi/2015/197"/>
+			<link href="http://www.legislation.gov.uk/ssi/2015/197/made"/>
+			<link rel="alternate" type="application/xml" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.xml" title="XML"/><link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.rdf" title="RDF/XML"/><link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.akn" title="AKN"/><link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.xht" title="HTML snippet"/><link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.html" title="HTML5"/><link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.htm" title="Website (XHTML) Default View"/><link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.csv" title="CSV"/><link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/ssi/2015/197/made/data.pdf" title="PDF"/>
+			<link rel="http://purl.org/dc/terms/tableOfContents" type="application/xml" href="http://www.legislation.gov.uk/ssi/2015/197/contents/made?text=climate" title="Table of Contents"/>
+			<author><name/></author>
+			<updated>2023-04-24T10:06:34+01:00</updated>
+			<published>2015-05-15T11:47:51.074+01:00</published>
+			<ukm:DocumentMainType Value="ScottishStatutoryInstrument"/><ukm:Year Value="2015"/><ukm:Number Value="197"/><ukm:ISBN Value="9780111027844"/><ukm:CreationDate Date="2015-05-15"/><ukm:Subject Value="CLIMATE CHANGE"/>
+			<ukm:Supersedes URI="http://www.legislation.gov.uk/id/sdsi/2015/9780111027394"><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">The Climate Change (Additional Greenhouse Gas) (Scotland) Order 2015</dc:title><ukm:DocumentMainType Value="ScottishDraftStatutoryInstrument"/><ukm:Year Value="2015"/><ukm:ISBN Value="9780111027394"/></ukm:Supersedes>
+			
+			<category term="CLIMATE CHANGE"/>
+			<summary>This Order modifies the Climate Change (Scotland) Act 2009 (“the 2009 Act”) by adding nitrogen trifluoride as an additional greenhouse gas to the greenhouse gases listed in section 10(1). Article 3 designates 1995 as the baseline year for nitrogen trifluoride.</summary>
+		</entry><entry>
+			<id>http://www.legislation.gov.uk/id/ssi/2023/164</id>
+			<title>The Climate Change (Scotland) Act 2009 (Interim Target) Amendment Regulations 2023</title>
+			<link rel="self" href="http://www.legislation.gov.uk/id/ssi/2023/164"/>
+			<link href="http://www.legislation.gov.uk/ssi/2023/164/made"/>
+			<link rel="alternate" type="application/xml" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.xml" title="XML"/><link rel="alternate" type="application/rdf+xml" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.rdf" title="RDF/XML"/><link rel="alternate" type="application/akn+xml" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.akn" title="AKN"/><link rel="alternate" type="application/xhtml+xml" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.xht" title="HTML snippet"/><link rel="alternate" type="application/akn+xhtml" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.html" title="HTML5"/><link rel="alternate" type="text/html" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.htm" title="Website (XHTML) Default View"/><link rel="alternate" type="text/csv" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.csv" title="CSV"/><link rel="alternate" type="application/pdf" href="http://www.legislation.gov.uk/ssi/2023/164/made/data.pdf" title="PDF"/>
+			<link rel="http://purl.org/dc/terms/tableOfContents" type="application/xml" href="http://www.legislation.gov.uk/ssi/2023/164/contents/made?text=climate" title="Table of Contents"/>
+			<author><name/></author>
+			<updated>2023-05-31T00:10:00+01:00</updated>
+			<published>2023-05-30T12:04:04.46658+01:00</published>
+			<ukm:DocumentMainType Value="ScottishStatutoryInstrument"/><ukm:Year Value="2023"/><ukm:Number Value="164"/><ukm:ISBN Value="9780111057599"/><ukm:CreationDate Date="2023-05-30"/><ukm:Subject Value="CLIMATE CHANGE"/>
+			<ukm:Supersedes URI="http://www.legislation.gov.uk/id/sdsi/2023/9780111057247"><dc:title xmlns:dc="http://purl.org/dc/elements/1.1/">The Climate Change (Scotland) Act 2009 (Interim Target) Amendment Regulations 2023</dc:title><ukm:DocumentMainType Value="ScottishDraftStatutoryInstrument"/><ukm:Year Value="2023"/><ukm:ISBN Value="9780111057247"/></ukm:Supersedes>
+			
+			<category term="CLIMATE CHANGE"/>
+			<summary>These Regulations amend the Climate Change (Scotland) Act 2009 (“the 2009 Act”). Section 2(1) of the 2009 Act (the interim targets) imposes a duty on the Scottish Ministers to ensure that the net Scottish emissions accounts for the years 2020, 2030 and 2040 are, respectively, at least 56%, 75% and 90% lower than the baseline (as defined by section 11(1) of the 2009 Act).</summary>
+		</entry>
+		</feed>

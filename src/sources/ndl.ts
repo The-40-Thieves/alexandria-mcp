@@ -1,15 +1,9 @@
-import { XMLParser } from 'fast-xml-parser';
 import type { LibraryResult } from '../types.ts';
 import { fetchText } from '../utils/http.ts';
+import { asArray, parseXml } from '../utils/xml.ts';
 import { register } from './registry.ts';
 
 const SRU = 'https://ndlsearch.ndl.go.jp/api/sru';
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  textNodeName: '#text',
-});
 
 // NDL Search's SRU endpoint: recordSchema=dcndl_simple (as documented in
 // some older references) returns "illegal recordSchema value" as of
@@ -27,11 +21,6 @@ export async function ndlSearch(query: string, limit: number): Promise<LibraryRe
   });
   const xml = await fetchText(`${SRU}?${params}`);
   return normalizeNdl(xml, limit);
-}
-
-function toArray(val: unknown): unknown[] {
-  if (val == null) return [];
-  return Array.isArray(val) ? val : [val];
 }
 
 // First matching value for `key` found anywhere under `obj`, depth-first in
@@ -70,9 +59,9 @@ function titleOf(record: Record<string, unknown>): string {
 }
 
 export function normalizeNdl(xml: string, limit: number): LibraryResult[] {
-  const doc = parser.parse(xml) as Record<string, unknown>;
+  const doc = parseXml<Record<string, unknown>>(xml);
   const root = (doc.searchRetrieveResponse ?? doc) as Record<string, unknown>;
-  const records = toArray((root.records as Record<string, unknown> | undefined)?.record);
+  const records = asArray((root.records as Record<string, unknown> | undefined)?.record);
 
   return records.slice(0, limit).map((r) => {
     const rec = r as Record<string, unknown>;
@@ -81,7 +70,7 @@ export function normalizeNdl(xml: string, limit: number): LibraryResult[] {
     const id = String((admin?.['@_rdf:about'] as string | undefined) ?? '');
 
     const title = titleOf(rdf ?? {});
-    const creators = toArray(findDeep(rdf, 'dc:creator')).map(textOf).filter(Boolean);
+    const creators = asArray(findDeep(rdf, 'dc:creator')).map(textOf).filter(Boolean);
     const issued = textOf(findDeep(rdf, 'dcterms:issued')) || textOf(findDeep(rdf, 'dcterms:date'));
     const language = textOf(findDeep(rdf, 'dcterms:language'));
 
