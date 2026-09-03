@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import test from 'node:test';
+import { corpusSearchRef } from '../pipeline/corpusSearch.ts';
 import { register } from '../sources/registry.ts';
 import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
 import { resetRoutingCacheForTests } from '../utils/resultCache.ts';
@@ -137,6 +138,34 @@ function registerFakeSources(): void {
         authors: [],
         metadataOnly: true,
         externalUrl: 'https://example.test/b1',
+      };
+    },
+  });
+}
+
+// Task 12: freshness: 'realtime' means this source's results must never be
+// answered from a cached chunk - see the "never calls corpusSearch" test.
+function registerRealtimeSource(): void {
+  register('zzftest_realtime', {
+    description: `Test realtime source about ${TOKEN} changes`,
+    supportsIngest: true,
+    freshness: 'realtime',
+    async search() {
+      return [
+        {
+          id: 'r1',
+          source: 'zzftest_realtime',
+          title: 'Realtime Item',
+          authors: [],
+          hasFullText: true,
+        },
+      ];
+    },
+    async read() {
+      return {
+        title: 'Realtime Item',
+        authors: [],
+        text: `Breaking ${TOKEN} news just happened.`,
       };
     },
   });
@@ -748,4 +777,170 @@ test('libraryAnswer', async (t) => {
       );
     },
   );
+
+  await t.test(
+    'folds a corpus-as-cache hit into results and cites it without an adapter read',
+    async () => {
+      registerFakeSources();
+      resetCatalogCacheForTests();
+
+      const router = await startFakeChatServer(() => ({
+        intent: `find info about ${TOKEN}`,
+        routes: [{ source: 'zzftest_full', query: TOKEN, reason: 'full text match' }],
+      }));
+      t.after(() => router.close());
+
+      // Cites both the live source and the corpus hit, so the assertions
+      // below don't depend on which one RRF/rerank happened to rank first.
+      const synth = await startFakeChatServer(() => 'Two things happened [1][2].');
+      t.after(() => synth.close());
+      const verify = await startFakeChatServer(allSupportedVerifyDecide);
+      t.after(() => verify.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+      process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_VERIFY_BASE_URL = verify.url;
+      process.env.ALEXANDRIA_VERIFY_API_KEY = 'test-key';
+
+      // 'corpus' is deliberately never a registered source adapter (see
+      // getAdapter's "Unknown source" error) - if readTopSources() ever
+      // fell back to getAdapter('corpus').read() for this item instead of
+      // using its fullText directly, that call would throw, get caught,
+      // and the item would silently vanish from citations. So citations
+      // actually including it is proof the adapter was never called.
+      const originalSearch = corpusSearchRef.search;
+      corpusSearchRef.search = async () => [
+        {
+          id: 'zzftest_full:cached-doc:0',
+          source: 'corpus',
+          title: 'Cached Corpus Chunk',
+          authors: [],
+          hasFullText: true,
+          fullText: `Cached: the ${TOKEN} rollout finished ahead of schedule.`,
+        },
+      ];
+      t.after(() => {
+        corpusSearchRef.search = originalSearch;
+      });
+
+      const result = await libraryAnswer(`what changed in ${TOKEN}`, {
+        maxSources: 5,
+        resultsPerSource: 5,
+        readTop: 4,
+      });
+
+      assert.ok(
+        result.results.some((r) => r.source === 'corpus'),
+        'the corpus hit is folded into the fused/ranked results',
+      );
+      assert.ok(
+        result.citations.some((c) => c.source === 'corpus'),
+        'the corpus hit is cited, proving its fullText was used with no adapter read',
+      );
+    },
+  );
+
+  await t.test('never calls corpusSearch when every routed source is realtime', async () => {
+    registerRealtimeSource();
+    resetCatalogCacheForTests();
+
+    const router = await startFakeChatServer(() => ({
+      intent: `find info about ${TOKEN}`,
+      routes: [{ source: 'zzftest_realtime', query: TOKEN, reason: 'realtime match' }],
+    }));
+    t.after(() => router.close());
+
+    const synth = await startFakeChatServer(() => `Breaking ${TOKEN} news happened [1].`);
+    t.after(() => synth.close());
+    const verify = await startFakeChatServer(allSupportedVerifyDecide);
+    t.after(() => verify.close());
+
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_VERIFY_BASE_URL = verify.url;
+    process.env.ALEXANDRIA_VERIFY_API_KEY = 'test-key';
+
+    let calls = 0;
+    const originalSearch = corpusSearchRef.search;
+    corpusSearchRef.search = async () => {
+      calls++;
+      return [];
+    };
+    t.after(() => {
+      corpusSearchRef.search = originalSearch;
+    });
+
+    await libraryAnswer(`what changed in ${TOKEN}`, {
+      maxSources: 5,
+      resultsPerSource: 5,
+      readTop: 4,
+    });
+
+    assert.equal(calls, 0, 'corpusSearch is never called when every routed source is realtime');
+  });
+
+  // Review round 1 (Important 1): a corpus citation must carry a real
+  // URL and grade using its stamped cluster, not silently default the
+  // citation grader's tier for lack of one.
+  await t.test('a corpus citation carries a url and grades using its stamped cluster', async () => {
+    registerFakeSources();
+    resetCatalogCacheForTests();
+
+    const router = await startFakeChatServer(() => ({
+      intent: `find info about ${TOKEN}`,
+      routes: [{ source: 'zzftest_full', query: TOKEN, reason: 'full text match' }],
+    }));
+    t.after(() => router.close());
+
+    // Cites both possible sources so the assertions below don't depend on
+    // which one RRF/rerank happened to rank first.
+    const synth = await startFakeChatServer(() => 'Two things happened [1][2].');
+    t.after(() => synth.close());
+    const verify = await startFakeChatServer(allSupportedVerifyDecide);
+    t.after(() => verify.close());
+
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_VERIFY_BASE_URL = verify.url;
+    process.env.ALEXANDRIA_VERIFY_API_KEY = 'test-key';
+
+    const originalSearch = corpusSearchRef.search;
+    corpusSearchRef.search = async () => [
+      {
+        id: 'zzftest_full:cached-doc:0',
+        source: 'corpus',
+        title: 'Cached Corpus Chunk',
+        authors: [],
+        hasFullText: true,
+        fullText: `Cached info about ${TOKEN}.`,
+        url: 'https://example.test/cached-doc',
+        cluster: 'academic',
+      },
+    ];
+    t.after(() => {
+      corpusSearchRef.search = originalSearch;
+    });
+
+    const result = await libraryAnswer(`what changed in ${TOKEN}`, {
+      maxSources: 5,
+      resultsPerSource: 5,
+      readTop: 4,
+    });
+
+    const citation = result.citations.find((c) => c.source === 'corpus');
+    assert.ok(citation, 'the corpus hit is cited');
+    assert.equal(citation.url, 'https://example.test/cached-doc', 'the stamped url is cited');
+    assert.equal(
+      citation.grade?.signals.sourceTier,
+      1,
+      'the academic cluster grades tier 1, not the default tier 3 a missing cluster would produce',
+    );
+    assert.equal(citation.grade?.tier, 'A');
+  });
 });

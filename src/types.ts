@@ -18,6 +18,11 @@ export interface LibraryResult {
   published?: string;
   url?: string;
   cluster?: string; // set by libraryAsk's fan-out from the source's registry.ts cluster
+  // Task 12 (corpus-as-cache, src/pipeline/corpusSearch.ts): the chunk's
+  // text, already in hand from a vector-store query. When set,
+  // src/tools/libraryAnswer.ts's readTopSources() uses it directly instead
+  // of calling the source adapter's read() - there is nothing to fetch.
+  fullText?: string;
 }
 
 export interface Chunk {
@@ -50,6 +55,16 @@ export interface ChunkMetadata {
   license?: string;
   attribution?: string;
   expiresAt?: string;
+  // Review round 1 (Important 1): stamped by ingestText() so a
+  // corpus-as-cache citation (src/pipeline/corpusSearch.ts) has a real URL
+  // and cluster instead of defaulting the citation grader's tier. `url` is
+  // the best link ingestText had at read time (the adapter's ReadResult.
+  // externalUrl, falling back to the source's registry homepage); `cluster`
+  // is the source's registry cluster at ingest time. Both absent on a chunk
+  // ingested before this field existed - corpusSearch.ts falls back to the
+  // *current* registry entry for the chunk's source in that case.
+  url?: string;
+  cluster?: string;
 }
 
 export interface IndexPreview {
@@ -115,7 +130,29 @@ export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>;
 }
 
+// One row returned by VectorStoreProvider.query(). `source`/`sourceId`/
+// `chunkIndex` are read back out of the stored chunk's metadata (see
+// ChunkMetadata above) rather than being separate columns, and `metadata`
+// carries the full ChunkMetadata so a caller (src/pipeline/corpusSearch.ts)
+// doesn't need a second lookup to get title/authors/year/etc.
+export interface VectorQueryHit {
+  id: string;
+  source: LibrarySource;
+  sourceId: string;
+  chunkIndex: number;
+  text: string;
+  similarity: number;
+  metadata: ChunkMetadata;
+}
+
 export interface VectorStoreProvider {
   upsert(chunks: Chunk[], embeddings: number[][], mcpName: string): Promise<number>;
   isDuplicate(sourceId: string, mcpName: string): Promise<boolean>;
+  // Task 12: corpus-as-cache. Nearest-neighbor search over previously
+  // ingested chunks, ranked by cosine similarity descending. `filter.
+  // sources`, when given as a NON-EMPTY array, restricts to chunks whose
+  // metadata.source is in the list. Omitting `filter`/`filter.sources`
+  // entirely, and passing an EMPTY array, are equivalent - both mean
+  // "search the whole store" (Review round 1, Important 3).
+  query(embedding: number[], k: number, filter?: { sources?: string[] }): Promise<VectorQueryHit[]>;
 }

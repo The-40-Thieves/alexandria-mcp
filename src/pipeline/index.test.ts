@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertIngestAllowed, ingestMetadata } from '../sources/ingestPolicy.ts';
-import type { Chunk, EmbeddingProvider, VectorStoreProvider } from '../types.ts';
+import { register } from '../sources/registry.ts';
+import type { Chunk, EmbeddingProvider, VectorQueryHit, VectorStoreProvider } from '../types.ts';
 import { chunkSemantic, indexText, ingestText } from './index.ts';
 
 // A paragraph of clean ASCII prose, long enough (and well above the
@@ -30,6 +31,11 @@ class FakeVectorStore implements VectorStoreProvider {
   }
   async isDuplicate(): Promise<boolean> {
     return false;
+  }
+  // Task 12 added query() to the interface; unused by this ingest-path
+  // test, which never searches the store it writes to.
+  async query(): Promise<VectorQueryHit[]> {
+    return [];
   }
 }
 
@@ -76,6 +82,7 @@ test('library_ingest flow: refusal and stamped chunk metadata', async (t) => {
       ['A. Author'],
       2020,
       'en',
+      undefined,
       chunkStamp,
       { embedder, store },
     );
@@ -113,6 +120,7 @@ test('library_ingest flow: refusal and stamped chunk metadata', async (t) => {
         [],
         2026,
         'en',
+        undefined,
         chunkStamp,
         { embedder, store },
       );
@@ -138,12 +146,54 @@ test('library_ingest flow: refusal and stamped chunk metadata', async (t) => {
       1900,
       'en',
       undefined,
+      undefined,
       { embedder, store },
     );
     for (const chunk of store.lastChunks) {
       assert.equal(chunk.metadata.attribution, undefined);
       assert.equal(chunk.metadata.expiresAt, undefined);
       assert.equal(chunk.metadata.license, undefined);
+    }
+  });
+
+  // Review round 1 (Important 1): every written chunk carries a url (from
+  // the caller, e.g. the adapter's ReadResult.externalUrl or its registry
+  // homepage - see src/index.ts's library_ingest handler) and a cluster
+  // (resolved from the registry, not caller-supplied) so a corpus-as-cache
+  // citation later has both a real link and a real grader tier.
+  await t.test('every written chunk is stamped with url and the registry cluster', async () => {
+    register('zzfingest_stamp_source', {
+      description: 'test source for url/cluster stamping',
+      supportsIngest: true,
+      cluster: 'science',
+      async search() {
+        return [];
+      },
+      async read() {
+        return { title: 'stub', authors: [] };
+      },
+    });
+
+    const store = new FakeVectorStore();
+    const embedder = new FakeEmbeddingProvider();
+
+    await ingestText(
+      LONG_TEXT,
+      'zzfingest_stamp_source',
+      'doc1',
+      'A Test Document',
+      ['Author'],
+      2024,
+      'en',
+      'https://example.test/doc1',
+      undefined,
+      { embedder, store },
+    );
+
+    assert.ok(store.lastChunks.length > 0);
+    for (const chunk of store.lastChunks) {
+      assert.equal(chunk.metadata.url, 'https://example.test/doc1');
+      assert.equal(chunk.metadata.cluster, 'science');
     }
   });
 });
@@ -207,6 +257,7 @@ test('chunkSemantic: title/heading-chain prefix on embedText, not on text', asyn
         ['Author'],
         1900,
         'en',
+        undefined,
         undefined,
         { embedder, store },
       );

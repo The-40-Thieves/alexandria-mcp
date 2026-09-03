@@ -262,6 +262,20 @@ const rawFields = {
       'Optional knowledge-base MCP server URL, folded into library_answer as one more ranked list.',
     ),
   KNOWLEDGE_MCP_TOKEN: z.string().optional().describe('Bearer token for KNOWLEDGE_MCP_URL.'),
+  // Task 12: corpus-as-cache (src/pipeline/corpusSearch.ts). Folds
+  // previously-ingested chunks (already in Supabase from library_ingest)
+  // into library_answer as one more RRF list, read straight from the
+  // stored text with no adapter round-trip. Gated on SUPABASE_URL plus a
+  // configured `embeddings` role; only chunks from a source whose registry
+  // freshness is "static" or "daily" are ever eligible - never "realtime".
+  ALEXANDRIA_CORPUS_MIN_SIM: z.coerce
+    .number()
+    .min(0)
+    .max(1)
+    .default(0.92)
+    .describe(
+      'Minimum cosine similarity (0-1) for a corpus-as-cache hit to be folded into library_answer. Only chunks from a "static" or "daily" freshness source are ever eligible.',
+    ),
 
   // ── library_ingest storage (src/pipeline/**) ────────────────────────────
   SUPABASE_URL: z
