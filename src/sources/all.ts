@@ -11,7 +11,6 @@ import './perseus.ts';
 import './ctext.ts';
 import './gallica.ts';
 import './loc.ts';
-import './hathitrust.ts';
 import './dpla.ts';
 import './ndl.ts';
 import './europeana.ts';

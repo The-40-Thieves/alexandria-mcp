@@ -5,6 +5,7 @@
 // generically from AuthSpec so individual adapters don't hand-roll it.
 import type { LibraryResult, ReadResult } from '../../types.ts';
 import { DEFAULT_TIMEOUT_MS, fetchJSON } from '../../utils/http.ts';
+import type { IngestPolicy } from '../ingestPolicy.ts';
 import type { AuthSpec, Cluster, Freshness, SourceMeta } from '../registry.ts';
 import { register, requireKey } from '../registry.ts';
 
@@ -15,6 +16,7 @@ export interface RestSpec<TRaw> {
   freshness: Freshness;
   homepage: string;
   supportsIngest: boolean;
+  ingestPolicy?: IngestPolicy;
   auth?: AuthSpec;
   optionalEnv?: string[];
   pacing?: SourceMeta['pacing'];
@@ -105,6 +107,7 @@ export function defineRest<TRaw>(spec: RestSpec<TRaw>): void {
   register(spec.name, {
     description: spec.description,
     supportsIngest: spec.supportsIngest,
+    ingestPolicy: spec.ingestPolicy,
     kind: 'rest',
     cluster: spec.cluster,
     freshness: spec.freshness,

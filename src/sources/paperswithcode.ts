@@ -1,5 +1,7 @@
 // Papers with Code: ML papers cross-referenced with their code
-// implementations. No API key required.
+// implementations. The original paperswithcode.com API was retired
+// 2025-07-24; this queries paperswithcode.co, a community-run mirror of
+// the same dataset. No API key required.
 import type { LibraryResult } from '../types.ts';
 import { defineRest } from './kinds/rest.ts';
 import { truncateText } from './registry.ts';
@@ -41,12 +43,14 @@ export function normalizePapersWithCode(item: PwcPaper): LibraryResult {
 defineRest<PwcSearchResponse>({
   name: 'paperswithcode',
   description:
-    'Papers with Code: machine learning papers cross-referenced with their code implementations. No API key required.',
+    'Papers with Code: machine learning papers cross-referenced with their code implementations. ' +
+    'Queries the community mirror at paperswithcode.co (the original paperswithcode.com API was ' +
+    'retired 2025-07-24). No API key required.',
   cluster: 'ai_research',
   freshness: 'daily',
   homepage: 'https://paperswithcode.co',
   supportsIngest: false,
-  verifiedAt: '2026-09-01',
+  verifiedAt: '2026-09-03',
   search: {
     url: (q, limit) => `${BASE}/?q=${encodeURIComponent(q)}&items_per_page=${limit}`,
     pick: (raw) => raw.results ?? [],

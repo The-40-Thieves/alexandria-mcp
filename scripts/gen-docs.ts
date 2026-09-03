@@ -69,16 +69,17 @@ function buildSourcesDoc(sources: Source[]): string {
     const list = clusters.get(cluster) ?? [];
     lines.push(`## ${cluster} (${list.length})`, '');
     lines.push(
-      '| Name | Kind | Cluster | Freshness | Auth env | Optional env | Verified | Description |',
+      '| Name | Kind | Cluster | Freshness | Auth env | Optional env | Verified | Ingest | Description |',
     );
-    lines.push('|---|---|---|---|---|---|---|---|');
+    lines.push('|---|---|---|---|---|---|---|---|---|');
     for (const s of list) {
       const name = s.hidden ? `${s.name} *(hidden)*` : s.name;
       const authEnv = s.auth?.env ?? 'none';
       const optionalEnv = s.optionalEnv?.length ? s.optionalEnv.join(', ') : '-';
       const verified = s.verifiedAt ?? '-';
+      const ingestPolicy = s.ingestPolicy ?? 'allowed';
       lines.push(
-        `| ${name} | ${s.kind} | ${s.cluster} | ${s.freshness} | ${authEnv} | ${optionalEnv} | ${verified} | ${escapeCell(s.description)} |`,
+        `| ${name} | ${s.kind} | ${s.cluster} | ${s.freshness} | ${authEnv} | ${optionalEnv} | ${verified} | ${ingestPolicy} | ${escapeCell(s.description)} |`,
       );
     }
     lines.push('');

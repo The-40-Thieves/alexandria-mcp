@@ -112,6 +112,9 @@ register('semanticscholar', {
   description:
     'Semantic Scholar: 200M+ academic papers. Abstracts always available; OA PDF links for open access papers. Supports library_recommend. Set SEMANTIC_SCHOLAR_API_KEY for a dedicated rate pool.',
   supportsIngest: true,
+  // Semantic Scholar's API terms require attributing stored content to the
+  // source (see src/sources/ingestPolicy.ts).
+  ingestPolicy: 'attribution',
   kind: 'rest',
   cluster: 'academic',
   freshness: 'daily',
