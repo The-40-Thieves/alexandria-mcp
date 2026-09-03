@@ -101,6 +101,7 @@ export async function crossrefRead(doi: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi: string;
 }> {
   const mailto = mailtoQuery();
   const data = await fetchJSON<CrossrefWorkResponse>(
@@ -140,6 +141,7 @@ export async function crossrefRead(doi: string): Promise<{
     authors: authorNames(work.author),
     year: issuedYear(work),
     language: work.language ?? undefined,
+    doi: work.DOI || doi,
   };
 }
 

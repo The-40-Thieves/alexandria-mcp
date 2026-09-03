@@ -5,6 +5,7 @@ import {
   extractDoiFromUrl,
   fetchBiocFullText,
   OPEN_ACCESS_HOP_ORDER,
+  OpenAccessBlockedError,
   pmcidFromBiocUrl,
   resolveOpenAccess,
 } from './openAccess.ts';
@@ -73,6 +74,28 @@ test('resolveOpenAccess', async (t) => {
       const result = await resolveOpenAccess(DOI);
       assert.equal(result?.via, 'pmc');
       assert.match(result?.url ?? '', /PMC1234567\/unicode$/);
+    },
+  );
+
+  await t.test(
+    'rejects a malformed pmcid from idconv rather than interpolating it into the BioC URL (Minor 1)',
+    async () => {
+      globalThis.fetch = (async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('api.openalex.org')) return jsonResponse({});
+        // Not /^PMC\d+$/ - idconv should never send this, but the pmc hop
+        // must not trust it blindly.
+        if (url.includes('idconv')) {
+          return jsonResponse({ records: [{ pmcid: '../evil' }] });
+        }
+        if (url.includes('api.fatcat.wiki')) return notFound();
+        throw new Error(`unexpected fetch: ${url}`);
+      }) as typeof fetch;
+
+      const result = await resolveOpenAccess(DOI);
+      // pmc is skipped (falls through, same as "no pmcid at all" -
+      // core is unset in this test block, so the chain runs out at fatcat.
+      assert.equal(result, undefined);
     },
   );
 
@@ -165,6 +188,56 @@ test('resolveOpenAccess', async (t) => {
       await assert.rejects(() => resolveOpenAccess(DOI), /private/);
     },
   );
+
+  await t.test(
+    'a block at the FIRST hop reports only that hop as tried, not all four (review round 1, Important 2)',
+    async () => {
+      globalThis.fetch = (async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('api.openalex.org')) {
+          return jsonResponse({ best_oa_location: { pdf_url: 'http://10.1.2.3/private.pdf' } });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }) as typeof fetch;
+
+      try {
+        await resolveOpenAccess(DOI);
+        assert.fail('expected resolveOpenAccess to reject');
+      } catch (err) {
+        assert.ok(err instanceof OpenAccessBlockedError);
+        assert.deepEqual(err.tried, ['openalex']);
+      }
+    },
+  );
+
+  await t.test('a block at the SECOND hop reports both hops tried, in order', async () => {
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes('api.openalex.org')) return jsonResponse({});
+      if (url.includes('idconv')) {
+        return jsonResponse({ records: [{ pmcid: 'PMC1234567' }] });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    // The pmc hop's own URL is deterministic (BIOC_BASE + pmcid), not
+    // caller-supplied, so it can't be blocked directly - force the
+    // block by making assertFetchableUrl's DNS lookup answer private
+    // for this one test, then restore the shared public stub after.
+    const savedLookup = dnsResolver.lookup;
+    dnsResolver.lookup = (async () => [
+      { address: '10.9.9.9', family: 4 },
+    ]) as typeof dnsResolver.lookup;
+
+    try {
+      await resolveOpenAccess(DOI);
+      assert.fail('expected resolveOpenAccess to reject');
+    } catch (err) {
+      assert.ok(err instanceof OpenAccessBlockedError);
+      assert.deepEqual(err.tried, ['openalex', 'pmc']);
+    } finally {
+      dnsResolver.lookup = savedLookup;
+    }
+  });
 });
 
 test('fetchBiocFullText is re-exported for library_read to fetch PMC full text directly', () => {

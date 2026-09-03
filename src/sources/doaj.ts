@@ -12,6 +12,12 @@ interface DOAJBib {
   link?: Array<{ url: string; type: string }>;
   subject?: Array<{ term: string }>;
   journal?: { title?: string; language?: string[] };
+  identifier?: Array<{ id: string; type: string }>;
+}
+
+function doiOf(b: DOAJBib): string | undefined {
+  // DOAJ normalises bibjson.identifier.type to lower-case (e.g. DOI -> doi).
+  return b.identifier?.find((i) => i.type === 'doi')?.id;
 }
 
 interface DOAJResult {
@@ -52,6 +58,7 @@ export async function doajRead(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi?: string;
 }> {
   const data = await fetchJSON<DOAJResult>(`${BASE}/articles/${id}`);
   const b = data.bibjson || {};
@@ -61,6 +68,7 @@ export async function doajRead(id: string): Promise<{
     authors: (b.author || []).map((a) => a.name),
     year: b.year ? parseInt(b.year, 10) : undefined,
     language: b.journal?.language?.[0],
+    doi: doiOf(b),
   };
 }
 

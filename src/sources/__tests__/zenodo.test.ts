@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { normalizeZenodo, zenodoSearch } from '../zenodo.ts';
+import { normalizeZenodo, zenodoRead, zenodoSearch } from '../zenodo.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/zenodo-search.json'), 'utf8'),
@@ -55,6 +55,30 @@ test('zenodoSearch fails fast (no sleep, no retry) when Retry-After exceeds the 
     );
     assert.equal(calls, 1); // no retry attempted
     assert.ok(Date.now() - t0 < 500); // no 24h sleep leaked
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('zenodoRead', async () => {
+  const originalFetch = globalThis.fetch;
+  const record = {
+    id: 13235113,
+    doi: '10.5281/zenodo.13235113',
+    metadata: {
+      title: 'A record with a DOI',
+      description: '<p>Some description text.</p>',
+      creators: [{ name: 'A. Author' }],
+      publication_date: '2024-08-01',
+      language: 'en',
+    },
+  };
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify(record), { status: 200 })) as typeof fetch;
+  try {
+    const result = await zenodoRead('13235113');
+    assert.equal(result.title, 'A record with a DOI');
+    assert.equal(result.doi, '10.5281/zenodo.13235113');
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -88,6 +88,7 @@ export async function zenodoRead(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi?: string;
 }> {
   const r = await zenodoFetch<ZenodoRecord>(`${BASE}/records/${id}`);
   return {
@@ -98,6 +99,7 @@ export async function zenodoRead(id: string): Promise<{
       ? parseInt(r.metadata.publication_date.substring(0, 4), 10)
       : undefined,
     language: r.metadata.language,
+    doi: r.doi,
   };
 }
 

@@ -94,6 +94,7 @@ test('crossrefRead', async (t) => {
     assert.match(result.text, /References \(30\)/);
     assert.match(result.text, /BibTeX:/);
     assert.match(result.text, /@article/);
+    assert.equal(result.doi, '10.1038/nature12373');
   });
 
   await t.test('still returns metadata when the BibTeX fetch fails', async () => {

@@ -90,6 +90,12 @@ interface IdConvResponse {
   records?: Array<{ pmcid?: string }>;
 }
 
+// idconv's own regex is looser than this (it accepts things this project
+// doesn't need to support); validated before interpolation into the BioC
+// URL below so a malformed or unexpected value from idconv can never
+// smuggle something other than a PMCID into that URL.
+const PMCID_PATTERN = /^PMC\d+$/;
+
 async function tryPmc(doi: string): Promise<OpenAccessLocation | undefined> {
   let pmcid: string | undefined;
   try {
@@ -100,7 +106,7 @@ async function tryPmc(doi: string): Promise<OpenAccessLocation | undefined> {
   } catch {
     return undefined; // idconv has no record for this DOI, or is unavailable
   }
-  if (!pmcid) return undefined;
+  if (!pmcid || !PMCID_PATTERN.test(pmcid)) return undefined;
   const url = `${BIOC_BASE}/${pmcid}/unicode`;
   await assertFetchableUrl(url);
   return { url, via: 'pmc' };
@@ -183,9 +189,36 @@ const HOPS: Record<OpenAccessVia, (doi: string) => Promise<OpenAccessLocation | 
   fatcat: tryFatcat,
 };
 
+// Thrown when a hop's own candidate URL is refused by assertFetchableUrl
+// (a real SSRF-guard refusal, not "nothing found" - see the hops above,
+// none of which throws on their own account). `tried` is exactly the hops
+// resolveOpenAccess actually attempted before the one that threw - the
+// loop stops at the first throw, so hops after it were never attempted
+// and must not be reported as tried. Carried on the error itself (rather
+// than resolveOpenAccess returning a `{candidate?, tried}` shape) so a
+// caller that only wants the happy path can keep awaiting a plain
+// `OpenAccessLocation | undefined`.
+export class OpenAccessBlockedError extends Error {
+  readonly tried: OpenAccessVia[];
+  constructor(message: string, tried: OpenAccessVia[]) {
+    super(message);
+    this.name = 'OpenAccessBlockedError';
+    this.tried = tried;
+  }
+}
+
 export async function resolveOpenAccess(doi: string): Promise<OpenAccessLocation | undefined> {
+  const tried: OpenAccessVia[] = [];
   for (const hop of OPEN_ACCESS_HOP_ORDER) {
-    const location = await HOPS[hop](doi);
+    tried.push(hop);
+    let location: OpenAccessLocation | undefined;
+    try {
+      location = await HOPS[hop](doi);
+    } catch (err) {
+      throw new OpenAccessBlockedError(err instanceof Error ? err.message : String(err), [
+        ...tried,
+      ]);
+    }
     if (location) return location;
   }
   return undefined;

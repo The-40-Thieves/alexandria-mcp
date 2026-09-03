@@ -56,6 +56,7 @@ export async function europmcRead(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi?: string;
 }> {
   const [src, srcId] = id.split(':');
 
@@ -74,6 +75,7 @@ export async function europmcRead(id: string): Promise<{
         authors: r?.authorString ? r.authorString.split(', ') : [],
         year: r?.pubYear ? parseInt(r.pubYear, 10) : undefined,
         language: 'en',
+        doi: r?.doi,
       };
     }
   } catch {
@@ -91,6 +93,7 @@ export async function europmcRead(id: string): Promise<{
     authors: r.authorString ? r.authorString.split(', ') : [],
     year: r.pubYear ? parseInt(r.pubYear, 10) : undefined,
     language: 'en',
+    doi: r.doi,
   };
 }
 

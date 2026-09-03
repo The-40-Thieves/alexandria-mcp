@@ -749,6 +749,22 @@ test('library_read open-access fallback', async (t) => {
     },
   });
 
+  register('t_read_short_text_no_doi', {
+    description:
+      'fixture: short text (no metadataOnly) but no DOI at all - never triggers the fallback',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read() {
+      return {
+        title: 'Short But Undoi-ed',
+        authors: ['C. Author'],
+        text: 'A short stub with no DOI anywhere.',
+      };
+    },
+  });
+
   const app = createHttpApp();
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -780,8 +796,27 @@ test('library_read open-access fallback', async (t) => {
 
   globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = String(input);
+    // crossref itself: a short abstract (well under MIN_FULL_TEXT_CHARS),
+    // no references, so the fallback triggers on short text rather than
+    // metadataOnly - this is the review round 1 Important-1 path.
+    if (url.includes('api.crossref.org/works/')) {
+      return new Response(
+        JSON.stringify({
+          message: {
+            DOI: '10.9999/crossref-fixture',
+            title: ['A Crossref Fixture Work'],
+            author: [{ given: 'A', family: 'Author' }],
+            abstract: '<jats:p>A short abstract, well under the full-text threshold.</jats:p>',
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (url.startsWith('https://doi.org/10.9999/crossref-fixture')) {
+      return new Response('bibtex unavailable', { status: 500 }); // optional; crossrefRead tolerates this
+    }
     if (url.includes('api.openalex.org')) {
-      if (url.includes('pdf-fixture')) {
+      if (url.includes('pdf-fixture') || url.includes('crossref-fixture')) {
         return new Response(
           JSON.stringify({ best_oa_location: { pdf_url: 'https://oa.example.org/paper.pdf' } }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -837,6 +872,45 @@ test('library_read open-access fallback', async (t) => {
     });
     // metadataOnly is untouched (still true) - the fallback never got real text.
     assert.equal(structured?.metadataOnly, true);
+  });
+
+  // Review round 1, Important 1: a REAL scholarly adapter (crossref, never
+  // metadataOnly) whose read() returns a short abstract plus a DOI must
+  // also run the fallback chain, not just a metadataOnly fixture.
+  await t.test(
+    'a real scholarly adapter (crossref) with a short abstract and a DOI runs the chain and gets PDF text with pages',
+    async () => {
+      const { result } = await call('library_read', {
+        id: '10.9999/crossref-fixture',
+        source: 'crossref',
+      });
+      assert.equal(result?.isError, undefined);
+      const structured = result?.structuredContent;
+      assert.equal(structured?.metadataOnly, false);
+      assert.equal(structured?.doi, '10.9999/crossref-fixture');
+      assert.equal(
+        structured?.text,
+        'Hello from page one of the fixture PDF.\n\nHello from page two of the fixture PDF.',
+      );
+      assert.deepEqual(structured?.pages, [
+        { page: 1, charStart: 0, charEnd: 39 },
+        { page: 2, charStart: 41, charEnd: 80 },
+      ]);
+      // The original abstract is preserved, not discarded.
+      assert.match(
+        String(structured?.note),
+        /A short abstract, well under the full-text threshold\./,
+      );
+      assert.equal(structured?.unavailable, undefined);
+    },
+  );
+
+  await t.test('a short-text result with no DOI anywhere never triggers the fallback', async () => {
+    const { result } = await call('library_read', { id: 'x3', source: 't_read_short_text_no_doi' });
+    assert.equal(result?.isError, undefined);
+    const structured = result?.structuredContent;
+    assert.equal(structured?.text, 'A short stub with no DOI anywhere.');
+    assert.equal(structured?.unavailable, undefined);
   });
 });
 

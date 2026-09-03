@@ -88,6 +88,7 @@ defineRest<DataciteListResponse>({
         authors: creatorNames(a.creators),
         year: a.publicationYear,
         language: a.language,
+        doi: a.doi,
         ...truncateText(text),
       };
     },

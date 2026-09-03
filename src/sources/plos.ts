@@ -44,6 +44,7 @@ export async function plosRead(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi: string;
 }> {
   const data = await fetchJSON<PLOSResponse>(
     `${BASE}?q=id:"${encodeURIComponent(id)}"&fl=${FIELDS}&wt=json`,
@@ -56,6 +57,7 @@ export async function plosRead(id: string): Promise<{
     authors: d.author || [],
     year: d.publication_date ? parseInt(d.publication_date.substring(0, 4), 10) : undefined,
     language: 'en',
+    doi: d.id, // PLOS article ids ARE DOIs (see previewUrl above)
   };
 }
 

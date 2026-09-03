@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { mapPaper, s2Search } from '../semanticscholar.ts';
+import { mapPaper, s2Read, s2Search } from '../semanticscholar.ts';
 
 const fixture = JSON.parse(
   readFileSync(path.resolve(process.cwd(), 'eval/fixtures/semanticscholar-search.json'), 'utf8'),
@@ -74,6 +74,19 @@ test('s2Search fails fast (no sleep, no retry) when Retry-After exceeds the cap'
     );
     assert.equal(calls, 1); // no retry attempted
     assert.ok(Date.now() - t0 < 500); // no 24h sleep leaked
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('s2Read carries externalIds.DOI through as doi', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify(fixture.data[0]), { status: 200 })) as typeof fetch;
+  try {
+    const result = await s2Read('13c6de882218ba6c689ca5c035708b1b0e6f6b9c');
+    assert.equal(result.title, 'Deep Learning');
+    assert.equal(result.doi, fixture.data[0].externalIds.DOI);
   } finally {
     globalThis.fetch = originalFetch;
   }

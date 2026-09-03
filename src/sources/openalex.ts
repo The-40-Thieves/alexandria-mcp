@@ -86,6 +86,7 @@ export async function openalexRead(id: string): Promise<{
   authors: string[];
   year?: number;
   language?: string;
+  doi?: string;
 }> {
   const w = await fetchJSON<OAWork>(`${BASE}/works/${id}?${authParam()}`);
   const abstract = invertedToAbstract(w.abstract_inverted_index);
@@ -95,6 +96,9 @@ export async function openalexRead(id: string): Promise<{
     authors: (w.authorships || []).map((a) => a.author.display_name),
     year: w.publication_year,
     language: w.language,
+    // OpenAlex's `doi` field is the full https://doi.org/... URL, not the
+    // bare DOI every OA hop's URL construction (openAccess.ts) expects.
+    doi: w.doi?.replace(/^https?:\/\/doi\.org\//, ''),
   };
 }
 
