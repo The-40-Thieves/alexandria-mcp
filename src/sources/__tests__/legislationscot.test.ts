@@ -54,6 +54,25 @@ test('normalizeLegislationScot', async (t) => {
     const out = normalizeLegislationScot('<feed><entry><title>No id here</title></entry></feed>');
     assert.deepEqual(out, []);
   });
+
+  // Final wave, A4: same fix as legislation.ts - cleanField now routes
+  // through the shared textOf() instead of a bare `(s ?? '').trim()`, so
+  // an attribute on id/title/updated (which fast-xml-parser turns into an
+  // object, not a string) no longer crashes with "s.trim is not a
+  // function".
+  await t.test('an attributed leaf (id/title/updated with an attribute) does not crash', () => {
+    const out = normalizeLegislationScot(
+      '<feed><entry>' +
+        '<id xml:lang="en">http://www.legislation.gov.uk/id/asp/2024/1</id>' +
+        '<title type="main">An Act with an attributed title</title>' +
+        '<updated tz="Z">2024-01-01T00:00:00Z</updated>' +
+        '</entry></feed>',
+    );
+    assert.equal(out.length, 1);
+    assert.equal(out[0].id, 'id/asp/2024/1');
+    assert.equal(out[0].title, 'An Act with an attributed title');
+    assert.equal(out[0].year, 2024);
+  });
 });
 
 test('extractTitle', async (t) => {

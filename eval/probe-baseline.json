@@ -1,432 +1,432 @@
 {
-  "generatedAt": "2026-09-02T06:43:44.213Z",
+  "generatedAt": "2026-09-03T04:35:49.495Z",
   "results": {
     "gutenberg": {
-      "status": "OK",
-      "ms": 110,
-      "count": 30
+      "status": "TIMEOUT",
+      "ms": 15027,
+      "count": 0,
+      "message": "This operation was aborted"
     },
     "openlibrary": {
       "status": "OK",
-      "ms": 1569,
+      "ms": 1873,
       "count": 2
     },
     "archive": {
       "status": "OK",
-      "ms": 1403,
+      "ms": 553,
       "count": 2
     },
     "sacredtexts": {
       "status": "OK",
-      "ms": 1,
+      "ms": 9,
       "count": 2
     },
     "wikisource": {
       "status": "OK",
-      "ms": 202,
+      "ms": 424,
       "count": 2
     },
     "standardebooks": {
       "status": "OK",
-      "ms": 50,
+      "ms": 198,
       "count": 1
     },
     "perseus": {
       "status": "OK",
-      "ms": 1,
+      "ms": 9,
       "count": 2
     },
     "ctext": {
       "status": "OK",
-      "ms": 159,
+      "ms": 463,
       "count": 1
     },
     "gallica": {
       "status": "EMPTY",
-      "ms": 410,
+      "ms": 637,
       "count": 0
     },
     "loc": {
       "status": "OK",
-      "ms": 35,
+      "ms": 101,
       "count": 2
     },
     "hathitrust": {
       "status": "EMPTY",
-      "ms": 0,
+      "ms": 8,
       "count": 0
     },
     "dpla": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 5,
       "count": 0,
       "message": "DPLA requires DPLA_API_KEY. Register a free key at: https://pro.dp.la/developers/policies#getting-a-key then set DPLA_API_KEY in your environment."
     },
     "ndl": {
       "status": "OK",
-      "ms": 27,
+      "ms": 285,
       "count": 2
     },
     "europeana": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 3,
       "count": 0,
       "message": "Europeana requires EUROPEANA_API_KEY. Register a free key at: https://pro.europeana.eu/page/developer-keys then set EUROPEANA_API_KEY in your environment."
     },
     "trove": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "Trove requires a free API key. Register at: https://trove.nla.gov.au/about/create-something/using-api then set TROVE_API_KEY in your environment."
     },
     "bhl": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 4,
       "count": 0,
-      "message": "BHL requires a free API key. Register at: https://www.biodiversitylibrary.org/getapikey.aspx then set BHL_API_KEY in your environment."
+      "message": "bhl requires BHL_API_KEY"
     },
     "digitalnz": {
       "status": "OK",
-      "ms": 1016,
+      "ms": 1113,
       "count": 2
     },
     "internetclassics": {
       "status": "OK",
-      "ms": 0,
+      "ms": 6,
       "count": 2
     },
     "marxists": {
       "status": "OK",
-      "ms": 376,
+      "ms": 716,
       "count": 2
     },
     "projectruneberg": {
       "status": "OK",
-      "ms": 1,
+      "ms": 6,
       "count": 2
     },
     "cervantes": {
       "status": "OK",
-      "ms": 485,
+      "ms": 227,
       "count": 2
     },
     "doab": {
       "status": "OK",
-      "ms": 797,
+      "ms": 748,
       "count": 2
     },
     "googlebooks": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "Google Books requires GOOGLE_BOOKS_API_KEY (the shared keyless quota is exhausted, confirmed live: every unauthenticated request returns 429 \"Quota exceeded\"). "
     },
     "chroniclingamerica": {
       "status": "OK",
-      "ms": 47,
+      "ms": 70,
       "count": 2
     },
     "ccel": {
       "status": "OK",
-      "ms": 1,
+      "ms": 5,
       "count": 2
     },
     "wdl": {
       "status": "OK",
-      "ms": 28,
+      "ms": 136,
       "count": 2
     },
     "datagov": {
       "status": "OK",
-      "ms": 28,
+      "ms": 202,
       "count": 2
     },
     "arxiv": {
       "status": "OK",
-      "ms": 102,
+      "ms": 756,
       "count": 2
     },
     "core": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 3,
       "count": 0,
       "message": "CORE requires CORE_API_KEY. Register a free key at: https://core.ac.uk/services/api then set CORE_API_KEY in your environment."
     },
     "europmc": {
       "status": "OK",
-      "ms": 675,
+      "ms": 1186,
       "count": 2
     },
     "nasa": {
       "status": "OK",
-      "ms": 674,
+      "ms": 587,
       "count": 2
     },
     "osti": {
       "status": "OK",
-      "ms": 277,
+      "ms": 219,
       "count": 2
     },
     "eric": {
       "status": "OK",
-      "ms": 166,
+      "ms": 549,
       "count": 2
     },
     "nsf": {
       "status": "OK",
-      "ms": 96,
+      "ms": 68,
       "count": 2
     },
     "courtlistener": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 2,
       "count": 0,
       "message": "CourtListener requires COURTLISTENER_API_KEY. Register a free key at: https://www.courtlistener.com/help/api/ then set COURTLISTENER_API_KEY in your environment"
     },
     "biorxiv": {
       "status": "OK",
-      "ms": 2051,
+      "ms": 1527,
       "count": 2
     },
     "zenodo": {
       "status": "OK",
-      "ms": 2280,
+      "ms": 2226,
       "count": 2
     },
     "semanticscholar": {
       "status": "ERROR",
-      "ms": 1185,
+      "ms": 1487,
       "count": 0,
       "message": "HTTP 429 , url: https://api.semanticscholar.org/graph/v1/paper/search?query=history%20of%20science&fields=paperId,title,authors,year,abstract,openAccessPdf,exte"
     },
     "govinfo": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 3,
       "count": 0,
       "message": "GovInfo requires GOVINFO_API_KEY. Register a free key at: https://api.govinfo.gov/docs/ then set GOVINFO_API_KEY in your environment."
     },
     "nih": {
       "status": "OK",
-      "ms": 477,
+      "ms": 171,
       "count": 2
     },
     "nbnorway": {
       "status": "OK",
-      "ms": 576,
+      "ms": 1170,
       "count": 2
     },
     "legislation": {
-      "status": "EMPTY",
-      "ms": 104,
-      "count": 0
+      "status": "OK",
+      "ms": 376,
+      "count": 2
     },
     "osf": {
       "status": "OK",
-      "ms": 1421,
+      "ms": 2702,
       "count": 2
     },
     "earlyprint": {
       "status": "ERROR",
-      "ms": 56,
+      "ms": 116,
       "count": 0,
       "message": "HTTP 404 Not Found, url: https://eplab.artsci.wustl.edu/blacklab-server/earlyprint/docs?filter=title%3Ahistory%20of%20science%20OR%20author%3Ahistory%20of%20sci"
     },
     "openiti": {
       "status": "OK",
-      "ms": 153,
+      "ms": 294,
       "count": 2
     },
     "legislationscot": {
       "status": "OK",
-      "ms": 9,
+      "ms": 512,
       "count": 2
     },
     "openalex": {
       "status": "OK",
-      "ms": 519,
+      "ms": 1076,
       "count": 2
     },
     "plos": {
       "status": "OK",
-      "ms": 60,
+      "ms": 224,
       "count": 2
     },
     "nasaads": {
-      "status": "ERROR",
-      "ms": 0,
+      "status": "KEY_MISSING",
+      "ms": 2,
       "count": 0,
-      "message": "NASA_ADS_API_KEY is not set. Register free at https://ui.adsabs.harvard.edu/user/settings/token"
+      "message": "nasaads requires NASA_ADS_API_KEY"
     },
     "smithsonian": {
-      "status": "ERROR",
-      "ms": 0,
+      "status": "KEY_MISSING",
+      "ms": 3,
       "count": 0,
-      "message": "SMITHSONIAN_API_KEY is not set. Register free at https://api.data.gov/signup/"
+      "message": "smithsonian requires SMITHSONIAN_API_KEY"
     },
     "doaj": {
       "status": "OK",
-      "ms": 220,
+      "ms": 308,
       "count": 2
     },
     "nara": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 2,
       "count": 0,
       "message": "NARA requires NARA_API_KEY. Register a free key at: https://www.archives.gov/research/catalog/help/api then set NARA_API_KEY in your environment."
     },
     "springer": {
-      "status": "ERROR",
-      "ms": 0,
+      "status": "KEY_MISSING",
+      "ms": 3,
       "count": 0,
-      "message": "SPRINGER_META_API_KEY is not set. Register at https://dev.springernature.com/"
+      "message": "springer requires SPRINGER_META_API_KEY"
     },
     "harvardlib": {
       "status": "ERROR",
-      "ms": 80,
+      "ms": 167,
       "count": 0,
-      "message": "HTTP 429 , url: https://api.lib.harvard.edu/v2/items.dc.json?q=history%20of%20science&limit=2&start=1"
+      "message": "HTTP 429 Too Many Requests, url: https://api.lib.harvard.edu/v2/items.dc.json?q=history%20of%20science&limit=2&start=1"
     },
     "apollo": {
       "status": "OK",
-      "ms": 412,
+      "ms": 801,
       "count": 2
     },
     "ora": {
       "status": "OK",
-      "ms": 740,
+      "ms": 876,
       "count": 2
     },
     "codewiki": {
       "status": "EMPTY",
-      "ms": 339,
+      "ms": 415,
       "count": 0
     },
     "youtube": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
-      "message": "youtube requires YOUTUBE_API_KEY for search"
+      "message": "youtube requires YOUTUBE_API_KEY"
     },
     "exploitdb": {
       "status": "OK",
-      "ms": 30,
+      "ms": 146,
       "count": 2
     },
     "msrc": {
       "status": "OK",
-      "ms": 960,
+      "ms": 970,
       "count": 2
     },
     "projectzero": {
       "status": "OK",
-      "ms": 345,
+      "ms": 560,
       "count": 2
     },
     "cisco-psirt": {
       "status": "OK",
-      "ms": 452,
+      "ms": 586,
       "count": 2
     },
     "bleepingcomputer": {
       "status": "OK",
-      "ms": 60,
+      "ms": 92,
       "count": 2
     },
     "allafrica": {
       "status": "OK",
-      "ms": 103,
+      "ms": 112,
       "count": 2
     },
     "arabnews": {
       "status": "OK",
-      "ms": 372,
+      "ms": 311,
       "count": 2
     },
     "thehindu-intl": {
       "status": "OK",
-      "ms": 47,
+      "ms": 77,
       "count": 2
     },
     "abc-world": {
       "status": "OK",
-      "ms": 234,
+      "ms": 359,
       "count": 2
     },
     "folha-en": {
-      "status": "TIMEOUT",
-      "ms": 20001,
-      "count": 0,
-      "message": "This operation was aborted"
+      "status": "OK",
+      "ms": 882,
+      "count": 2
     },
     "dw": {
       "status": "OK",
-      "ms": 238,
+      "ms": 140,
       "count": 2
     },
     "france24": {
       "status": "OK",
-      "ms": 42,
+      "ms": 57,
       "count": 2
     },
     "aljazeera": {
       "status": "OK",
-      "ms": 98,
+      "ms": 120,
       "count": 2
     },
     "almonitor": {
       "status": "OK",
-      "ms": 103,
+      "ms": 123,
       "count": 2
     },
     "thediplomat": {
       "status": "OK",
-      "ms": 46,
+      "ms": 47,
       "count": 2
     },
     "nikkeiasia": {
       "status": "OK",
-      "ms": 21,
+      "ms": 52,
       "count": 2
     },
     "dailymaverick": {
       "status": "OK",
-      "ms": 46,
+      "ms": 324,
       "count": 2
     },
     "restofworld": {
       "status": "OK",
-      "ms": 17,
+      "ms": 63,
       "count": 2
     },
     "scmp": {
       "status": "OK",
-      "ms": 520,
+      "ms": 573,
       "count": 2
     },
     "nist-csrc": {
       "status": "OK",
-      "ms": 73,
+      "ms": 801,
       "count": 2
     },
     "lobsters": {
       "status": "OK",
-      "ms": 39,
+      "ms": 134,
       "count": 2
     },
     "ecosystems": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "ecosystems requires CONTACT_EMAIL"
     },
     "depsdev": {
       "status": "OK",
-      "ms": 31,
+      "ms": 191,
       "count": 2
     },
     "stackexchange": {
       "status": "OK",
-      "ms": 121,
+      "ms": 246,
       "count": 2
     },
     "hn": {
@@ -436,294 +436,295 @@
     },
     "devto": {
       "status": "OK",
-      "ms": 13,
+      "ms": 38,
       "count": 2
     },
     "githubsearch": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "githubsearch requires GITHUB_TOKEN"
     },
     "peps": {
       "status": "OK",
-      "ms": 18,
+      "ms": 154,
       "count": 2
     },
     "tc39": {
       "status": "OK",
-      "ms": 17,
+      "ms": 195,
       "count": 2
     },
     "swiftevolution": {
       "status": "OK",
-      "ms": 61,
+      "ms": 120,
       "count": 2
     },
     "mdn": {
       "status": "OK",
-      "ms": 18,
+      "ms": 224,
       "count": 10
     },
     "context7": {
       "status": "OK",
-      "ms": 1002,
+      "ms": 939,
       "count": 2
     },
     "ietf": {
       "status": "OK",
-      "ms": 96,
+      "ms": 136,
       "count": 2
     },
     "w3c": {
       "status": "OK",
-      "ms": 43,
+      "ms": 4767,
       "count": 2
     },
     "googlenews": {
       "status": "OK",
-      "ms": 1250,
+      "ms": 1185,
       "count": 2
     },
     "nhk": {
       "status": "OK",
-      "ms": 46,
+      "ms": 191,
       "count": 2
     },
     "circl": {
       "status": "OK",
-      "ms": 295,
+      "ms": 443,
       "count": 2
     },
     "osv": {
       "status": "OK",
-      "ms": 1079,
+      "ms": 1186,
       "count": 1
     },
     "ghsa": {
       "status": "OK",
-      "ms": 173,
+      "ms": 157,
       "count": 2
     },
     "kev": {
       "status": "OK",
-      "ms": 82,
+      "ms": 75,
       "count": 2
     },
     "euvd": {
       "status": "OK",
-      "ms": 604,
+      "ms": 974,
       "count": 2
     },
     "epss": {
       "status": "OK",
-      "ms": 12,
+      "ms": 58,
       "count": 1
     },
     "nvd": {
       "status": "OK",
-      "ms": 101,
+      "ms": 1779,
       "count": 2
     },
     "cwe": {
       "status": "OK",
-      "ms": 25,
+      "ms": 50,
       "count": 1
     },
     "attack": {
       "status": "OK",
-      "ms": 553,
+      "ms": 641,
       "count": 2
     },
     "twelvedata": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "twelvedata requires TWELVEDATA_API_KEY"
     },
     "coingecko": {
       "status": "OK",
-      "ms": 37,
+      "ms": 95,
       "count": 2
     },
     "frankfurter": {
       "status": "OK",
-      "ms": 20,
+      "ms": 46,
       "count": 1
     },
     "eia": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 3,
       "count": 0,
       "message": "eia requires EIA_API_KEY"
     },
     "fred": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "fred requires FRED_API_KEY"
     },
     "dbnomics": {
       "status": "OK",
-      "ms": 982,
+      "ms": 7934,
       "count": 2
     },
     "comtrade": {
       "status": "OK",
-      "ms": 987,
+      "ms": 2592,
       "count": 2
     },
     "census": {
       "status": "OK",
-      "ms": 617,
+      "ms": 5719,
       "count": 2
     },
     "openfda": {
       "status": "OK",
-      "ms": 465,
+      "ms": 3248,
       "count": 2
     },
     "epatri": {
       "status": "OK",
-      "ms": 499,
+      "ms": 476,
       "count": 3
     },
     "hud": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 3,
       "count": 0,
       "message": "hud requires HUD_API_TOKEN"
     },
     "rentcast": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "rentcast requires RENTCAST_API_KEY"
     },
     "gdelt": {
       "status": "ERROR",
-      "ms": 28898,
+      "ms": 25838,
       "count": 0,
       "message": "fetch failed"
     },
     "newsdata": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 4,
       "count": 0,
       "message": "newsdata requires NEWSDATA_API_KEY"
     },
     "guardian": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 4,
       "count": 0,
       "message": "guardian requires GUARDIAN_API_KEY"
     },
     "hapi": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "hapi requires HDX_APP_IDENTIFIER"
     },
     "reliefweb": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "reliefweb requires RELIEFWEB_APPNAME"
     },
     "ucdp": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 3,
       "count": 0,
       "message": "ucdp requires UCDP_TOKEN"
     },
     "wikicurrent": {
       "status": "OK",
-      "ms": 140,
+      "ms": 219,
       "count": 2
     },
     "federalregister": {
       "status": "OK",
-      "ms": 17,
+      "ms": 173,
       "count": 2
     },
     "congress": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 4,
       "count": 0,
       "message": "congress requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)"
     },
     "regulations": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 3,
       "count": 0,
       "message": "regulations requires DATA_GOV_API_KEY (or GOVINFO_API_KEY)"
     },
     "ukparliament": {
       "status": "OK",
-      "ms": 24,
+      "ms": 11483,
       "count": 2
     },
     "hfpapers": {
       "status": "OK",
-      "ms": 1623,
+      "ms": 1704,
       "count": 2
     },
     "paperswithcode": {
       "status": "OK",
-      "ms": 388,
+      "ms": 557,
       "count": 50
     },
     "huggingface": {
       "status": "OK",
-      "ms": 1682,
+      "ms": 1753,
       "count": 2
     },
     "context7mcp": {
       "status": "OK",
-      "ms": 1668,
+      "ms": 1314,
       "count": 2
     },
     "jina": {
       "status": "EMPTY",
-      "ms": 121,
+      "ms": 546,
       "count": 0
     },
     "jinaarxiv": {
       "status": "EMPTY",
-      "ms": 55,
+      "ms": 105,
       "count": 0
     },
     "mdnmcp": {
       "status": "OK",
-      "ms": 417,
+      "ms": 1061,
       "count": 2
     },
     "githubmcp": {
       "status": "KEY_MISSING",
-      "ms": 1,
+      "ms": 2,
       "count": 0,
       "message": "githubmcp requires an API token or credential that is not configured"
     },
     "searxng": {
-      "status": "OK",
-      "ms": 1706,
-      "count": 2
+      "status": "KEY_MISSING",
+      "ms": 3,
+      "count": 0,
+      "message": "searxng requires the SEARXNG_URL environment variable"
     },
     "jinasearch": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 2,
       "count": 0,
       "message": "jinasearch requires JINA_API_KEY"
     },
     "tavily": {
       "status": "KEY_MISSING",
-      "ms": 0,
+      "ms": 2,
       "count": 0,
       "message": "tavily requires TAVILY_API_KEY"
     },
     "webfetch": {
       "status": "EMPTY",
-      "ms": 1,
+      "ms": 5,
       "count": 0
     }
   }

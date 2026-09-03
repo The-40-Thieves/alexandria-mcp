@@ -41,6 +41,16 @@ function parseId(raw: string): string {
   return raw.replace(/^https?:\/\/arxiv\.org\/abs\//, '').replace(/v\d+$/, '');
 }
 
+// A self-closing `<name/>` (no attributes, no text) parses to '', so
+// cleanField(a.name) yields '' rather than undefined - unfiltered, that
+// added a spurious empty-string author the pre-migration node-html-parser
+// extraction never produced (final wave, B7).
+function authorsOf(entry: Pick<ArxivEntry, 'author'> | undefined): string[] {
+  return asArray(entry?.author)
+    .map((a) => cleanField(a.name))
+    .filter(Boolean);
+}
+
 function entriesOf(xml: string): ArxivEntry[] {
   const doc = parseXml<ArxivFeed>(xml, { isArray: ['entry', 'author'] });
   return asArray(doc.feed?.entry);
@@ -52,7 +62,7 @@ export function normalizeArxiv(xml: string): LibraryResult[] {
     const title = cleanField(entry.title);
     const summary = cleanField(entry.summary);
     const published = cleanField(entry.published);
-    const authors = asArray(entry.author).map((a) => cleanField(a.name));
+    const authors = authorsOf(entry);
     const cat = entry['arxiv:primary_category']?.['@_term'];
     return {
       id,
@@ -93,7 +103,7 @@ export async function arxivRead(id: string): Promise<{
       return {
         text: fullText,
         title: cleanField(entry?.title) || id,
-        authors: asArray(entry?.author).map((a) => cleanField(a.name)),
+        authors: authorsOf(entry),
         year: published ? parseInt(published.substring(0, 4), 10) : undefined,
         language: 'en',
       };
@@ -109,7 +119,7 @@ export async function arxivRead(id: string): Promise<{
   return {
     text: cleanField(entry?.summary) || `No text available for arxiv:${id}`,
     title: cleanField(entry?.title) || id,
-    authors: asArray(entry?.author).map((a) => cleanField(a.name)),
+    authors: authorsOf(entry),
     year: published ? parseInt(published.substring(0, 4), 10) : undefined,
     language: 'en',
   };

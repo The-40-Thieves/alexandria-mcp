@@ -42,6 +42,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { Config } from '../config.ts';
 import { config } from '../config.ts';
 import { log } from '../log.ts';
+import { SECURE_DIR_MODE, secureSqliteFile } from './fileMode.ts';
 
 export interface StateStore {
   /** Current reserved count for `source` on `day` (0 if never reserved). */
@@ -59,7 +60,7 @@ export interface StateStore {
   /** The cached value for `key`, or undefined if absent or expired. */
   getCache<T = unknown>(key: string, now?: number): T | undefined;
   /** Stores `value` under `key`, replacing any prior TTL cap enforcement. */
-  setCache<T = unknown>(key: string, value: T, expiresAt: number): void;
+  setCache<T = unknown>(key: string, value: T, expiresAt: number, now?: number): void;
   /** Removes every cache entry whose expiresAt is at or before `now`. Returns the count removed. */
   evictExpired(now?: number): number;
   /** Raw row/entry count in the cache (used by /health; may include entries not yet lazily evicted). */
@@ -68,6 +69,37 @@ export interface StateStore {
 }
 
 const DEFAULT_CACHE_MAX = 500;
+
+// resultCache.ts's routingCache prefixes every key with this (see that
+// module's comment on routingCacheKey for why "routing-decision|" in
+// particular can never collide with a cacheKey(source, ...) entry). Final
+// wave, A8: the cache table's cacheMax cap used to be shared by both
+// callers of one StateStore (searchCache and routingCache), so a burst of
+// routing decisions could evict search results and vice versa. Both
+// setCache() implementations below cap the routing-decision namespace and
+// everything else independently at cacheMax each, using this prefix as
+// the split point - defined here (not resultCache.ts, which imports FROM
+// this module) so both sides share one source of truth instead of two
+// copies of the literal string drifting apart.
+export const ROUTING_CACHE_KEY_PREFIX = 'routing-decision|';
+
+function isRoutingCacheKey(key: string): boolean {
+  return key.startsWith(ROUTING_CACHE_KEY_PREFIX);
+}
+
+// Final wave, A9: quota rows/keys are one-per-source-per-UTC-day and were
+// never pruned, so they accumulate forever. `day` is always the
+// 'YYYY-MM-DD' shape quotaLedger.ts's callers already use, which sorts
+// (and subtracts) correctly as a plain string/Date - no calendar library
+// needed. Called once per genuinely new `day` seen by reserveQuota() in
+// both implementations, not on every call, since it needs to scan/delete.
+const QUOTA_RETENTION_DAYS = 7;
+
+function cutoffDay(day: string, retentionDays: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - retentionDays);
+  return d.toISOString().slice(0, 10);
+}
 
 // ─── MemoryStateStore ────────────────────────────────────────────────────
 
@@ -82,6 +114,7 @@ export class MemoryStateStore implements StateStore {
   private quota = new Map<string, Map<string, number>>();
   private cache = new Map<string, CacheEntry>();
   private cacheMax: number;
+  private lastPrunedQuotaDay: string | undefined;
 
   constructor(cacheMax = DEFAULT_CACHE_MAX) {
     this.cacheMax = cacheMax;
@@ -92,6 +125,13 @@ export class MemoryStateStore implements StateStore {
   }
 
   reserveQuota(source: string, day: string, cap: number): number | null {
+    if (day !== this.lastPrunedQuotaDay) {
+      const cutoff = cutoffDay(day, QUOTA_RETENTION_DAYS);
+      for (const d of this.quota.keys()) {
+        if (d < cutoff) this.quota.delete(d);
+      }
+      this.lastPrunedQuotaDay = day;
+    }
     let sources = this.quota.get(day);
     if (!sources) {
       sources = new Map();
@@ -116,16 +156,40 @@ export class MemoryStateStore implements StateStore {
     return entry.value as T;
   }
 
-  setCache<T>(key: string, value: T, expiresAt: number): void {
+  setCache<T>(key: string, value: T, expiresAt: number, now = Date.now()): void {
+    // Expired-but-not-yet-evicted rows must not count against the cap -
+    // otherwise a burst of short-TTL entries that have already logically
+    // expired can still crowd out a fresh one (final wave, A8/A9). `now`
+    // defaults to Date.now() but is threaded through explicitly (rather
+    // than each call reading the real clock independently) so a caller
+    // with its own notion of "now" - ResultCache#set already computes one
+    // - and a test with a synthetic clock both see one consistent value.
+    this.evictExpired(now);
     // Map preserves insertion order and re-setting an existing key does
     // not move it, so only a genuinely new key at capacity evicts (the
     // oldest, by iteration order) - matching resultCache.ts's prior
-    // behavior exactly.
-    if (!this.cache.has(key) && this.cache.size >= this.cacheMax) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey !== undefined) this.cache.delete(oldestKey);
+    // behavior exactly. The routing-decision namespace and everything else
+    // are capped independently (final wave, A8) so one can never evict the
+    // other.
+    if (!this.cache.has(key) && this.namespaceSize(key) >= this.cacheMax) {
+      const routing = isRoutingCacheKey(key);
+      for (const oldestKey of this.cache.keys()) {
+        if (isRoutingCacheKey(oldestKey) === routing) {
+          this.cache.delete(oldestKey);
+          break;
+        }
+      }
     }
     this.cache.set(key, { value, expiresAt });
+  }
+
+  private namespaceSize(key: string): number {
+    const routing = isRoutingCacheKey(key);
+    let count = 0;
+    for (const k of this.cache.keys()) {
+      if (isRoutingCacheKey(k) === routing) count++;
+    }
+    return count;
   }
 
   evictExpired(now = Date.now()): number {
@@ -153,11 +217,16 @@ export class MemoryStateStore implements StateStore {
 export class SqliteStateStore implements StateStore {
   private db: DatabaseSync;
   private cacheMax: number;
+  // Final wave, A7: warn at most once per corrupt/truncated key, not once
+  // per read - a hot key with a bad row would otherwise log on every
+  // guarded search()/planRoute() call that misses.
+  private warnedCorruptKeys = new Set<string>();
+  private lastPrunedQuotaDay: string | undefined;
 
   constructor(dbPath: string, cacheMax = DEFAULT_CACHE_MAX) {
     this.cacheMax = cacheMax;
     if (dbPath !== ':memory:') {
-      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true, mode: SECURE_DIR_MODE });
     }
     this.db = new DatabaseSync(dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
@@ -176,6 +245,12 @@ export class SqliteStateStore implements StateStore {
         expiresAt INTEGER NOT NULL
       )
     `);
+    // alexandria.db holds the quota ledger and cached search/routing
+    // decisions; DatabaseSync creates the file (and, once the CREATE
+    // TABLE statements above have written under WAL mode, its -wal/-shm
+    // siblings) with the process umask, so tighten all of them to
+    // owner-only here, after they exist (final wave, A5).
+    secureSqliteFile(dbPath);
   }
 
   getQuota(source: string, day: string): number {
@@ -186,6 +261,13 @@ export class SqliteStateStore implements StateStore {
   }
 
   reserveQuota(source: string, day: string, cap: number): number | null {
+    // Final wave, A9: one row per source per UTC day accumulates forever
+    // otherwise. Only runs the DELETE on the first reservation of a
+    // genuinely new day, not on every call.
+    if (day !== this.lastPrunedQuotaDay) {
+      this.db.prepare('DELETE FROM quota WHERE day < ?').run(cutoffDay(day, QUOTA_RETENTION_DAYS));
+      this.lastPrunedQuotaDay = day;
+    }
     // INSERT ... ON CONFLICT DO UPDATE ... RETURNING is one statement, so
     // it is atomic with respect to any other synchronous call on this same
     // DatabaseSync connection - and DatabaseSync is synchronous end to
@@ -219,22 +301,60 @@ export class SqliteStateStore implements StateStore {
       this.db.prepare('DELETE FROM cache WHERE key = ?').run(key);
       return undefined;
     }
-    return JSON.parse(row.value) as T;
+    // A corrupt or truncated value (a partial write, a disk-level bit flip,
+    // a manual edit) must miss like any other cache miss, not throw into
+    // the guarded search() or planRoute() paths above this store. Delete
+    // the bad row so it doesn't keep failing on every subsequent read.
+    try {
+      return JSON.parse(row.value) as T;
+    } catch (err) {
+      this.db.prepare('DELETE FROM cache WHERE key = ?').run(key);
+      if (!this.warnedCorruptKeys.has(key)) {
+        this.warnedCorruptKeys.add(key);
+        const message = err instanceof Error ? err.message : String(err);
+        log.warn({ key, message }, 'state store: corrupt cache row, treating as a miss');
+      }
+      return undefined;
+    }
   }
 
-  setCache<T>(key: string, value: T, expiresAt: number): void {
+  setCache<T>(key: string, value: T, expiresAt: number, now = Date.now()): void {
+    // Expired-but-not-yet-evicted rows must not count against the cap
+    // (final wave, A8/A9). See MemoryStateStore's setCache for why `now`
+    // is threaded through rather than read from the clock a second time.
+    this.evictExpired(now);
     const exists = this.db.prepare('SELECT 1 FROM cache WHERE key = ?').get(key);
     if (!exists) {
-      const { count } = this.db.prepare('SELECT COUNT(*) AS count FROM cache').get() as {
-        count: number;
-      };
+      // The routing-decision namespace and everything else are capped
+      // independently (final wave, A8) so a burst of routing decisions can
+      // never evict search results, or vice versa: a LIKE-scoped count and
+      // a LIKE-scoped oldest-row delete, rather than the whole table.
+      const routing = isRoutingCacheKey(key);
+      const likePattern = routing ? `${ROUTING_CACHE_KEY_PREFIX}%` : null;
+      const { count } = (
+        likePattern
+          ? this.db.prepare('SELECT COUNT(*) AS count FROM cache WHERE key LIKE ?').get(likePattern)
+          : this.db
+              .prepare('SELECT COUNT(*) AS count FROM cache WHERE key NOT LIKE ?')
+              .get(`${ROUTING_CACHE_KEY_PREFIX}%`)
+      ) as { count: number };
       if (count >= this.cacheMax) {
         // Oldest by rowid: an UPDATE (the ON CONFLICT path below) never
         // changes a row's rowid, only a fresh INSERT does, so rowid order
         // tracks insertion order the same way resultCache.ts's Map did.
-        this.db.exec(
-          'DELETE FROM cache WHERE rowid = (SELECT rowid FROM cache ORDER BY rowid ASC LIMIT 1)',
-        );
+        if (likePattern) {
+          this.db
+            .prepare(
+              'DELETE FROM cache WHERE rowid = (SELECT rowid FROM cache WHERE key LIKE ? ORDER BY rowid ASC LIMIT 1)',
+            )
+            .run(likePattern);
+        } else {
+          this.db
+            .prepare(
+              'DELETE FROM cache WHERE rowid = (SELECT rowid FROM cache WHERE key NOT LIKE ? ORDER BY rowid ASC LIMIT 1)',
+            )
+            .run(`${ROUTING_CACHE_KEY_PREFIX}%`);
+        }
       }
     }
     this.db
@@ -327,8 +447,8 @@ class LazyStateStore implements StateStore {
     return this.target().getCache<T>(key, now);
   }
 
-  setCache<T = unknown>(key: string, value: T, expiresAt: number): void {
-    this.target().setCache(key, value, expiresAt);
+  setCache<T = unknown>(key: string, value: T, expiresAt: number, now?: number): void {
+    this.target().setCache(key, value, expiresAt, now);
   }
 
   evictExpired(now?: number): number {
@@ -351,3 +471,12 @@ class LazyStateStore implements StateStore {
 }
 
 export const stateStore: StateStore = new LazyStateStore();
+
+// Final wave, A11: a named entry point for index.ts's shutdown hook,
+// alongside dispatcher.ts's closeDispatchers() - closes the sqlite
+// connection (if one was ever opened; LazyStateStore#close() only closes
+// what it actually built) so a clean SIGTERM/SIGINT doesn't leave a
+// dangling file handle.
+export function closeStateStore(): void {
+  stateStore.close();
+}

@@ -19,6 +19,7 @@ function rawRequest(port: number, requestLine: string, timeoutMs = 3000): Promis
     const finish = () => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       socket.destroy();
       resolve(data);
     };
@@ -28,7 +29,14 @@ function rawRequest(port: number, requestLine: string, timeoutMs = 3000): Promis
     });
     socket.on('error', finish);
     socket.on('close', finish);
-    setTimeout(finish, timeoutMs);
+    // Final wave, B6: finish() used to leave this timer running even after
+    // an earlier trigger (data/error/close) already settled - harmless
+    // (the `settled` guard no-ops the late fire) but it kept a handle open
+    // for the rest of timeoutMs regardless. clearTimeout in finish() above
+    // stops that on the common early-settle path; unref() covers the
+    // remaining case (this timer itself is the one that fires) by never
+    // holding the process/test runner open on its own account.
+    const timer = setTimeout(finish, timeoutMs).unref();
   });
 }
 
@@ -335,6 +343,118 @@ test('GET /health and GET /metrics', async (t) => {
       const body = (await res.json()) as { tools: Record<string, { invocations: number }> };
       assert.equal(body.tools.library_list_sources?.invocations, 1);
     },
+  );
+});
+
+/**
+ * Final wave, A10: the old Express app answered HEAD on a GET route with
+ * headers and no body by default; the plain node:http listener only ever
+ * matched GET, so a HEAD /health or HEAD /metrics 404'd. sendJson() now
+ * writes the same headers (content-type, content-length) either way and
+ * only omits the body for HEAD.
+ */
+test('HEAD /health and HEAD /metrics answer with headers and no body', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  for (const path of ['/health', '/metrics']) {
+    await t.test(path, async () => {
+      const [getRes, headRes] = await Promise.all([
+        fetch(`http://127.0.0.1:${port}${path}`),
+        fetch(`http://127.0.0.1:${port}${path}`, { method: 'HEAD' }),
+      ]);
+      const getBody = await getRes.text();
+      const headBody = await headRes.text();
+
+      assert.equal(headRes.status, 200);
+      assert.equal(headRes.headers.get('content-type'), 'application/json');
+      assert.equal(
+        headRes.headers.get('content-length'),
+        getRes.headers.get('content-length'),
+        'HEAD reports the same content-length a GET would have sent',
+      );
+      assert.equal(headBody, '', 'HEAD carries no body');
+      assert.ok(getBody.length > 0, 'sanity: the GET response does have a body');
+    });
+  }
+});
+
+/**
+ * Final wave, A10 (review round 2): readJsonBody() used to just throw on
+ * an oversized body, leaving the request stream (and its socket) open to
+ * keep receiving whatever the client still had queued up to its declared
+ * Content-Length. The first attempt at a fix (destroying `req` from
+ * inside the catch block) looked right and even passed a test - but the
+ * test's request line declared `Connection: close`, so Node's own HTTP
+ * server closes the socket after responding regardless of whether the
+ * fix does anything at all, and the fix itself was a no-op: by the time
+ * readJsonBody()'s `for await` throws, Node's async-iterator protocol has
+ * already destroyed `req`'s readable side as part of unwinding the loop
+ * (so `req.destroyed` is already true and `req.socket` already
+ * detached), so `if (!req.destroyed) req.destroy()` never runs, and even
+ * unguarded would have nothing left to close. This request line does NOT
+ * declare Connection: close, so an early close here can only be the
+ * server's own action (handleMcpRequest's captured `sock` +
+ * `res.on('finish', () => sock?.destroy())`), and the promise below has
+ * no soft "closed: true" fallback on timeout - if the server does not
+ * close the connection, this test fails instead of quietly passing.
+ */
+test('an oversized POST body gets the 500 envelope and the server closes the connection', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const oversizedChunk = 'x'.repeat(150 * 1024); // already over the 100kb cap alone
+  const declaredLength = 10 * 1024 * 1024; // far more than what's actually sent
+
+  const socket = netConnect(port, '127.0.0.1');
+  t.after(() => {
+    if (!socket.destroyed) socket.destroy();
+  });
+  await new Promise<void>((resolve) => socket.once('connect', resolve));
+
+  let data = '';
+  socket.on('data', (chunk) => {
+    data += chunk.toString();
+  });
+
+  // Deliberately NOT `Connection: close` - see the comment above for why
+  // that would make this test pass regardless of whether the production
+  // fix does anything.
+  socket.write(
+    `POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: ${declaredLength}\r\n\r\n`,
+  );
+  socket.write(oversizedChunk); // never writes the rest of the declared length
+
+  // No soft fallback: 'close', 'end', and 'error' all count as the
+  // connection being torn down; a plain timeout is a hard test failure
+  // (an unhandled rejection / the awaited promise never settling), not a
+  // silently-accepted "the server left it open".
+  await Promise.race([
+    new Promise<void>((resolve) => socket.once('close', () => resolve())),
+    new Promise<void>((resolve) => socket.once('end', () => resolve())),
+    new Promise<void>((resolve) => socket.once('error', () => resolve())),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('the server did not close the connection within 2000ms')),
+        2000,
+      ),
+    ),
+  ]);
+
+  assert.match(data, /"code":-32603/, data);
+
+  // No further bytes accepted: the socket must already be torn down, not
+  // merely half-closed and still willing to read more of the declared
+  // Content-Length.
+  assert.ok(
+    socket.destroyed || socket.readyState === 'closed',
+    `expected the socket to be destroyed/closed, got readyState=${socket.readyState}`,
   );
 });
 

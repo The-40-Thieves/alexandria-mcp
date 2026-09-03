@@ -8,6 +8,7 @@ import type { LibraryResult } from '../types.ts';
 import {
   stateStore as defaultStateStore,
   MemoryStateStore,
+  ROUTING_CACHE_KEY_PREFIX,
   type StateStore,
 } from './stateStore.ts';
 
@@ -38,7 +39,7 @@ export class ResultCache<T> {
   set(key: string, value: T, now = Date.now()): void {
     const ttlMs = this.resolveTtlMs();
     if (ttlMs <= 0) return; // 0 disables caching
-    this.store.setCache(key, value, now + ttlMs);
+    this.store.setCache(key, value, now + ttlMs, now);
   }
 }
 
@@ -96,8 +97,23 @@ export const routingCache = new ResultCache<CachedRoutingDecision>(
   defaultStateStore,
 );
 
-export function routingCacheKey(query: string, maxSources: number): string {
-  return `routing-decision|${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${maxSources}`;
+// stage1, skipMargin, and routerModel are folded into the key (final wave,
+// A2) because each one changes what decision would be computed for the
+// same query/maxSources: a decision cached under stage1='embeddings' must
+// never be replayed once the process (or a later env change) is running
+// stage1='bm25', a decision cached under one skip margin must not be
+// replayed once the operator changes ALEXANDRIA_ROUTER_SKIP_MARGIN, and a
+// decision cached under one router model must not be replayed once
+// ALEXANDRIA_ROUTER_MODEL changes - all three are cheap to read
+// synchronously (no network call), so there is no cost to including them.
+export function routingCacheKey(
+  query: string,
+  maxSources: number,
+  stage1: 'embeddings' | 'bm25',
+  skipMargin: number,
+  routerModel: string,
+): string {
+  return `${ROUTING_CACHE_KEY_PREFIX}${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${maxSources}|${stage1}|${skipMargin}|${routerModel}`;
 }
 
 // Test-only: clears every entry in the shared stateStore cache table (both

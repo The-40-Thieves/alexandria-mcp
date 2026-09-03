@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fetchWithRetry, retryAfterMs } from './http.ts';
+import { fetchJSON, fetchText, fetchWithRetry, redactUrl, retryAfterMs } from './http.ts';
 
 test('retryAfterMs', async (t) => {
   await t.test('missing header falls back to 1000ms', () => {
@@ -79,4 +79,69 @@ test('fetchWithRetry', async (t) => {
       assert.equal((capturedInit?.headers as Record<string, string>)?.['X-Test'], 'yes');
     },
   );
+});
+
+// Final wave, A3: about a dozen source adapters put their API key in the
+// query string, and fetchJSON/fetchText put the request URL verbatim into
+// a thrown Error's message - which scripts/probe.ts captures and
+// .github/workflows/probe.yml uploads as a public artifact / interpolates
+// into a public issue. redactUrl() (and the two throw sites that use it)
+// must never let a credential-shaped query parameter's value survive into
+// that message.
+test('redactUrl', async (t) => {
+  await t.test('masks a query parameter whose name reads as a credential', () => {
+    const redacted = redactUrl('https://x.example/?api_key=abc');
+    assert.ok(!redacted.includes('abc'), redacted);
+    assert.match(redacted, /api_key=%5BRedacted%5D|api_key=\[Redacted\]/);
+  });
+
+  await t.test('masks every credential-shaped variant this repo actually uses', () => {
+    for (const param of ['api_key', 'apikey', 'apiKey', 'token', 'access_token', 'secret']) {
+      const redacted = redactUrl(`https://x.example/search?${param}=abc&q=physics`);
+      assert.ok(!redacted.includes('abc'), `${param}: ${redacted}`);
+      assert.ok(redacted.includes('q=physics'), 'a non-credential param is left untouched');
+    }
+  });
+
+  await t.test(
+    'a URL with no credential-shaped parameter is unchanged apart from normalization',
+    () => {
+      const redacted = redactUrl('https://x.example/search?q=physics&limit=5');
+      assert.ok(redacted.includes('q=physics'));
+      assert.ok(redacted.includes('limit=5'));
+    },
+  );
+
+  await t.test('a string that does not parse as a URL is returned unchanged', () => {
+    assert.equal(redactUrl('not a url'), 'not a url');
+  });
+});
+
+test('fetchJSON/fetchText error messages never carry a redacted query value', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async () => new Response('server error', { status: 500 })) as typeof fetch;
+
+  await t.test('fetchJSON', async () => {
+    await assert.rejects(
+      () => fetchJSON('https://x.example/?api_key=abc', {}, 1000, 0),
+      (err: Error) => {
+        assert.ok(!err.message.includes('abc'), err.message);
+        return true;
+      },
+    );
+  });
+
+  await t.test('fetchText', async () => {
+    await assert.rejects(
+      () => fetchText('https://x.example/?api_key=abc', {}, 1000, 0),
+      (err: Error) => {
+        assert.ok(!err.message.includes('abc'), err.message);
+        return true;
+      },
+    );
+  });
 });

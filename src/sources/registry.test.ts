@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import test, { describe, it } from 'node:test';
 import { fetchJSON } from '../utils/http.ts';
+import { stateStore } from '../utils/stateStore.ts';
 import {
   catalog,
   getAdapter,
@@ -356,6 +357,59 @@ describe('healthSummary', () => {
     assert.equal(after.quota.sources, before.quota.sources + 1);
     assert.equal(after.cache.entries, before.cache.entries + 1);
     assert.equal(after.quota.day, before.quota.day);
+  });
+
+  // Final wave, B3: cacheSize() is a raw row count that can include rows
+  // already past their expiresAt but not yet lazily evicted - nothing had
+  // read that particular key since it expired, so nothing triggered its
+  // removal. healthSummary() now evicts first, so an already-expired row
+  // must not inflate cache.entries.
+  it('does not count an already-expired cache row (evicts before counting)', () => {
+    const before = healthSummary();
+    stateStore.setCache('t_health_expired_probe', 'x', Date.now() - 1000);
+    const after = healthSummary();
+    assert.equal(
+      after.cache.entries,
+      before.cache.entries,
+      'an expired row is evicted, not counted',
+    );
+  });
+
+  // Final wave, B4: under ALEXANDRIA_LEDGER=supabase, quota.reserved/
+  // quota.sources read as zero (reservations go to Supabase, not this
+  // StateStore) - easy to misread as "no quota used today" rather than
+  // "wrong backend for this view". quota.backend names which one these
+  // numbers actually came from, the same condition createLedger() itself
+  // gates on (ALEXANDRIA_LEDGER=supabase AND both Supabase env vars set).
+  it('quota.backend is "state" by default', () => {
+    assert.equal(healthSummary().quota.backend, 'state');
+  });
+
+  it('quota.backend is "supabase" only when the ledger would actually route there', () => {
+    const original = {
+      ALEXANDRIA_LEDGER: process.env.ALEXANDRIA_LEDGER,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    };
+    try {
+      process.env.ALEXANDRIA_LEDGER = 'supabase';
+      delete process.env.SUPABASE_URL;
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+      assert.equal(
+        healthSummary().quota.backend,
+        'state',
+        'ALEXANDRIA_LEDGER=supabase alone, with no Supabase credentials, still reads as state',
+      );
+
+      process.env.SUPABASE_URL = 'https://example.supabase.co';
+      process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+      assert.equal(healthSummary().quota.backend, 'supabase');
+    } finally {
+      for (const [key, value] of Object.entries(original)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 });
 

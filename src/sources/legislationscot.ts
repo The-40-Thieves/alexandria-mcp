@@ -24,8 +24,8 @@ interface AtomFeed {
 // the plain-string case alike, returning '' when there's no text content.
 // findDeep/textOf are the shared xml.ts versions (this used to carry its
 // own copy, same as legislationscot.ts and ndl.ts each did).
-function cleanField(s: string | undefined): string {
-  return (s ?? '').trim();
+function cleanField(s: unknown): string {
+  return textOf(s).trim();
 }
 
 // legislation.gov.uk's full-text data.xml documents can run to hundreds of

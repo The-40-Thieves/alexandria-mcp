@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.ts';
 import { type Cluster, catalog, type Freshness } from '../sources/registry.ts';
-import { embed, hasEmbeddingsConfigured } from './providers.ts';
+import { embed, hasEmbeddingsConfigured, roleConfig } from './providers.ts';
 
 export interface CatalogEntry {
   name: string;
@@ -39,8 +39,13 @@ function entryText(name: string, description: string, cluster: Cluster): string 
   return `${name}: ${description} (cluster ${cluster})`;
 }
 
-function sha256(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
+// The embeddings role's model id is folded into the cache key so a model
+// change (ALEXANDRIA_EMBEDDINGS_MODEL, or the shared default) never reuses
+// another model's vectors under the same text - two models can disagree on
+// dimensionality and semantics for the identical string.
+function cacheKey(text: string): string {
+  const model = roleConfig('embeddings').model;
+  return createHash('sha256').update(`${model}\0${text}`, 'utf8').digest('hex');
 }
 
 type EmbeddingCacheFile = Record<string, number[]>;
@@ -66,8 +71,9 @@ function saveCacheFile(cache: EmbeddingCacheFile): void {
 let cachedCatalog: CatalogEntry[] | undefined;
 
 // From catalog(); embeds when an embeddings role is configured, cached in
-// memory for the process and persisted to disk keyed by sha256 of the text
-// so restarts skip re-embedding unchanged sources.
+// memory for the process and persisted to disk keyed by sha256(model + text)
+// so restarts skip re-embedding unchanged sources under the same model, and
+// a model change never reads back another model's vectors.
 export async function buildCatalog(): Promise<CatalogEntry[]> {
   if (cachedCatalog) return cachedCatalog;
 
@@ -85,7 +91,7 @@ export async function buildCatalog(): Promise<CatalogEntry[]> {
 
   const diskCache = loadCacheFile();
   const toEmbed = entries.filter((e) => {
-    const cached = diskCache[sha256(e.text)];
+    const cached = diskCache[cacheKey(e.text)];
     if (cached) {
       e.vector = cached;
       return false;
@@ -97,7 +103,7 @@ export async function buildCatalog(): Promise<CatalogEntry[]> {
     const vectors = await embed(toEmbed.map((e) => e.text));
     for (let i = 0; i < toEmbed.length; i++) {
       toEmbed[i].vector = vectors[i];
-      diskCache[sha256(toEmbed[i].text)] = vectors[i];
+      diskCache[cacheKey(toEmbed[i].text)] = vectors[i];
     }
     saveCacheFile(diskCache);
   }
@@ -287,7 +293,13 @@ export function bm25Candidates(query: string, entries: CatalogEntry[], k: number
 
 // ─── Cosine ranking (when the catalog was embedded) ────────────────────────
 
-function cosineSimilarity(a: number[], b: number[]): number {
+// Guards against a stale-cache mismatch: two vectors of different lengths
+// (a query embedded by one model against a catalog entry cached by another,
+// or a dimension change mid-rollout) would otherwise silently score against
+// a truncated entry vector (shorter query) or divide out to NaN (shorter
+// entry) instead of visibly failing.
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
   let dot = 0;
   let na = 0;
   let nb = 0;
@@ -404,6 +416,18 @@ export async function candidates(
 // the default skip only ever applies in 'embeddings' mode; BM25 mode
 // needs an operator-set ALEXANDRIA_ROUTER_SKIP_MARGIN to opt in.
 export type Stage1Mode = 'embeddings' | 'bm25';
+
+// Cheap, synchronous guess at which stage-1 mode buildCatalog() will (or
+// already did) produce for the current process, without paying for a
+// catalog build: mirrors the hasVectors check inside candidates()/
+// candidatesWithMargin(). libraryAsk.ts's routing-cache key uses this so a
+// cache lookup never costs a buildCatalog() call, while still keying on
+// the mode that decision would have used - a stale hit from before an
+// embeddings-configuration change is a miss instead of a silent replay
+// into the other mode.
+export function stage1ModeHint(): Stage1Mode {
+  return hasEmbeddingsConfigured() ? 'embeddings' : 'bm25';
+}
 
 export interface CandidatesWithMargin {
   candidates: CatalogEntry[];

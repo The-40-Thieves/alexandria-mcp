@@ -75,196 +75,233 @@ function roleFields<const Role extends string>(role: Role, lower: string): RoleF
   } as RoleFields<Role>;
 }
 
-// Some optional settings (ALEXANDRIA_CACHE_TTL_MS, ALEXANDRIA_ROUTER_SKIP_MARGIN)
-// are parsed downstream with Number(raw), falling back to a built-in
-// default for anything non-finite (resultCache.ts's parseTtlMs,
-// libraryAsk.ts's parseSkipMargin). An env-file loader commonly emits a
-// declared-but-empty var as "" (KEY=, the exact shape .env.example uses
-// for every optional field) - and Number('') is 0, which is finite and
-// often in-range, so a merely-unset value would silently become an
-// explicit, valid 0 instead of falling back to the default. This
-// preprocess strips that shape at the schema boundary (empty or
-// whitespace-only -> undefined) so neither downstream parser has to
-// special-case "" itself - only a genuinely-set, non-numeric, or
-// out-of-range value reaches them as invalid, which is their own concern
-// (a fallback, and for parseSkipMargin a one-time warn).
+// An env-file loader commonly emits a declared-but-empty var as "" (KEY=,
+// the exact shape .env.example uses for every optional field). Before the
+// final wave (A6), that "" reached each field's own zod type directly:
+// z.coerce.number() turns it into 0 (finite, often in-range, so PORT=
+// or ALEXANDRIA_CACHE_TTL_MS= silently became an explicit 0 instead of
+// falling back to a default), and z.enum(...) rejects it outright (so a
+// single declared-but-unset TRANSPORT=, LOG_LEVEL=, ALEXANDRIA_LEDGER=,
+// or ALEXANDRIA_RERANK= failed the WHOLE parse, not just that field) -
+// only ALEXANDRIA_CACHE_TTL_MS and ALEXANDRIA_ROUTER_SKIP_MARGIN (via
+// optionalNumericString below) got this treatment. emptyToUndefined()
+// wraps an already-built field schema (whatever combination of
+// .optional()/.default()/.enum()/.describe() it already has) so
+// empty-or-whitespace-only input hits the schema as `undefined` instead -
+// falling through to that field's own `.default()` when it has one, or
+// staying unset otherwise - applied uniformly to every field below so a
+// declared-but-empty optional var never fails the parse. Genuinely-set,
+// invalid values (non-numeric, out of enum) still reach that field's own
+// validation and fail exactly as before.
+function emptyToUndefined<T extends z.ZodTypeAny>(inner: T) {
+  const wrapped = z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    inner,
+  );
+  return inner.description ? wrapped.describe(inner.description) : wrapped;
+}
+
+// Thin convenience over emptyToUndefined for the two fields
+// (ALEXANDRIA_CACHE_TTL_MS, ALEXANDRIA_ROUTER_SKIP_MARGIN) that are parsed
+// downstream with Number(raw), falling back to a built-in default for
+// anything non-finite (resultCache.ts's parseTtlMs, libraryAsk.ts's
+// parseSkipMargin) rather than being coerced to a number here.
 function optionalNumericString(description: string): z.ZodType<string | undefined> {
-  return z
-    .preprocess(
-      (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
-      z.string().optional(),
-    )
-    .describe(description);
+  return emptyToUndefined(z.string().optional().describe(description));
+}
+
+// Every field's raw definition, exactly as before this wave (whatever
+// combination of .optional()/.default()/.enum()/.describe() each one
+// already had) - wrapped uniformly by emptyToUndefined() below rather than
+// rewritten field by field, so "" behaves like unset everywhere at once.
+const rawFields = {
+  // ── Transport ────────────────────────────────────────────────────────
+  TRANSPORT: z
+    .enum(['stdio', 'http'])
+    .default('stdio')
+    .describe('MCP transport: "stdio" (default) or "http".'),
+  PORT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(3000)
+    .describe('HTTP transport port (TRANSPORT=http only).'),
+
+  // ── Shared LLM provider table ───────────────────────────────────────────
+  ALEXANDRIA_BASE_URL: z
+    .string()
+    .optional()
+    .describe(
+      'Shared OpenAI-compatible gateway base URL for every role (router/synth/research/embeddings/rerank).',
+    ),
+  ALEXANDRIA_API_KEY: z
+    .string()
+    .optional()
+    .describe('Shared API key paired with ALEXANDRIA_BASE_URL.'),
+  OPENAI_API_KEY: z
+    .string()
+    .optional()
+    .describe(
+      'Direct OpenAI API key. Used when no gateway is configured, and as the automatic fallback target when a configured gateway errors.',
+    ),
+  ...roleFields('ROUTER', 'router'),
+  ...roleFields('SYNTH', 'synth'),
+  ...roleFields('RESEARCH', 'research'),
+  ...roleFields('EMBEDDINGS', 'embeddings'),
+  ...roleFields('RERANK', 'rerank'),
+  ALEXANDRIA_RERANK: z
+    .enum(['llm'])
+    .optional()
+    .describe(
+      'Set to "llm" to rerank fused results with a chat call (the rerank role); otherwise the fused order is kept.',
+    ),
+
+  // ── Routing (src/tools/libraryAsk.ts, src/utils/catalogIndex.ts) ────────
+  ALEXANDRIA_ROUTER_SKIP_MARGIN: optionalNumericString(
+    "Stage-1 confidence margin (0-1: top candidate score minus the score at max_sources+1, normalised by the top score) at or above which library_ask skips the LLM router call and fans out to stage 1's top max_sources directly with the raw query. Unset (or empty) uses the built-in default; an explicit, non-negative value opts in even in BM25 mode (see docs/routing-eval.md).",
+  ),
+
+  // ── Caches / state / ledger ─────────────────────────────────────────────
+  ALEXANDRIA_CACHE_TTL_MS: optionalNumericString(
+    'Search result cache TTL in milliseconds. Unset (or empty) or non-numeric uses the built-in default.',
+  ),
+  ALEXANDRIA_CATALOG_CACHE: z
+    .string()
+    .optional()
+    .describe(
+      'Path to the routing catalog embedding cache. Defaults to eval/catalog-embeddings.json inside the package.',
+    ),
+  ALEXANDRIA_HTTP_CACHE: z
+    .string()
+    .optional()
+    .describe(
+      'Path to the shared undici RFC 9111 http-cache SQLite database. Defaults to data/http-cache.db inside the package; set to ":memory:" to force the in-memory store, or falls back to it automatically if the path can\'t be created.',
+    ),
+  ALEXANDRIA_STATE_DB: z
+    .string()
+    .optional()
+    .describe(
+      'Path to the node:sqlite database backing the daily quota ledger and search result cache. Defaults to data/alexandria.db inside the package; set to ":memory:" to force the in-memory store, or falls back to it automatically if the path can\'t be created.',
+    ),
+  ALEXANDRIA_LEDGER: z
+    .enum(['supabase'])
+    .optional()
+    .describe(
+      'Set to "supabase" (with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY) to persist the daily quota ledger there instead of ALEXANDRIA_STATE_DB.',
+    ),
+
+  // ── Fetch tier (src/web/fetchTier.ts) ───────────────────────────────────
+  ALEXANDRIA_ALLOW_LOOPBACK: z
+    .string()
+    .optional()
+    .describe(
+      'Test-only: lets the fetch tier SSRF guard reach 127.0.0.1/localhost. Never set in production.',
+    ),
+  SEARXNG_URL: z
+    .string()
+    .optional()
+    .describe('Self-hosted SearXNG metasearch instance URL. Hides the searxng source without it.'),
+  CRAWL4AI_URL: z
+    .string()
+    .optional()
+    .describe(
+      'Self-hosted crawl4ai headless-browser render server URL (fetch tier 3). Hides that tier without it.',
+    ),
+  CRAWL4AI_API_TOKEN: z
+    .string()
+    .optional()
+    .describe('Bearer token for CRAWL4AI_URL, only needed if your instance requires auth.'),
+  JINA_API_KEY: z
+    .string()
+    .optional()
+    .describe(
+      'Jina AI Reader/Search key. Required to unhide the jinasearch source; also enables fetch tier 2 (jina reader) as a fallback when set.',
+    ),
+  ALEXANDRIA_JINA_READER: z
+    .string()
+    .optional()
+    .describe(
+      'Set to 1 to use the jina reader fetch tier anonymously (20 RPM shared cap) when JINA_API_KEY is unset.',
+    ),
+
+  // ── knowledge_search delegation (src/tools/libraryAnswer.ts) ────────────
+  KNOWLEDGE_MCP_URL: z
+    .string()
+    .optional()
+    .describe(
+      'Optional knowledge-base MCP server URL, folded into library_answer as one more ranked list.',
+    ),
+  KNOWLEDGE_MCP_TOKEN: z.string().optional().describe('Bearer token for KNOWLEDGE_MCP_URL.'),
+
+  // ── library_ingest storage (src/pipeline/**) ────────────────────────────
+  SUPABASE_URL: z
+    .string()
+    .optional()
+    .describe(
+      'Supabase project URL. Required for library_ingest and for ALEXANDRIA_LEDGER=supabase.',
+    ),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .optional()
+    .describe(
+      'Supabase service role key. Required for library_ingest and for ALEXANDRIA_LEDGER=supabase.',
+    ),
+  SUPABASE_TABLE: z
+    .string()
+    .optional()
+    .describe('Table name for library_ingest chunks. Default knowledge_chunks.'),
+  EMBEDDING_PROVIDER: z
+    .string()
+    .optional()
+    .describe('library_ingest embedding provider. Only "openai" (the default) is implemented.'),
+  VECTOR_STORE_PROVIDER: z
+    .string()
+    .optional()
+    .describe(
+      'library_ingest vector store provider. Only "supabase" (the default) is implemented.',
+    ),
+
+  // ── Diagnostics ──────────────────────────────────────────────────────────
+  NODE_ENV: z
+    .string()
+    .optional()
+    .describe(
+      'Standard Node environment name. Only "test" has a special meaning here: it makes src/log.ts default to a discard destination instead of real stderr, so `npm test` (which sets this) stays quiet unless a test captures log output itself.',
+    ),
+  DEBUG: z
+    .string()
+    .optional()
+    .describe(
+      'Set to any non-empty value to log extra diagnostics (also raises LOG_LEVEL to debug).',
+    ),
+  LOG_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+    .optional()
+    .describe('pino log level. Defaults to "debug" when DEBUG is set, otherwise "info".'),
+} satisfies Record<string, z.ZodTypeAny>;
+
+// Object.fromEntries loses the precise per-key literal types (widens to a
+// single `V` for every key), and casting the result to a shape type built
+// from z.ZodType<z.infer<...>> (zod's generic base class) throws away the
+// specific ZodOptional/ZodDefault wrapper each field's schema needs for zod
+// to infer that key as optional/defaulted rather than a required field
+// whose value happens to include undefined - which is exactly the
+// distinction Pick<Config, K> callers (e.g. stateStore.ts's
+// createStateStore(env: Pick<Config, 'ALEXANDRIA_STATE_DB'>)) rely on to
+// accept a plain NodeJS.ProcessEnv. This mapped-type helper keeps each
+// field's true wrapped type instead.
+function wrapShape<S extends Record<string, z.ZodTypeAny>>(
+  shape: S,
+): { [K in keyof S]: ReturnType<typeof emptyToUndefined<S[K]>> } {
+  const wrapped = {} as { [K in keyof S]: ReturnType<typeof emptyToUndefined<S[K]>> };
+  for (const key of Object.keys(shape) as (keyof S)[]) {
+    wrapped[key] = emptyToUndefined(shape[key]);
+  }
+  return wrapped;
 }
 
 const schema = z
-  .object({
-    // ── Transport ────────────────────────────────────────────────────────
-    TRANSPORT: z
-      .enum(['stdio', 'http'])
-      .default('stdio')
-      .describe('MCP transport: "stdio" (default) or "http".'),
-    PORT: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(3000)
-      .describe('HTTP transport port (TRANSPORT=http only).'),
-
-    // ── Shared LLM provider table ───────────────────────────────────────────
-    ALEXANDRIA_BASE_URL: z
-      .string()
-      .optional()
-      .describe(
-        'Shared OpenAI-compatible gateway base URL for every role (router/synth/research/embeddings/rerank).',
-      ),
-    ALEXANDRIA_API_KEY: z
-      .string()
-      .optional()
-      .describe('Shared API key paired with ALEXANDRIA_BASE_URL.'),
-    OPENAI_API_KEY: z
-      .string()
-      .optional()
-      .describe(
-        'Direct OpenAI API key. Used when no gateway is configured, and as the automatic fallback target when a configured gateway errors.',
-      ),
-    ...roleFields('ROUTER', 'router'),
-    ...roleFields('SYNTH', 'synth'),
-    ...roleFields('RESEARCH', 'research'),
-    ...roleFields('EMBEDDINGS', 'embeddings'),
-    ...roleFields('RERANK', 'rerank'),
-    ALEXANDRIA_RERANK: z
-      .enum(['llm'])
-      .optional()
-      .describe(
-        'Set to "llm" to rerank fused results with a chat call (the rerank role); otherwise the fused order is kept.',
-      ),
-
-    // ── Routing (src/tools/libraryAsk.ts, src/utils/catalogIndex.ts) ────────
-    ALEXANDRIA_ROUTER_SKIP_MARGIN: optionalNumericString(
-      "Stage-1 confidence margin (0-1: top candidate score minus the score at max_sources+1, normalised by the top score) at or above which library_ask skips the LLM router call and fans out to stage 1's top max_sources directly with the raw query. Unset (or empty) uses the built-in default; an explicit, non-negative value opts in even in BM25 mode (see docs/routing-eval.md).",
-    ),
-
-    // ── Caches / state / ledger ─────────────────────────────────────────────
-    ALEXANDRIA_CACHE_TTL_MS: optionalNumericString(
-      'Search result cache TTL in milliseconds. Unset (or empty) or non-numeric uses the built-in default.',
-    ),
-    ALEXANDRIA_CATALOG_CACHE: z
-      .string()
-      .optional()
-      .describe(
-        'Path to the routing catalog embedding cache. Defaults to eval/catalog-embeddings.json inside the package.',
-      ),
-    ALEXANDRIA_HTTP_CACHE: z
-      .string()
-      .optional()
-      .describe(
-        'Path to the shared undici RFC 9111 http-cache SQLite database. Defaults to data/http-cache.db inside the package; set to ":memory:" to force the in-memory store, or falls back to it automatically if the path can\'t be created.',
-      ),
-    ALEXANDRIA_STATE_DB: z
-      .string()
-      .optional()
-      .describe(
-        'Path to the node:sqlite database backing the daily quota ledger and search result cache. Defaults to data/alexandria.db inside the package; set to ":memory:" to force the in-memory store, or falls back to it automatically if the path can\'t be created.',
-      ),
-    ALEXANDRIA_LEDGER: z
-      .enum(['supabase'])
-      .optional()
-      .describe(
-        'Set to "supabase" (with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY) to persist the daily quota ledger there instead of ALEXANDRIA_STATE_DB.',
-      ),
-
-    // ── Fetch tier (src/web/fetchTier.ts) ───────────────────────────────────
-    ALEXANDRIA_ALLOW_LOOPBACK: z
-      .string()
-      .optional()
-      .describe(
-        'Test-only: lets the fetch tier SSRF guard reach 127.0.0.1/localhost. Never set in production.',
-      ),
-    SEARXNG_URL: z
-      .string()
-      .optional()
-      .describe(
-        'Self-hosted SearXNG metasearch instance URL. Hides the searxng source without it.',
-      ),
-    CRAWL4AI_URL: z
-      .string()
-      .optional()
-      .describe(
-        'Self-hosted crawl4ai headless-browser render server URL (fetch tier 3). Hides that tier without it.',
-      ),
-    CRAWL4AI_API_TOKEN: z
-      .string()
-      .optional()
-      .describe('Bearer token for CRAWL4AI_URL, only needed if your instance requires auth.'),
-    JINA_API_KEY: z
-      .string()
-      .optional()
-      .describe(
-        'Jina AI Reader/Search key. Required to unhide the jinasearch source; also enables fetch tier 2 (jina reader) as a fallback when set.',
-      ),
-    ALEXANDRIA_JINA_READER: z
-      .string()
-      .optional()
-      .describe(
-        'Set to 1 to use the jina reader fetch tier anonymously (20 RPM shared cap) when JINA_API_KEY is unset.',
-      ),
-
-    // ── knowledge_search delegation (src/tools/libraryAnswer.ts) ────────────
-    KNOWLEDGE_MCP_URL: z
-      .string()
-      .optional()
-      .describe(
-        'Optional knowledge-base MCP server URL, folded into library_answer as one more ranked list.',
-      ),
-    KNOWLEDGE_MCP_TOKEN: z.string().optional().describe('Bearer token for KNOWLEDGE_MCP_URL.'),
-
-    // ── library_ingest storage (src/pipeline/**) ────────────────────────────
-    SUPABASE_URL: z
-      .string()
-      .optional()
-      .describe(
-        'Supabase project URL. Required for library_ingest and for ALEXANDRIA_LEDGER=supabase.',
-      ),
-    SUPABASE_SERVICE_ROLE_KEY: z
-      .string()
-      .optional()
-      .describe(
-        'Supabase service role key. Required for library_ingest and for ALEXANDRIA_LEDGER=supabase.',
-      ),
-    SUPABASE_TABLE: z
-      .string()
-      .optional()
-      .describe('Table name for library_ingest chunks. Default knowledge_chunks.'),
-    EMBEDDING_PROVIDER: z
-      .string()
-      .optional()
-      .describe('library_ingest embedding provider. Only "openai" (the default) is implemented.'),
-    VECTOR_STORE_PROVIDER: z
-      .string()
-      .optional()
-      .describe(
-        'library_ingest vector store provider. Only "supabase" (the default) is implemented.',
-      ),
-
-    // ── Diagnostics ──────────────────────────────────────────────────────────
-    NODE_ENV: z
-      .string()
-      .optional()
-      .describe(
-        'Standard Node environment name. Only "test" has a special meaning here: it makes src/log.ts default to a discard destination instead of real stderr, so `npm test` (which sets this) stays quiet unless a test captures log output itself.',
-      ),
-    DEBUG: z
-      .string()
-      .optional()
-      .describe(
-        'Set to any non-empty value to log extra diagnostics (also raises LOG_LEVEL to debug).',
-      ),
-    LOG_LEVEL: z
-      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-      .optional()
-      .describe('pino log level. Defaults to "debug" when DEBUG is set, otherwise "info".'),
-  })
+  .object(wrapShape(rawFields))
   .describe('Alexandria ops-level environment: transport, providers, caches, and integrations.');
 
 export type Config = z.infer<typeof schema>;

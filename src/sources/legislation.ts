@@ -21,8 +21,8 @@ interface AtomFeed {
 // the plain-string case alike, returning '' when there's no text content.
 // findDeep/textOf are the shared xml.ts versions (this used to carry its
 // own copy, same as legislationscot.ts and ndl.ts each did).
-function cleanField(s: string | undefined): string {
-  return (s ?? '').trim();
+function cleanField(s: unknown): string {
+  return textOf(s).trim();
 }
 
 // legislation.gov.uk's full-text data.xml documents can run to hundreds of
@@ -83,9 +83,19 @@ export function normalizeLegislation(atom: string): LibraryResult[] {
     .filter((r) => r.id);
 }
 
+// Final wave, A4: `/search?q=...` returns the HTML results page (0
+// `<entry>` elements, so normalizeLegislation() silently returned []
+// with no error and /health showed this source clean while it answered
+// nothing). `/all/data.feed?text=...` is legislation.gov.uk's Atom search
+// feed - the same content-negotiated `.feed` pattern legislationscot.ts
+// already uses successfully (`/asp+ssi/data.feed?text=...`), scoped to
+// "all" types instead of "asp+ssi". Verified live 2026-09-02:
+// `curl -s "https://www.legislation.gov.uk/all/data.feed?text=climate&results-count=3"`
+// returns 200 application/atom+xml with 3 <entry> elements; `/search?q=...`
+// returns 200 text/html with 0.
 export async function legislationSearch(query: string, limit = 10): Promise<LibraryResult[]> {
   const atom = await fetchText(
-    `${BASE}/search?q=${encodeURIComponent(query)}&results-count=${limit}`,
+    `${BASE}/all/data.feed?text=${encodeURIComponent(query)}&results-count=${limit}`,
   );
   return normalizeLegislation(atom);
 }

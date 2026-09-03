@@ -1,4 +1,13 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/__tests__/**"]
+  "compilerOptions": {
+    // The base tsconfig.json no longer sets rootDir (final wave, A13: it
+    // now typechecks both src/**/* and scripts/**/*, which have no single
+    // rootDir that keeps dist/'s layout unchanged). The build only ever
+    // compiles src/ - scripts run natively via `node scripts/*.ts`, never
+    // from dist - so rootDir is restored here, scoped to the one config
+    // that actually emits.
+    "rootDir": "./src"
+  },
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/__tests__/**", "scripts/**/*"]
 }

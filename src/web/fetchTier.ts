@@ -165,13 +165,33 @@ function classifyIpv6(host: string): IpClass {
 }
 
 // Classifies a bracket-free host string that is ALREADY a literal IPv4 or
-// IPv6 address (not a hostname to resolve). Returns null for anything that
-// isn't a recognized literal IP, including an ordinary hostname.
+// IPv6 address (not a hostname to resolve). Returns null both for an
+// ordinary hostname (not a literal IP at all) AND for a literal IP that
+// isn't in any restricted range (a genuine public address) - callers that
+// need to tell those two null cases apart (is this string a literal IP at
+// all, regardless of whether it's restricted) must check isIpLiteral()
+// first; see its comment for the bug that conflating them caused.
 function classifyIpLiteral(host: string): IpClass {
   const v4 = parseDottedIPv4(host);
   if (v4) return classifyIpv4(...v4);
   if (host.includes(':')) return classifyIpv6(host);
   return null;
+}
+
+// Final wave, A12: resolveFetchTarget() used to gate its "skip DNS
+// resolution, nothing to pin" early return on `classifyIpLiteral(host)`
+// being truthy - which only holds for a RESTRICTED literal (loopback,
+// private, link-local, ...), not for a literal IP at all. A public IPv6
+// literal (https://[2606:4700:4700::1111]/, Cloudflare's actual address)
+// classifies as null (it isn't restricted) and fell through to
+// dnsResolver.lookup(parsed.hostname, ...) with the host still bracketed -
+// Node's dns.lookup() can't resolve a bracket-wrapped literal, so this
+// failed with ENOTFOUND on every public IPv6 literal target. Whether a
+// string is a literal IP at all (skip DNS either way) is a different
+// question from whether that address is restricted (throw or allow) -
+// this answers the first one.
+function isIpLiteral(host: string): boolean {
+  return parseDottedIPv4(host) !== null || host.includes(':');
 }
 
 function throwForIpClass(cls: Exclude<IpClass, null>, rawUrl: string, detail?: string): never {
@@ -319,16 +339,25 @@ async function resolveFetchTarget(rawUrl: string): Promise<ResolvedFetchTarget> 
     return { pin: { hostname, addresses: LOCALHOST_PIN_ADDRESSES } };
   }
 
-  const literalClass = classifyIpLiteral(hostname);
-  if (literalClass) {
-    assertIpClassAllowed(literalClass, rawUrl);
-    return {}; // a literal IP host: nothing to resolve or pin (undici's
-    // connector skips DNS/connect.lookup entirely for a literal IP target)
+  if (isIpLiteral(hostname)) {
+    // Allowed or restricted, a literal IP is never resolved: undici's
+    // connector skips DNS/connect.lookup entirely for a literal IP target,
+    // and Node's dns.lookup() can't resolve one anyway (see isIpLiteral's
+    // comment for the bug this used to hit on a public IPv6 literal).
+    assertIpClassAllowed(classifyIpLiteral(hostname), rawUrl);
+    return {};
   }
 
   let addresses: Array<{ address: string; family: number }>;
   try {
-    addresses = await dnsResolver.lookup(parsed.hostname, { all: true });
+    // `hostname` (stripBrackets + lowercased above), not `parsed.hostname`:
+    // unified with the same spelling stored as pin.hostname below, and
+    // with what dispatcher.ts's pinnedLookup compares against (final wave,
+    // A12) - brackets never apply here (isIpLiteral already returned
+    // false), so this only changes casing for an ordinary hostname, but
+    // keeps both call sites reading from one normalized value instead of
+    // two independently-derived ones that happen to usually agree.
+    addresses = await dnsResolver.lookup(hostname, { all: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`fetchAsText: could not resolve ${hostname}: ${message}`);

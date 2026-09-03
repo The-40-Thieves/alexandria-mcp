@@ -183,31 +183,30 @@ invocation below also explicitly `env -u`s `OPENAI_API_KEY`,
 value itself is never in this file, a log, or a commit - only the
 variable name.
 
-**Gateway host gotcha**: pointing `ALEXANDRIA_EMBEDDINGS_BASE_URL` at the
-gateway's literal IP (`http://100.78.123.100:4001/v1`, as CLAUDE.md
-documents it) made every embed call through `installDispatcher()`'s
-globally-installed DNS-caching dispatcher (`src/utils/dispatcher.ts`) hang
-past its 15s headers timeout, even though a plain `curl` to the same IP
-returned in under 2s and a raw `fetch()` with no dispatcher installed
-worked immediately - consistent with undici's DNS interceptor attempting
-an actual resolver lookup on an IP literal instead of recognizing it needs
-none. Using the box's Tailscale MagicDNS name for the same host
-(`http://cave.tail3f4c45.ts.net:4001/v1`, found via `tailscale status` /
-`getent hosts`) avoided it. `scripts/eval-routing.ts` calls
-`installDispatcher()` unconditionally (pre-existing, Task 3), so this
-matters for anyone re-running this eval against that gateway by IP; it is
-not a Task 6 change and is not fixed here - `src/utils/dispatcher.ts` is
-out of this task's file list. Flagged as a concern in the task report.
+**Gateway host gotcha (did not reproduce, final wave)**: an earlier run of
+this eval saw every embed call against the gateway's literal IP
+(`http://100.78.123.100:4001/v1`, as CLAUDE.md documents it) hang past its
+15s headers timeout through `installDispatcher()`'s globally-installed
+dispatcher (`src/utils/dispatcher.ts`), and switching to the box's
+Tailscale MagicDNS name for the same host
+(`http://cave.tail3f4c45.ts.net:4001/v1`) avoided it. That was read at the
+time as undici's DNS interceptor mishandling an IP literal. The final-wave
+review ran the exact production dispatcher shape against
+`http://100.78.123.100:4001` and 18 other literal-IP hosts over GET, POST,
+and SSE: all 200, 5-87ms, no hang. The original cause was never isolated;
+the MagicDNS name was a workaround that happened to sidestep whatever the
+real cause was (network path, gateway-side, or transient), not a fix for
+a bug in this codebase. Do not code against the hang - there is nothing in
+`src/utils/dispatcher.ts` shown to reproduce it.
 
 **Catalog cache isolation**: `buildCatalog()`'s disk cache
-(`ALEXANDRIA_CATALOG_CACHE`) keys each entry by `sha256(entryText)` only,
-not by embedding model - a model change reusing the default
-`eval/catalog-embeddings.json` would silently serve vectors from whatever
-model built it. No such file existed yet in this repo, but every
-embeddings run below pointed `ALEXANDRIA_CATALOG_CACHE` at a
-model-specific path, `eval/catalog-embeddings-bge-m3.json`, to keep it
-that way going forward. That per-text (not per-model) cache key is a
-pre-existing design choice (Task 3), not changed here.
+(`ALEXANDRIA_CATALOG_CACHE`) now keys each entry by
+`sha256(embeddingsModel + '\0' + entryText)` (final wave, A1), so a model
+change can never reuse another model's vectors under the same default
+`eval/catalog-embeddings.json` path. Every embeddings run below still
+pointed `ALEXANDRIA_CATALOG_CACHE` at its own path,
+`eval/catalog-embeddings-bge-m3.json`, which remains harmless belt and
+braces now that the key itself carries the model.
 
 **Method**: each of the 8 runs is a separate process with
 `ALEXANDRIA_STATE_DB=:memory:`, so the Task 6 routing cache starts empty

@@ -25,8 +25,13 @@ import { config } from '../config.ts';
 import { log } from '../log.ts';
 import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
-import { type CatalogEntry, candidatesWithMargin, type Stage1Mode } from '../utils/catalogIndex.ts';
-import { chatJSON } from '../utils/providers.ts';
+import {
+  type CatalogEntry,
+  candidatesWithMargin,
+  type Stage1Mode,
+  stage1ModeHint,
+} from '../utils/catalogIndex.ts';
+import { chatJSON, roleConfig } from '../utils/providers.ts';
 import { routingCache, routingCacheKey } from '../utils/resultCache.ts';
 
 export interface RouteItem {
@@ -216,7 +221,17 @@ export async function planRoute(query: string, opts: AskOptions = {}): Promise<P
   // A cache hit replays a previously computed decision (router or
   // margin-skip) verbatim - no stage 1 or stage 2 work at all, so no LLM
   // call of any kind, not even the query embed() cosine ranking needs.
-  const key = routingCacheKey(query, maxSources);
+  // The key folds in stage1ModeHint(), the effective skip margin, and the
+  // router model - all cheap, synchronous reads - so a decision cached
+  // under one mode/margin/model is never replayed once any of the three
+  // changes (final wave, A2).
+  const stage1Hint = stage1ModeHint();
+  const skipMarginHint = parseSkipMargin(
+    config.ALEXANDRIA_ROUTER_SKIP_MARGIN,
+    stage1Hint === 'embeddings' ? DEFAULT_ROUTER_SKIP_MARGIN : Number.POSITIVE_INFINITY,
+  );
+  const routerModel = roleConfig('router').model;
+  const key = routingCacheKey(query, maxSources, stage1Hint, skipMarginHint, routerModel);
   const cached = routingCache.get(key);
   if (cached) {
     return {

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Dispatcher } from 'undici';
+import { isSensitiveKey } from './secretWords.ts';
 
 // The ambient global RequestInit (from @types/node) has no `dispatcher`
 // field under this project's tsconfig, so options that want one are typed
@@ -34,6 +35,31 @@ export const requestContext = new AsyncLocalStorage<RequestContextStore>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// About a dozen source adapters (congress, eia, govinfo, smithsonian,
+// springer, newsdata, regulations, googlebooks, openalex, ctext, and
+// others - `rg -n 'api_key|apikey|key=' src/sources`) pass their API key
+// in the query string rather than a header. fetchJSON/fetchText below put
+// the request URL verbatim into a thrown Error's message, and
+// scripts/probe.ts captures that message into eval/probe-latest.json,
+// which .github/workflows/probe.yml uploads as a public artifact and
+// interpolates into a public issue on a public repo - so any query
+// parameter whose name reads as a credential (the same word test
+// src/log.ts's redaction uses, via utils/secretWords.ts) is masked before
+// the URL ever reaches an error message. Falls back to returning the URL
+// unchanged if it doesn't parse as a URL at all.
+export function redactUrl(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  for (const key of [...parsed.searchParams.keys()]) {
+    if (isSensitiveKey(key)) parsed.searchParams.set(key, '[Redacted]');
+  }
+  return parsed.toString();
 }
 
 export async function fetchWithRetry(
@@ -113,7 +139,7 @@ export async function fetchJSON<T>(
   );
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${url}`);
+    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
   }
 
   return response.json() as Promise<T>;
@@ -128,7 +154,7 @@ export async function fetchText(
   const response = await fetchWithRetry(url, options, timeoutMs, retries);
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${url}`);
+    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
   }
 
   return response.text();
