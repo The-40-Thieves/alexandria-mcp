@@ -36,4 +36,22 @@ test('normalizeArxiv', async (t) => {
     assert.equal(out[0].id, '1234.5678');
     assert.equal(out[0].title, 'Attributed Title');
   });
+
+  // Final wave, B7: a self-closing <name/> (no attributes, no text) parses
+  // to '', so cleanField() -> '' too - unfiltered, that added a spurious
+  // empty-string author the pre-migration node-html-parser extraction
+  // never produced.
+  await t.test('drops an author with a self-closing, empty <name/>', () => {
+    const withEmptyAuthor = `<feed><entry>
+      <id>http://arxiv.org/abs/1234.5678v1</id>
+      <title>A Paper</title>
+      <summary>Some summary</summary>
+      <published>2020-01-01T00:00:00Z</published>
+      <author><name>Real Author</name></author>
+      <author><name/></author>
+    </entry></feed>`;
+    const out = normalizeArxiv(withEmptyAuthor);
+    assert.equal(out.length, 1);
+    assert.deepEqual(out[0].authors, ['Real Author']);
+  });
 });

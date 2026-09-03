@@ -323,6 +323,29 @@ test('assertFetchableUrl', async (t) => {
   await t.test('allows an ordinary public https URL', async () => {
     await assert.doesNotReject(() => assertFetchableUrl('https://example.com/article'));
   });
+
+  // Final wave, A12: classifyIpLiteral() returns null both for "not a
+  // literal IP at all" and for "a literal IP that isn't restricted" (a
+  // genuine public address) - resolveFetchTarget() used to treat that null
+  // as "not a literal, go resolve it", so a public IPv6 literal fell
+  // through to dnsResolver.lookup(parsed.hostname, ...) with the host
+  // still bracketed. isIpLiteral() answers "is this a literal IP at all"
+  // separately, so this must be allowed AND must never reach the resolver.
+  await t.test('allows a public IPv6 literal and never calls the resolver for it', async () => {
+    let lookupCalls = 0;
+    dnsResolver.lookup = (async () => {
+      lookupCalls++;
+      return [{ address: '93.184.216.34', family: 4 }];
+    }) satisfies DnsLookupAll;
+    t.after(() => {
+      dnsResolver.lookup = (async () => [
+        { address: '93.184.216.34', family: 4 },
+      ]) satisfies DnsLookupAll;
+    });
+
+    await assert.doesNotReject(() => assertFetchableUrl('https://[2606:4700:4700::1111]/'));
+    assert.equal(lookupCalls, 0, 'a literal IP must never reach dnsResolver.lookup');
+  });
 });
 
 test('fetchAsText', async (t) => {

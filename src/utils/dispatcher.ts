@@ -18,6 +18,17 @@
 //                        address. See withPinnedAddress() below for how it
 //                        closes the TOCTOU gap between validation and connect.
 //
+// Final wave, B1: keep-alive can reuse an already-open socket to a
+// hostname/address this same Agent validated and connected to earlier -
+// that reuse is what KEEP_ALIVE_TIMEOUT_MS below is for. That is not a gap
+// in guardedDispatcher's guarantee: assertFetchableUrl() re-validates the
+// hostname fresh on every single fetchAsText() call (fetchTier.ts calls it
+// before each attempt, not once per process), so a hostname that has since
+// started resolving to a private address is refused at that revalidation
+// step, before withPinnedAddress() below is even consulted for THIS call -
+// an existing keep-alive connection to the address it validated LAST time
+// is simply never reached for a call the guard already rejected.
+//
 // No interceptors.retry on either: fetchWithRetry() (src/utils/http.ts)
 // already owns retry and Retry-After parsing; a second retry layer
 // underneath it would double the effective retry count and reorder when
@@ -129,14 +140,9 @@ export function resetHttpCacheWarningForTests(): void {
 // so raising maxCount 5x (51 -> 256) for a lower per-entry ceiling trades
 // away caching the occasional large response for caching far more distinct
 // URLs, which is the better trade for a dispatcher shared by ~130 sources.
-// NOTE on a claim from review: the ruling that set these two values also
-// said a response over 1 MB is a full-text read already covered by
-// src/utils/resultCache.ts. Checked against src/sources/registry.ts and
-// that is not accurate: searchCache there wraps only search(), not read(),
-// so a read response over 1 MB is genuinely uncached at every layer here,
-// not backed by another cache. The maxCount/capacity tradeoff above (more
-// distinct URLs cached vs. occasionally missing a large one) stands on its
-// own regardless of that claim.
+// Read responses are not cached by the result cache (src/utils/resultCache.ts's
+// searchCache wraps only search(), not read()); the 1 MB entry ceiling above
+// governs source fetches only.
 // MemoryCacheStore (the fallback below) gets the 256 MB budget directly via
 // its own maxSize option instead (unchanged); maxEntrySize (1 MB) applies to
 // both stores.
@@ -281,9 +287,31 @@ export function buildSourceDispatcher(cacheLocation: string = cachePath()): Disp
 // on every one of those imports rather than only when a caller actually
 // wants the installed dispatcher. installDispatcher() below is the only
 // thing that populates this binding, and it is idempotent.
-export let sourceDispatcher: Dispatcher | undefined;
+// Final wave, B1: no consumer outside this module actually imports this -
+// knip couldn't see that on its own (ignoreExportsUsedInFile), so the
+// export sat unused. closeDispatchers() below is this module's own public
+// way to reach it.
+let sourceDispatcher: Dispatcher | undefined;
 
 let installed = false;
+
+// Test-only seam (same `{ value }`-swap pattern as fetchTier.ts's
+// dnsResolver/openaiBaseUrlOverride): lets dispatcher.test.ts stub a
+// failing setGlobalDispatcher() call to exercise the latch-on-success fix
+// (A11) without depending on the real undici setGlobalDispatcher ever
+// actually throwing.
+export const setGlobalDispatcherImpl: { value: typeof setGlobalDispatcher } = {
+  value: setGlobalDispatcher,
+};
+
+// Test-only: resets the module-level install latch, so a test that forces
+// installDispatcher() to throw (via setGlobalDispatcherImpl above) doesn't
+// leave `installed`/`sourceDispatcher` in a state later tests in the same
+// process would otherwise inherit.
+export function resetDispatcherInstallForTests(): void {
+  installed = false;
+  sourceDispatcher = undefined;
+}
 
 /**
  * Builds sourceDispatcher (if not already built) and sets it as undici's
@@ -296,7 +324,26 @@ let installed = false;
  */
 export function installDispatcher(): void {
   if (installed) return;
-  installed = true;
+  // Final wave, A11: the latch used to be set BEFORE buildSourceDispatcher()/
+  // setGlobalDispatcher() were known to have succeeded, so a throw from
+  // either (an unwritable cache location falls back to MemoryCacheStore
+  // rather than throwing, but setGlobalDispatcher or the Agent constructor
+  // itself could still throw) left `installed` stuck true forever - every
+  // later call became a silent no-op with no global dispatcher ever
+  // actually set, and no way to retry. Setting it only after both calls
+  // return means a throw here leaves the process able to call
+  // installDispatcher() again.
   sourceDispatcher = buildSourceDispatcher();
-  setGlobalDispatcher(sourceDispatcher);
+  setGlobalDispatcherImpl.value(sourceDispatcher);
+  installed = true;
+}
+
+// Final wave, A11: closes both Agents' pooled connections on shutdown.
+// Idempotent and safe to call even if installDispatcher() was never called
+// (sourceDispatcher stays undefined in that case). Does not reset the
+// `installed` latch - this is a process-shutdown action, not a "go back to
+// uninstalled" one; a process that closes its dispatchers and keeps running
+// has no dispatcher to fetch through either way.
+export async function closeDispatchers(): Promise<void> {
+  await Promise.all([sourceDispatcher?.close(), guardedDispatcher.close()]);
 }

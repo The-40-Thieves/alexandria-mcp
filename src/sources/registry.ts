@@ -1,3 +1,4 @@
+import { config } from '../config.ts';
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { requestContext } from '../utils/http.ts';
 import { sourceMetrics } from '../utils/metrics.ts';
@@ -351,7 +352,7 @@ export function healthSummary(): {
   visible: number;
   hidden: number;
   byKind: Record<SourceKind, number>;
-  quota: { day: string; reserved: number; sources: number };
+  quota: { day: string; reserved: number; sources: number; backend: 'state' | 'supabase' };
   cache: { entries: number };
 } {
   const all = listSources();
@@ -363,7 +364,11 @@ export function healthSummary(): {
   // memory). When ALEXANDRIA_LEDGER=supabase is configured, reservations
   // go to Supabase instead and never touch this store, so these numbers
   // read as zero in that deployment mode; that mode has its own quota
-  // visibility via the quota_ledger table.
+  // visibility via the quota_ledger table. `backend` below (final wave,
+  // B4) names which one this payload's quota numbers actually came from,
+  // the same condition createLedger() itself gates on, so a supabase
+  // deployment's zeros here read as "wrong backend for this view", not
+  // "no quota used today".
   //
   // One bulk read (quotaForDay), not one getQuota() round trip per
   // registered source (~138 of them): a row only exists once something
@@ -373,12 +378,25 @@ export function healthSummary(): {
   const perSource = stateStore.quotaForDay(day);
   let reserved = 0;
   for (const n of perSource.values()) reserved += n;
+  const backend: 'state' | 'supabase' =
+    config.ALEXANDRIA_LEDGER === 'supabase' &&
+    config.SUPABASE_URL &&
+    config.SUPABASE_SERVICE_ROLE_KEY
+      ? 'supabase'
+      : 'state';
+  // Final wave, B3: cacheSize() is a raw row/entry count that can include
+  // rows already past their expiresAt but not yet lazily evicted (nothing
+  // reads them, so nothing has triggered their removal) - evict first so
+  // /health's cache.entries reflects what is actually still live, not a
+  // count inflated by however much cruft happens to be sitting around
+  // since the last read that touched those particular keys.
+  stateStore.evictExpired();
   return {
     sources: all.length,
     visible: all.length - hidden,
     hidden,
     byKind,
-    quota: { day, reserved, sources: perSource.size },
+    quota: { day, reserved, sources: perSource.size, backend },
     cache: { entries: stateStore.cacheSize() },
   };
 }

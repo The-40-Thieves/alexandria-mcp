@@ -97,7 +97,15 @@ test('read-paths fixtures', async (t) => {
     const articleUrl = 'https://example.com/news/some-article';
 
     await t.test('returns text via the fetch tier', async () => {
-      globalThis.fetch = (async () => htmlResponse(ARTICLE_HTML)) as typeof fetch;
+      // Final wave, B5: branches on URL like federalregister/peps below,
+      // rather than answering every fetch with the article HTML - a wrong
+      // URL now fails loudly instead of the test passing regardless of
+      // what gdeltRead() actually asked for.
+      globalThis.fetch = (async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url === articleUrl) return htmlResponse(ARTICLE_HTML);
+        throw new Error(`unexpected fetch: ${url}`);
+      }) as typeof fetch;
       const result = await gdeltRead(articleUrl);
       assert.equal(result.metadataOnly, undefined);
       assert.equal(result.externalUrl, articleUrl);
@@ -116,9 +124,15 @@ test('read-paths fixtures', async (t) => {
 
   await t.test('mdn', async (t) => {
     const id = '/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array';
+    const articleUrl = `https://developer.mozilla.org${id}`;
 
     await t.test('returns text via the fetch tier', async () => {
-      globalThis.fetch = (async () => htmlResponse(ARTICLE_HTML)) as typeof fetch;
+      // Final wave, B5: branches on URL, same as gdelt above.
+      globalThis.fetch = (async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url === articleUrl) return htmlResponse(ARTICLE_HTML);
+        throw new Error(`unexpected fetch: ${url}`);
+      }) as typeof fetch;
       const result = await mdnRead(id);
       assert.equal(result.metadataOnly, undefined);
       assert.equal(result.externalUrl, `https://developer.mozilla.org${id}`);
@@ -139,7 +153,12 @@ test('read-paths fixtures', async (t) => {
     const id = 'https://www3.nhk.or.jp/nhkworld/en/news/20260902_N03/';
 
     await t.test('returns text via the fetch tier', async () => {
-      globalThis.fetch = (async () => htmlResponse(ARTICLE_HTML)) as typeof fetch;
+      // Final wave, B5: branches on URL, same as gdelt above.
+      globalThis.fetch = (async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url === id) return htmlResponse(ARTICLE_HTML);
+        throw new Error(`unexpected fetch: ${url}`);
+      }) as typeof fetch;
       const result = await nhkRead(id);
       assert.equal(result.metadataOnly, undefined);
       assert.equal(result.externalUrl, id);
@@ -184,6 +203,15 @@ test('read-paths fixtures', async (t) => {
     });
 
     await t.test('falls back to metadata when the tier fails', async () => {
+      // Final wave, B5: peps.ts caches the downloaded index in a
+      // module-level `let cached` for the life of the process, so this
+      // sub-test's `indexUrl` branch above is never actually exercised -
+      // the prior sub-test's call already populated the cache, and
+      // pepsRead() here reuses it without fetching indexUrl again. Left
+      // in (rather than dropped) so this mock still matches the shape a
+      // fresh process would need, and so a stray fetch to indexUrl - were
+      // the caching ever removed - still fails loudly instead of an
+      // unmocked call reaching the real network.
       globalThis.fetch = (async (input: string | URL | Request) => {
         const url = String(input);
         if (url === indexUrl) return jsonResponse(index);

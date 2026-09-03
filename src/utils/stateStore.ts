@@ -471,3 +471,12 @@ class LazyStateStore implements StateStore {
 }
 
 export const stateStore: StateStore = new LazyStateStore();
+
+// Final wave, A11: a named entry point for index.ts's shutdown hook,
+// alongside dispatcher.ts's closeDispatchers() - closes the sqlite
+// connection (if one was ever opened; LazyStateStore#close() only closes
+// what it actually built) so a clean SIGTERM/SIGINT doesn't leave a
+// dangling file handle.
+export function closeStateStore(): void {
+  stateStore.close();
+}

@@ -6,7 +6,7 @@ import { getAdapter, listSources } from '../src/sources/registry.ts';
 import { installDispatcher } from '../src/utils/dispatcher.ts';
 import { pool } from '../src/utils/mcpClientPool.ts';
 
-export type ProbeStatus = 'OK' | 'EMPTY' | 'ERROR' | 'TIMEOUT' | 'KEY_MISSING';
+export type ProbeStatus = 'OK' | 'EMPTY' | 'EMPTY_REGRESSION' | 'ERROR' | 'TIMEOUT' | 'KEY_MISSING';
 export interface ProbeResult {
   status: ProbeStatus;
   ms: number;
@@ -139,6 +139,32 @@ export function regressions(
     .sort();
 }
 
+// Final wave, A14: this is the only gate that could have caught A4.
+// legislation.gov.uk's HTML-not-Atom response classified as plain EMPTY -
+// indistinguishable, in the per-source status written to
+// eval/probe-latest.json and in the printed counts, from an
+// EXPECTED_EMPTY source or one that is merely quiet today. regressions()
+// above already treats "baseline OK, now EMPTY" as a real regression for
+// its own exit-1 gate, but that signal lived only in that separate list;
+// this relabels the SAME case to EMPTY_REGRESSION in the result each
+// source's own status carries, so it also shows up per-source (and in the
+// counts summary) even for a caller that only looks at probe-latest.json.
+// Skips a source EXPECTED_EMPTY already excuses from regressions(), for
+// the same reason: an EMPTY there was never a claim of health to begin
+// with, baseline or not.
+export function withEmptyRegressionLabels(
+  base: Record<string, { status: string }>,
+  now: Record<string, ProbeResult>,
+): Record<string, ProbeResult> {
+  const out: Record<string, ProbeResult> = {};
+  for (const [name, result] of Object.entries(now)) {
+    const wasOk = base[name]?.status === 'OK';
+    const isSilentRegression = result.status === 'EMPTY' && wasOk && !EXPECTED_EMPTY.has(name);
+    out[name] = isSilentRegression ? { ...result, status: 'EMPTY_REGRESSION' } : result;
+  }
+  return out;
+}
+
 async function probeOne(name: string): Promise<ProbeResult> {
   const q = PROBE_QUERIES[name] ?? DEFAULT_QUERY;
   const t0 = Date.now();
@@ -225,13 +251,30 @@ async function main() {
     );
   }
   await mcpToolsSnapshotOrDrift(mcpSnapshot, only);
-  const out = { generatedAt: new Date().toISOString(), results };
+
+  // Final wave, A14: loaded before writing output/counts (moved up from
+  // the regressions() check at the bottom, unchanged otherwise) so
+  // withEmptyRegressionLabels() can relabel a silent EMPTY-that-used-to-
+  // be-OK before it's ever written to disk or counted, not only flagged
+  // in the separate exit-1 list further down. Same gating as the existing
+  // regressions() check: a single-source run (--source=) has no baseline
+  // comparison, and writing a fresh baseline never relabels against itself.
+  const hasBaseline = !writeBaseline && fs.existsSync('eval/probe-baseline.json') && !only;
+  const base = hasBaseline
+    ? (JSON.parse(fs.readFileSync('eval/probe-baseline.json', 'utf8')).results as Record<
+        string,
+        { status: string }
+      >)
+    : undefined;
+  const labeled = base ? withEmptyRegressionLabels(base, results) : results;
+
+  const out = { generatedAt: new Date().toISOString(), results: labeled };
   fs.mkdirSync('eval', { recursive: true });
   fs.writeFileSync(
     path.join('eval', writeBaseline ? 'probe-baseline.json' : 'probe-latest.json'),
     `${JSON.stringify(out, null, 2)}\n`,
   );
-  const counts = Object.values(results).reduce(
+  const counts = Object.values(labeled).reduce(
     (m, r) => {
       m[r.status] = (m[r.status] ?? 0) + 1;
       return m;
@@ -239,10 +282,9 @@ async function main() {
     {} as Record<string, number>,
   );
   console.error(JSON.stringify(counts));
-  if (!writeBaseline && fs.existsSync('eval/probe-baseline.json') && !only) {
-    const base = JSON.parse(fs.readFileSync('eval/probe-baseline.json', 'utf8')).results;
+  if (base) {
     const authBySource = new Map(listSources().map((s) => [s.name, Boolean(s.auth)]));
-    const bad = regressions(base, results, (s) => authBySource.get(s) ?? false);
+    const bad = regressions(base, labeled, (s) => authBySource.get(s) ?? false);
     if (bad.length) {
       console.error(`REGRESSION: ${bad.join(', ')}`);
       process.exit(1);

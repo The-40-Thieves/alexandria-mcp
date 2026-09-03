@@ -18,9 +18,10 @@ import { libraryAnswer } from './tools/libraryAnswer.ts';
 import { libraryAsk } from './tools/libraryAsk.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
 import type { LibrarySource } from './types.ts';
-import { installDispatcher } from './utils/dispatcher.ts';
+import { closeDispatchers, installDispatcher } from './utils/dispatcher.ts';
 import { requestContext } from './utils/http.ts';
 import { metricsSnapshot, sourceCallTotals, toolMetrics } from './utils/metrics.ts';
+import { closeStateStore } from './utils/stateStore.ts';
 import { VERSION } from './version.ts';
 
 import './sources/all.ts';
@@ -537,13 +538,21 @@ const JSON_BODY_LIMIT_BYTES = 100 * 1024;
 // unbounded read. GET/DELETE /mcp (no body) and any non-JSON content-type
 // still pass `undefined` through to the transport unchanged, same as
 // express.json() no-oping on those today.
+// Final wave, A10: distinguishes the oversize case from any other body-read
+// failure so handleMcpRequest's catch below can destroy the request's
+// socket - never stopped before - without touching the ordinary error
+// path used by every other kind of failure.
+class PayloadTooLargeError extends Error {}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Buffer>) {
     size += chunk.length;
     if (size > JSON_BODY_LIMIT_BYTES) {
-      throw new Error(`request entity too large (limit ${JSON_BODY_LIMIT_BYTES} bytes)`);
+      throw new PayloadTooLargeError(
+        `request entity too large (limit ${JSON_BODY_LIMIT_BYTES} bytes)`,
+      );
     }
     chunks.push(chunk);
   }
@@ -576,6 +585,16 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Prom
     await transport.handleRequest(req, res, body);
   } catch (err) {
     jsonRpcErrorHandler(err, res);
+    if (err instanceof PayloadTooLargeError) {
+      // req and res share one underlying socket, so destroying req here
+      // would sever the connection out from under jsonRpcErrorHandler's
+      // own res.end() above - res 'finish' fires once that response is
+      // fully handed off, only then is it safe to stop a peer that was
+      // still sending (possibly megabytes) more than this request needed.
+      res.on('finish', () => {
+        if (!req.destroyed) req.destroy();
+      });
+    }
   }
 }
 
@@ -607,10 +626,17 @@ function jsonRpcErrorHandler(err: unknown, res: ServerResponse): void {
 // first means a throw here propagates to createHttpApp's try/catch before
 // any header has been sent, so jsonRpcErrorHandler can still send a clean
 // 500 envelope.
-function sendJson(res: ServerResponse, body: unknown): void {
+// method defaults to 'GET': every existing call site sends a body. HEAD
+// (final wave, A10) still computes the payload - so content-length and any
+// serialization error match the GET response byte for byte - but writes no
+// body, the way Express's default HEAD handling for a GET route did.
+function sendJson(res: ServerResponse, body: unknown, method = 'GET'): void {
   const payload = JSON.stringify(body);
-  res.writeHead(200, { 'content-type': 'application/json' });
-  res.end(payload);
+  res.writeHead(200, {
+    'content-type': 'application/json',
+    'content-length': Buffer.byteLength(payload),
+  });
+  res.end(method === 'HEAD' ? undefined : payload);
 }
 
 // Strips a query string from a raw request target - deliberately NOT via
@@ -638,7 +664,10 @@ export function createHttpApp(): Server {
       const path = requestPath(req);
       // /mcp alone gets Express's old case-insensitive, trailing-slash-
       // tolerant matching back (`/MCP`, `/mcp/` both routed); /health and
-      // /metrics stay exact-match, as documented in the README.
+      // /metrics stay exact-match. The README documents their methods
+      // (GET /health, GET /metrics), not this path-matching strictness -
+      // it is not a README-specified contract, just this handler's own
+      // choice not to extend /mcp's tolerant matching to them.
       const mcpPath = path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
       if (
         mcpPath.toLowerCase() === '/mcp' &&
@@ -647,22 +676,30 @@ export function createHttpApp(): Server {
         void handleMcpRequest(req, res);
         return;
       }
-      if (path === '/health' && req.method === 'GET') {
+      // HEAD alongside GET (final wave, A10): Express's default HEAD
+      // handling for a GET route ran the same handler and dropped the
+      // body; sendJson's `method` param reproduces that (headers,
+      // including content-length, with no body).
+      if (path === '/health' && (req.method === 'GET' || req.method === 'HEAD')) {
         const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
         const { calls, errors } = sourceCallTotals();
-        sendJson(res, {
-          status: 'ok',
-          version: VERSION,
-          sources: { total: sources, visible, hidden, calls, errors },
-          byKind,
-          quota,
-          cache,
-          tools: TOOL_COUNT,
-        });
+        sendJson(
+          res,
+          {
+            status: 'ok',
+            version: VERSION,
+            sources: { total: sources, visible, hidden, calls, errors },
+            byKind,
+            quota,
+            cache,
+            tools: TOOL_COUNT,
+          },
+          req.method,
+        );
         return;
       }
-      if (path === '/metrics' && req.method === 'GET') {
-        sendJson(res, metricsSnapshot());
+      if (path === '/metrics' && (req.method === 'GET' || req.method === 'HEAD')) {
+        sendJson(res, metricsSnapshot(), req.method);
         return;
       }
       res.writeHead(404, { 'content-type': 'text/plain' });
@@ -712,11 +749,38 @@ function main(): void {
   // http cache) with no per-call change, since it's installed as undici's
   // global dispatcher. See src/utils/dispatcher.ts.
   installDispatcher();
+  installShutdownHook();
   const run = config.TRANSPORT === 'http' ? runHTTP : runStdio;
   run().catch((err) => {
     log.error({ err: err instanceof Error ? err.message : String(err) }, 'fatal startup error');
     process.exit(1);
   });
+}
+
+// Final wave, A11: one shutdown path for both transports (stdio and http
+// alike - neither previously closed anything on exit). SIGTERM/SIGINT are
+// the two signals a process manager (systemd, Docker, Coolify) and an
+// interactive Ctrl+C send respectively; both close the dispatcher Agents'
+// pooled connections and the state store's sqlite handle before exiting,
+// logging one line either way. Idempotent against a second signal arriving
+// mid-shutdown (`once`, and the listener removes itself first).
+function installShutdownHook(): void {
+  const shutdown = (signal: NodeJS.Signals) => {
+    process.removeListener('SIGTERM', shutdown);
+    process.removeListener('SIGINT', shutdown);
+    log.info({ signal }, 'alexandria shutting down');
+    closeStateStore();
+    closeDispatchers()
+      .catch((err) => {
+        log.error(
+          { err: err instanceof Error ? err.message : String(err) },
+          'error closing dispatchers',
+        );
+      })
+      .finally(() => process.exit(0));
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 }
 
 // Only start a transport when run as the entrypoint; importing this module

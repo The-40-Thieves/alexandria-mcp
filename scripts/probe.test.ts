@@ -10,6 +10,7 @@ import {
   MCP_SNAPSHOT_DIR,
   mcpToolsSnapshotOrDrift,
   regressions,
+  withEmptyRegressionLabels,
 } from './probe.ts';
 
 test('probe classification', async (t) => {
@@ -115,6 +116,53 @@ test('probe classification', async (t) => {
     const base = { other: { status: 'OK' } } as any;
     const now = { other: { status: 'EMPTY' } } as any;
     assert.deepEqual(regressions(base, now), ['other']);
+  });
+});
+
+// Final wave, A14: this is the only gate that could have caught A4 -
+// legislation.gov.uk's HTML-not-Atom response classified as plain EMPTY,
+// indistinguishable from an EXPECTED_EMPTY source or one merely quiet
+// today, in the per-source status written to probe-latest.json.
+test('withEmptyRegressionLabels', async (t) => {
+  await t.test('relabels EMPTY to EMPTY_REGRESSION when the baseline was OK', () => {
+    const base = { legislation: { status: 'OK' } };
+    const now = { legislation: { status: 'EMPTY', ms: 10, count: 0 } } as any;
+    const labeled = withEmptyRegressionLabels(base, now);
+    assert.equal(labeled.legislation.status, 'EMPTY_REGRESSION');
+    // Every other field is carried through unchanged.
+    assert.equal(labeled.legislation.ms, 10);
+    assert.equal(labeled.legislation.count, 0);
+  });
+
+  await t.test('leaves EMPTY alone when the baseline was already EMPTY (a stale baseline)', () => {
+    const base = { legislation: { status: 'EMPTY' } };
+    const now = { legislation: { status: 'EMPTY', ms: 10, count: 0 } } as any;
+    assert.equal(withEmptyRegressionLabels(base, now).legislation.status, 'EMPTY');
+  });
+
+  await t.test(
+    'leaves EMPTY alone for an EXPECTED_EMPTY source even when the baseline was OK',
+    () => {
+      assert.ok(EXPECTED_EMPTY.has('hathitrust'));
+      const base = { hathitrust: { status: 'OK' } };
+      const now = { hathitrust: { status: 'EMPTY', ms: 10, count: 0 } } as any;
+      assert.equal(withEmptyRegressionLabels(base, now).hathitrust.status, 'EMPTY');
+    },
+  );
+
+  await t.test(
+    'leaves a non-EMPTY status (OK, ERROR, ...) alone regardless of the baseline',
+    () => {
+      const base = { arxiv: { status: 'OK' } };
+      const now = { arxiv: { status: 'OK', ms: 10, count: 3 } } as any;
+      assert.equal(withEmptyRegressionLabels(base, now).arxiv.status, 'OK');
+    },
+  );
+
+  await t.test('leaves EMPTY alone for a source absent from the baseline', () => {
+    const base = {};
+    const now = { newsource: { status: 'EMPTY', ms: 10, count: 0 } } as any;
+    assert.equal(withEmptyRegressionLabels(base, now).newsource.status, 'EMPTY');
   });
 });
 

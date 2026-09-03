@@ -19,6 +19,7 @@ function rawRequest(port: number, requestLine: string, timeoutMs = 3000): Promis
     const finish = () => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       socket.destroy();
       resolve(data);
     };
@@ -28,7 +29,14 @@ function rawRequest(port: number, requestLine: string, timeoutMs = 3000): Promis
     });
     socket.on('error', finish);
     socket.on('close', finish);
-    setTimeout(finish, timeoutMs);
+    // Final wave, B6: finish() used to leave this timer running even after
+    // an earlier trigger (data/error/close) already settled - harmless
+    // (the `settled` guard no-ops the late fire) but it kept a handle open
+    // for the rest of timeoutMs regardless. clearTimeout in finish() above
+    // stops that on the common early-settle path; unref() covers the
+    // remaining case (this timer itself is the one that fires) by never
+    // holding the process/test runner open on its own account.
+    const timer = setTimeout(finish, timeoutMs).unref();
   });
 }
 
@@ -336,6 +344,102 @@ test('GET /health and GET /metrics', async (t) => {
       assert.equal(body.tools.library_list_sources?.invocations, 1);
     },
   );
+});
+
+/**
+ * Final wave, A10: the old Express app answered HEAD on a GET route with
+ * headers and no body by default; the plain node:http listener only ever
+ * matched GET, so a HEAD /health or HEAD /metrics 404'd. sendJson() now
+ * writes the same headers (content-type, content-length) either way and
+ * only omits the body for HEAD.
+ */
+test('HEAD /health and HEAD /metrics answer with headers and no body', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  for (const path of ['/health', '/metrics']) {
+    await t.test(path, async () => {
+      const [getRes, headRes] = await Promise.all([
+        fetch(`http://127.0.0.1:${port}${path}`),
+        fetch(`http://127.0.0.1:${port}${path}`, { method: 'HEAD' }),
+      ]);
+      const getBody = await getRes.text();
+      const headBody = await headRes.text();
+
+      assert.equal(headRes.status, 200);
+      assert.equal(headRes.headers.get('content-type'), 'application/json');
+      assert.equal(
+        headRes.headers.get('content-length'),
+        getRes.headers.get('content-length'),
+        'HEAD reports the same content-length a GET would have sent',
+      );
+      assert.equal(headBody, '', 'HEAD carries no body');
+      assert.ok(getBody.length > 0, 'sanity: the GET response does have a body');
+    });
+  }
+});
+
+/**
+ * Final wave, A10: readJsonBody() used to just throw on an oversized body,
+ * leaving the request stream (and its socket) open to keep receiving
+ * whatever the client still had queued up to its declared Content-Length.
+ * It now destroys the request as soon as the cap is crossed - well before
+ * this raw socket has sent anywhere near the (much larger) declared
+ * length - so the connection closes instead of the server continuing to
+ * read.
+ */
+test('an oversized POST body gets the 500 envelope and the server closes the connection', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const oversizedChunk = 'x'.repeat(150 * 1024); // already over the 100kb cap alone
+  const declaredLength = 10 * 1024 * 1024; // far more than what's actually sent
+
+  const result = await new Promise<{ data: string; closed: boolean }>((resolve) => {
+    let data = '';
+    let closed = false;
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve({ data, closed });
+    }, 3000);
+    const socket = netConnect(port, '127.0.0.1', () => {
+      socket.write(
+        `POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: ${declaredLength}\r\nConnection: close\r\n\r\n`,
+      );
+      socket.write(oversizedChunk); // never writes the rest of the declared length
+    });
+    socket.on('data', (chunk) => {
+      data += chunk.toString();
+    });
+    socket.on('close', () => {
+      closed = true;
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ data, closed });
+    });
+    socket.on('error', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ data, closed });
+    });
+  });
+
+  assert.ok(
+    result.closed,
+    'the server closed the connection instead of waiting for the rest of the declared Content-Length',
+  );
+  assert.match(result.data, /"code":-32603/, result.data);
 });
 
 test('createServer returns a fresh instance each call', () => {

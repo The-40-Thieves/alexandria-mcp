@@ -132,7 +132,9 @@ function buildHealthExample(sources: Source[]): string {
   // process (nothing reserved, cached, or called yet) rather than today's
   // actual date, so this line does not drift day to day.
   const sourcesStr = `{ total: ${sources.length}, visible: ${sources.length - hidden}, hidden: ${hidden}, calls: 0, errors: 0 }`;
-  const quotaStr = '{ day: "2026-09-02", reserved: 0, sources: 0 }';
+  // backend (final wave, B4): 'state' unless ALEXANDRIA_LEDGER=supabase is
+  // configured, same condition createLedger() itself gates on.
+  const quotaStr = '{ day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }';
   const cacheStr = '{ entries: 0 }';
   return `{ status: "ok", version: "${VERSION}", sources: ${sourcesStr}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
 }

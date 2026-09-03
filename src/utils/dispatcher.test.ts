@@ -9,9 +9,12 @@ import { destinationOverride } from '../log.ts';
 import {
   buildCacheStore,
   buildSourceDispatcher,
+  closeDispatchers,
   guardedDispatcher,
   installDispatcher,
+  resetDispatcherInstallForTests,
   resetHttpCacheWarningForTests,
+  setGlobalDispatcherImpl,
 } from './dispatcher.ts';
 
 interface FixtureServer {
@@ -179,6 +182,45 @@ test('installDispatcher', async (t) => {
     assert.doesNotThrow(() => installDispatcher());
   });
 
+  // Final wave, A11: the "installed" latch used to be set BEFORE
+  // setGlobalDispatcher() was known to have succeeded, so a throw there
+  // left the latch stuck true forever with no global dispatcher actually
+  // set - every later installDispatcher() call became a silent no-op with
+  // no way to retry.
+  await t.test('a throw during install leaves the latch retryable, not stuck', () => {
+    const originalCache = process.env.ALEXANDRIA_HTTP_CACHE;
+    process.env.ALEXANDRIA_HTTP_CACHE = ':memory:';
+    const originalImpl = setGlobalDispatcherImpl.value;
+    t.after(() => {
+      if (originalCache === undefined) delete process.env.ALEXANDRIA_HTTP_CACHE;
+      else process.env.ALEXANDRIA_HTTP_CACHE = originalCache;
+      setGlobalDispatcherImpl.value = originalImpl;
+      // Leave the module in the same real, working, installed state every
+      // other test in this file expects, regardless of how this test ends.
+      resetDispatcherInstallForTests();
+      installDispatcher();
+    });
+
+    resetDispatcherInstallForTests();
+    setGlobalDispatcherImpl.value = () => {
+      throw new Error('stubbed setGlobalDispatcher failure');
+    };
+
+    assert.throws(() => installDispatcher(), /stubbed setGlobalDispatcher failure/);
+
+    // The throw must not have left the latch stuck true: a subsequent call
+    // (with the failure removed) has to actually attempt the install again,
+    // not silently no-op.
+    setGlobalDispatcherImpl.value = originalImpl;
+    let installCount = 0;
+    setGlobalDispatcherImpl.value = ((dispatcher) => {
+      installCount++;
+      return originalImpl(dispatcher);
+    }) as typeof originalImpl;
+    assert.doesNotThrow(() => installDispatcher());
+    assert.equal(installCount, 1, 'the retry actually ran setGlobalDispatcher, not a no-op');
+  });
+
   await t.test(
     'the global fetch honors a dispatcher installed via setGlobalDispatcher, and caches through that exact path',
     async () => {
@@ -227,11 +269,16 @@ test('installDispatcher', async (t) => {
       // - the exact object fetchTier.ts's guarded fetches pass as an
       // explicit `dispatcher` option - as it stands today. It is also a
       // verified (not merely hoped-for) regression trap for the specific
-      // constraint package.json's undici pin exists to protect: re-run
-      // manually with the installed `undici` package temporarily bumped to
-      // 8.10.1 (`npm install undici@8.10.1 --no-save`), this exact test
-      // fails with "invalid onRequestStart method" - see dispatcher.ts's
-      // module comment for the full mechanism. A literal-IP target, so
+      // constraint package.json's undici pin exists to protect: on Node
+      // 24.x (bundled undici 7.29.0, this repo's mise-pinned runtime), re-
+      // run manually with the installed `undici` package temporarily
+      // bumped to 8.10.1 (`npm install undici@8.10.1 --no-save`), this
+      // exact test fails with "invalid onRequestStart method" - see
+      // dispatcher.ts's module comment for the full mechanism. That
+      // reproduction is Node-24-specific: on Node 26 (a newer bundled
+      // undici with its own compatibility shim), the same bumped-to-8.x
+      // re-run passes - this test only catches the regression under the
+      // Node version this repo actually runs on. A literal-IP target, so
       // guardedDispatcher's connect.lookup pin is never even consulted
       // (undici's connector skips DNS/connect.lookup entirely for a literal
       // IP) - this test is purely about whether the global fetch accepts
@@ -246,4 +293,23 @@ test('installDispatcher', async (t) => {
       assert.equal(await res.text(), 'no-store-1');
     },
   );
+});
+
+// Final wave, A11: index.ts's shutdown hook calls this on SIGTERM/SIGINT.
+// Placed last in this file - closes both module-level shared Agents
+// (sourceDispatcher, guardedDispatcher), which every earlier test in this
+// file depends on staying open.
+test('closeDispatchers', async (t) => {
+  t.after(() => {
+    // installDispatcher() is a no-op once `installed` is true regardless of
+    // whether sourceDispatcher itself is closed, so explicitly reset and
+    // reinstall to leave a working dispatcher for any test file run after
+    // this one in the same process.
+    resetDispatcherInstallForTests();
+    installDispatcher();
+  });
+
+  await t.test('closes both Agents without throwing, even if one was never installed', async () => {
+    await assert.doesNotReject(() => closeDispatchers());
+  });
 });
