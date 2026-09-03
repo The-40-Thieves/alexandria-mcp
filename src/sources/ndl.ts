@@ -1,6 +1,6 @@
 import type { LibraryResult } from '../types.ts';
 import { fetchText } from '../utils/http.ts';
-import { asArray, parseXml } from '../utils/xml.ts';
+import { asArray, findDeep, parseXml, textOf } from '../utils/xml.ts';
 import { register } from './registry.ts';
 
 const SRU = 'https://ndlsearch.ndl.go.jp/api/sru';
@@ -23,33 +23,11 @@ export async function ndlSearch(query: string, limit: number): Promise<LibraryRe
   return normalizeNdl(xml, limit);
 }
 
-// First matching value for `key` found anywhere under `obj`, depth-first in
-// document order; dcndl records nest the fields we want at varying depths
-// (and a record can repeat dcndl:BibResource as a near-empty stub), so a
-// deep search for the first occurrence is more robust than a fixed path.
-function findDeep(obj: unknown, key: string): unknown {
-  if (!obj || typeof obj !== 'object') return undefined;
-  const record = obj as Record<string, unknown>;
-  if (key in record) return record[key];
-  for (const v of Object.values(record)) {
-    const found = findDeep(Array.isArray(v) ? v[0] : v, key);
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-// An element with attributes (e.g. <dcterms:issued rdf:datatype="...">2017)
-// parses to { '@_rdf:datatype': ..., '#text': '2017' } rather than a plain
-// string.
-function textOf(val: unknown): string {
-  if (val == null) return '';
-  if (typeof val === 'string') return val;
-  if (typeof val === 'object' && '#text' in (val as Record<string, unknown>)) {
-    return String((val as Record<string, unknown>)['#text']);
-  }
-  return '';
-}
-
+// dcndl records nest the fields we want at varying depths (and a record
+// can repeat dcndl:BibResource as a near-empty stub), so findDeep's
+// document-wide search for the first occurrence is more robust than a
+// fixed path. findDeep/textOf are the shared xml.ts versions; this stays
+// local since it's ndl's own dc:title/rdf:value fallback logic.
 function titleOf(record: Record<string, unknown>): string {
   const flat = textOf(findDeep(record, 'dcterms:title'));
   if (flat) return flat;

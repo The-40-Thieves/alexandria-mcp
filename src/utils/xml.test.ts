@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { asArray, parseXml } from './xml.ts';
+import { asArray, findDeep, parseXml, textOf } from './xml.ts';
 
 test('parseXml', async (t) => {
   await t.test('parses attributes under the @_ prefix', () => {
@@ -72,5 +72,70 @@ test('asArray', async (t) => {
 
   await t.test('returns an empty array for an empty array', () => {
     assert.deepEqual(asArray([]), []);
+  });
+});
+
+test('findDeep', async (t) => {
+  await t.test('finds a key at the top level', () => {
+    const doc = parseXml<Record<string, unknown>>('<root><title>Top</title></root>');
+    assert.equal(findDeep(doc, 'title'), 'Top');
+  });
+
+  await t.test('finds a key nested several levels down, depth-first in document order', () => {
+    const doc = parseXml<Record<string, unknown>>(
+      '<root><a><b><c><target>Deep</target></c></b></a></root>',
+    );
+    assert.equal(findDeep(doc, 'target'), 'Deep');
+  });
+
+  await t.test('returns the first occurrence when the key repeats at different depths', () => {
+    const doc = parseXml<Record<string, unknown>>(
+      '<root><a><target>First</target></a><b><target>Second</target></b></root>',
+    );
+    assert.equal(findDeep(doc, 'target'), 'First');
+  });
+
+  await t.test('looks inside the first element of an array-valued sibling', () => {
+    // Two <item> siblings parse to an array regardless of isArray; findDeep
+    // dereferences to the first element's subtree rather than skipping the
+    // branch entirely.
+    const doc = parseXml<Record<string, unknown>>(
+      '<root><item><target>InArray</target></item><item><target>Skipped</target></item></root>',
+    );
+    assert.equal(findDeep(doc, 'target'), 'InArray');
+  });
+
+  await t.test('returns undefined when the key is nowhere in the document', () => {
+    const doc = parseXml<Record<string, unknown>>('<root><a>1</a></root>');
+    assert.equal(findDeep(doc, 'missing'), undefined);
+  });
+
+  await t.test('returns undefined for a non-object input', () => {
+    assert.equal(findDeep('a plain string', 'key'), undefined);
+    assert.equal(findDeep(null, 'key'), undefined);
+    assert.equal(findDeep(undefined, 'key'), undefined);
+  });
+});
+
+test('textOf', async (t) => {
+  await t.test('returns a plain string leaf as-is', () => {
+    assert.equal(textOf('hello'), 'hello');
+  });
+
+  await t.test("extracts '#text' from an object with attributes and text", () => {
+    assert.equal(textOf({ '@_type': 'html', '#text': 'Hello' }), 'Hello');
+  });
+
+  await t.test('returns an empty string for an attribute-only (self-closing) node', () => {
+    assert.equal(textOf({ '@_term': 'x' }), '');
+  });
+
+  await t.test('returns an empty string for null or undefined', () => {
+    assert.equal(textOf(null), '');
+    assert.equal(textOf(undefined), '');
+  });
+
+  await t.test('returns an empty string for an array (no single text value)', () => {
+    assert.equal(textOf(['a', 'b']), '');
   });
 });

@@ -1,6 +1,6 @@
 import type { LibraryResult } from '../types.ts';
 import { fetchText } from '../utils/http.ts';
-import { asArray, parseXml } from '../utils/xml.ts';
+import { asArray, findDeep, parseXml, textOf } from '../utils/xml.ts';
 import { register, truncateText } from './registry.ts';
 
 const BASE = 'https://www.legislation.gov.uk';
@@ -16,35 +16,13 @@ interface AtomFeed {
   feed?: { entry?: AtomEntry | AtomEntry[] };
 }
 
-// fast-xml-parser gives a leaf tag back as a plain string when it has no
-// attributes, or an object keyed on '#text' (plus any '@_'-attributes) when
-// it does, e.g. a self-closing `<category term="x"/>` parses to
-// `{ '@_term': 'x' }` with no text at all. textOf() covers both shapes and
-// returns '' for the attribute-only case.
-function textOf(v: unknown): string {
-  if (v == null) return '';
-  if (typeof v === 'string') return v;
-  if (typeof v === 'object' && '#text' in (v as Record<string, unknown>)) {
-    return String((v as Record<string, unknown>)['#text']);
-  }
-  return '';
-}
-
+// self-closing `<category term="x"/>` parses to `{ '@_term': 'x' }` with no
+// text at all; the shared textOf() covers that (attribute-only) case and
+// the plain-string case alike, returning '' when there's no text content.
+// findDeep/textOf are the shared xml.ts versions (this used to carry its
+// own copy, same as legislationscot.ts and ndl.ts each did).
 function cleanField(s: string | undefined): string {
   return (s ?? '').trim();
-}
-
-// First matching value for `key` found anywhere under `obj`, depth-first in
-// document order (a plain XML-wide search, same as the regex it replaces).
-function findDeep(obj: unknown, key: string): unknown {
-  if (!obj || typeof obj !== 'object') return undefined;
-  const record = obj as Record<string, unknown>;
-  if (key in record) return record[key];
-  for (const v of Object.values(record)) {
-    const found = findDeep(Array.isArray(v) ? v[0] : v, key);
-    if (found !== undefined) return found;
-  }
-  return undefined;
 }
 
 // legislation.gov.uk's full-text data.xml documents can run to hundreds of
