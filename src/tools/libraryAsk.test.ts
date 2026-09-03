@@ -4,8 +4,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import path from 'node:path';
 import test from 'node:test';
 import '../sources/all.ts';
-import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
-import { detectFreshnessPreference, libraryAsk, runAsk } from './libraryAsk.ts';
+import { candidatesWithMargin, resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
+import { resetRoutingCacheForTests } from '../utils/resultCache.ts';
+import { detectFreshnessPreference, libraryAsk, planRoute, runAsk } from './libraryAsk.ts';
 
 const arxivFixture = readFileSync(
   path.resolve(process.cwd(), 'eval/fixtures/arxiv-search.xml'),
@@ -93,12 +94,21 @@ test('runAsk / libraryAsk', async (t) => {
     process.env = originalEnv;
     globalThis.fetch = originalFetch;
     resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
   });
 
   delete process.env.OPENAI_API_KEY;
   delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
   delete process.env.ALEXANDRIA_API_KEY;
+  // These tests exercise the stage-2 router path specifically (hallucinated
+  // routes, cluster/freshness tagging), so disable the Task 6 margin-skip -
+  // margin never exceeds 1 for the BM25 ranking this file runs under (no
+  // embeddings key), so any threshold above 1 guarantees stage 2 always
+  // runs. Dedicated skip-path tests are in catalogIndex.test.ts / this
+  // file's own margin-skip block below.
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
   resetCatalogCacheForTests();
+  resetRoutingCacheForTests();
 
   await t.test(
     'drops a route naming a source outside the shortlist, tags results with cluster',
@@ -198,5 +208,156 @@ test('runAsk / libraryAsk', async (t) => {
 
     delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
     delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+  });
+});
+
+// Task 6: the router-skip margin and the routing decision cache, both
+// against planRoute() directly (stage 1 + stage 2 only, no fan-out) so a
+// call count on the fake router server is a direct proxy for "how many LLM
+// calls did this make", the same thing scripts/eval-routing.ts and
+// src/utils/metrics.ts's llmCalls counter measure in production.
+test('router skip margin and routing cache', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+
+  await t.test(
+    "skips the router at or above the query's own margin, calls it just below",
+    async () => {
+      resetCatalogCacheForTests();
+      resetRoutingCacheForTests();
+
+      // A query with a real, nonzero margin under BM25 (see
+      // catalogIndex.test.ts's "left-pad" regression test: depsdev
+      // dominates this one), so the boundary this test sets is meaningful
+      // rather than an arbitrary constant that could stop meaning anything
+      // if the catalog changes.
+      const query = 'npm package left-pad maintainers';
+      const { margin } = await candidatesWithMargin(query, 20, 3);
+      assert.ok(margin > 0, 'the test needs a real margin to bracket a threshold around');
+
+      const router = await startFakeRouter(() => ({
+        intent: 'router picked this',
+        routes: [{ source: 'depsdev', query: 'left-pad', reason: 'r' }],
+      }));
+      t.after(() => router.close());
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+      // The threshold is set just above the query's own margin, so the
+      // margin is below it: not confident enough yet.
+      process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = String(margin + 0.001);
+      resetRoutingCacheForTests();
+      const below = await planRoute(query, { maxSources: 3 });
+      assert.equal(below.stage2, 'llm');
+      assert.equal(below.intent, 'router picked this');
+      assert.equal(router.systemPrompts.length, 1, 'the router was called');
+
+      // Exactly at the query's own margin: confident enough (>=).
+      process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = String(margin);
+      resetRoutingCacheForTests();
+      const atThreshold = await planRoute(query, { maxSources: 3 });
+      assert.equal(atThreshold.stage2, 'skipped');
+      assert.equal(atThreshold.intent, query, 'the raw query stands in for an LLM-written intent');
+      assert.ok(
+        atThreshold.routes.every((r) => r.query === query),
+        'a skipped route fans out with the raw query, not an optimized per-source one',
+      );
+      assert.equal(
+        router.systemPrompts.length,
+        1,
+        'the router was not called a second time once skipped',
+      );
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+      delete process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN;
+    },
+  );
+
+  await t.test(
+    'a routing cache hit replays the decision and never calls the router again',
+    async () => {
+      resetCatalogCacheForTests();
+      resetRoutingCacheForTests();
+
+      const router = await startFakeRouter(() => ({
+        intent: 'router picked this once',
+        routes: [{ source: 'arxiv', query: 'attention', reason: 'r' }],
+      }));
+      t.after(() => router.close());
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      // Margin can never reach 2 under BM25 (no negative scores), so this
+      // isolates the cache's own effect from the margin-skip path above.
+      process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+
+      const first = await planRoute('a repeated cache-test query', { maxSources: 2 });
+      assert.equal(first.stage2, 'llm');
+      assert.equal(router.systemPrompts.length, 1);
+
+      const second = await planRoute('a repeated cache-test query', { maxSources: 2 });
+      assert.equal(
+        router.systemPrompts.length,
+        1,
+        'a cache hit costs no LLM call: the router was not called a second time',
+      );
+      assert.equal(second.stage2, 'llm', 'the cached decision replays which path produced it');
+      assert.equal(second.intent, first.intent);
+      assert.deepEqual(second.routes, first.routes);
+
+      // Whitespace/case normalisation matches resultCache.ts's cacheKey.
+      const third = await planRoute('  A REPEATED   cache-test QUERY  ', { maxSources: 2 });
+      assert.equal(router.systemPrompts.length, 1, 'normalised query text still hits the cache');
+      assert.equal(third.intent, first.intent);
+
+      // A different max_sources is a different cache key.
+      await planRoute('a repeated cache-test query', { maxSources: 3 });
+      assert.equal(
+        router.systemPrompts.length,
+        2,
+        'a different max_sources is a cache miss, so the router runs again',
+      );
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+      delete process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN;
+    },
+  );
+
+  await t.test('a routing cache hit replays a margin-skip decision too', async () => {
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+
+    const router = await startFakeRouter(() => ({
+      intent: 'should never be called',
+      routes: [{ source: 'depsdev', query: 'x', reason: 'r' }],
+    }));
+    t.after(() => router.close());
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+    // Always skip: the top score is always > 0 for a query that matches
+    // anything at all, and margin >= 0 is always true.
+    process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '0';
+
+    const first = await planRoute('npm package left-pad maintainers', { maxSources: 3 });
+    assert.equal(first.stage2, 'skipped');
+    assert.equal(router.systemPrompts.length, 0, 'stage 2 never ran the first time either');
+
+    const second = await planRoute('npm package left-pad maintainers', { maxSources: 3 });
+    assert.equal(second.stage2, 'skipped', 'the cache replays "skipped", not a fresh margin check');
+    assert.deepEqual(second.routes, first.routes);
+    assert.equal(router.systemPrompts.length, 0);
+
+    delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+    delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+    delete process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN;
   });
 });

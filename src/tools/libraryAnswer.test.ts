@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import test from 'node:test';
 import { register } from '../sources/registry.ts';
 import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
+import { resetRoutingCacheForTests } from '../utils/resultCache.ts';
 import {
   dropDanglingCitations,
   escapeSourceText,
@@ -205,12 +206,21 @@ test('libraryAnswer', async (t) => {
   t.after(() => {
     process.env = originalEnv;
     resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
   });
 
   delete process.env.OPENAI_API_KEY;
   delete process.env.ALEXANDRIA_API_KEY;
   delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
   delete process.env.KNOWLEDGE_MCP_URL;
+  // These tests all exercise the stage-2 router path via a fake router
+  // server, several with the same literal query text - disable the Task 6
+  // margin-skip (see libraryAsk.test.ts's runAsk/libraryAsk block for why
+  // a threshold above 1 does that under BM25 ranking) and clear the
+  // routing cache before every sub-test, so an earlier sub-test's cached
+  // decision is never replayed for a later one that reuses the same query.
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+  t.beforeEach(() => resetRoutingCacheForTests());
 
   await t.test(
     'rejects cleanly with no synth key configured, before doing any other work',

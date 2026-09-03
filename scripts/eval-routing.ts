@@ -25,6 +25,7 @@
 // prints and exits 0, so a BM25-only run (no embeddings key at all, the
 // common case for CI) never fails the gate on a ranking quality it can't yet
 // improve.
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse as parseYaml } from 'yaml';
@@ -33,6 +34,8 @@ import { listSources } from '../src/sources/registry.ts';
 import { planRoute } from '../src/tools/libraryAsk.ts';
 import { candidates } from '../src/utils/catalogIndex.ts';
 import { installDispatcher } from '../src/utils/dispatcher.ts';
+import { requestContext } from '../src/utils/http.ts';
+import { resetMetricsForTests, toolMetrics } from '../src/utils/metrics.ts';
 import { hasEmbeddingsConfigured, roleConfig } from '../src/utils/providers.ts';
 
 export interface GoldenQuery {
@@ -265,10 +268,26 @@ export async function main(): Promise<void> {
   const routerConfigured = Boolean(roleConfig('router').apiKey);
   if (routerConfigured) {
     const stage2Names = new Map<string, string[]>();
+    // Task 6: how many LLM calls a real library_ask call would actually
+    // make under this configuration - the Task 5 llmCalls counter, read
+    // through the same requestContext.run({tool: 'library_ask'}) scope
+    // index.ts's withRequestContext() wraps a real tool call in, around
+    // the exact planRoute() call library_ask's own runAsk() makes (fan-out
+    // itself never calls an LLM, so metering planRoute() alone is
+    // equivalent to metering the whole tool call). resetMetricsForTests()
+    // just before this loop, not resetting per-query, so the total divides
+    // cleanly by the query count for an average.
+    resetMetricsForTests();
+    let queriesRun = 0;
+    let skippedCount = 0;
     for (const q of golden) {
       if (isFullyHidden(q, hiddenNames)) continue;
+      queriesRun += 1;
       try {
-        const planned = await planRoute(q.query, { maxSources: 5 });
+        const planned = await requestContext.run({ reqId: randomUUID(), tool: 'library_ask' }, () =>
+          planRoute(q.query, { maxSources: 5 }),
+        );
+        if (planned.stage2 === 'skipped') skippedCount += 1;
         stage2Names.set(
           q.query,
           planned.routes.map((r) => r.source),
@@ -288,6 +307,11 @@ export async function main(): Promise<void> {
       { includeRecall20: false },
     );
     printReport('Stage 1+2 (router configured)', stage2Result, false);
+
+    const askLlmCalls = toolMetrics('library_ask').llmCalls;
+    console.log(
+      `\nlibrary_ask_llm_calls_total=${askLlmCalls} library_ask_llm_calls_avg=${(askLlmCalls / (queriesRun || 1)).toFixed(3)} queries=${queriesRun} stage2_skipped=${skippedCount} stage2_llm=${queriesRun - skippedCount}`,
+    );
   } else {
     console.log(
       '\nStage 1+2: skipped, no router role configured (set OPENAI_API_KEY or ALEXANDRIA_ROUTER_API_KEY)',

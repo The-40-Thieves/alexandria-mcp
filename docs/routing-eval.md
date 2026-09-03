@@ -139,3 +139,154 @@ To re-run: `npm run eval:routing`. To re-run against embeddings, set
 `OPENAI_API_KEY` (or `ALEXANDRIA_EMBEDDINGS_*`) first; the eval script
 will pick up whichever embeddings config `src/utils/providers.ts`
 resolves.
+
+## 2026-09-02, Task 6: router-skip margin
+
+Eight `npm run eval:routing` runs against the Cave LiteLLM gateway,
+measuring the stage-1 confidence margin (`src/utils/catalogIndex.ts`'s
+`candidatesWithMargin()`) that lets `library_ask` skip the router LLM call
+entirely (`src/tools/libraryAsk.ts`'s `planRoute()`), plus the routing
+decision cache. `eval/routing-golden.yaml` had 62 non-fully-hidden queries
+at run time (66 on 2026-09-02's earlier BM25-only baseline above; the
+`hidden` source set drifted between the two runs - see the "Fairness"
+section above for why a fully-hidden query is excluded rather than scored).
+
+**Models**: router role `openai/gpt-4o-mini` (via the gateway, with
+`ALEXANDRIA_ROUTER_JSON_MODE=1` - the gateway's own hostname isn't
+`api.openai.com`, so `chatJSON` won't request `response_format:
+json_object` on its own, and two other models tried first without it,
+`deepinfra/google/gemini-2.5-flash` and `anthropic/claude-haiku-4-5`,
+returned unparseable JSON - a `<think>` preamble on the first, markdown
+code fences on the second, neither stripped by `chatJSON`'s current
+parser). Embeddings role `BAAI/bge-m3` (1024 dims, confirmed via
+`embeddingDimensions()` during the run).
+
+**Env var correction**: the task brief named `ALEXANDRIA_EMBED_BASE_URL` /
+`ALEXANDRIA_EMBED_API_KEY` / `ALEXANDRIA_EMBED_MODEL`. `src/utils/
+providers.ts`'s `envKey()` (via `config.ts`'s `roleFields('EMBEDDINGS',
+...)`) reads `ALEXANDRIA_EMBEDDINGS_BASE_URL` / `_API_KEY` / `_MODEL`
+(role name `EMBEDDINGS`, not `EMBED`) - used the names the code actually
+reads.
+
+**Credential handling**: `LITELLM_AGENT_KEY` was read from
+`/data/llm-stack/.env` with `grep '^LITELLM_AGENT_KEY=' | cut -d= -f2-`
+into a shell variable, not sourced wholesale - an earlier attempt that did
+`set -a; . /data/llm-stack/.env; set +a` leaked that file's own
+`OPENAI_API_KEY` into the process environment, which made
+`hasEmbeddingsConfigured()` silently true (via `roleConfig()`'s
+`openaiApiKey` fallback) during what was meant to be the BM25-only run,
+against real `api.openai.com` with a different model - caught by the
+`library_ask_llm_calls_avg=2.000` in that first, discarded attempt (BM25
+mode should cost 1 call, not 2) and re-run correctly. Every eval
+invocation below also explicitly `env -u`s `OPENAI_API_KEY`,
+`ALEXANDRIA_API_KEY`, and `ALEXANDRIA_BASE_URL` as a second guard. The key
+value itself is never in this file, a log, or a commit - only the
+variable name.
+
+**Gateway host gotcha**: pointing `ALEXANDRIA_EMBEDDINGS_BASE_URL` at the
+gateway's literal IP (`http://100.78.123.100:4001/v1`, as CLAUDE.md
+documents it) made every embed call through `installDispatcher()`'s
+globally-installed DNS-caching dispatcher (`src/utils/dispatcher.ts`) hang
+past its 15s headers timeout, even though a plain `curl` to the same IP
+returned in under 2s and a raw `fetch()` with no dispatcher installed
+worked immediately - consistent with undici's DNS interceptor attempting
+an actual resolver lookup on an IP literal instead of recognizing it needs
+none. Using the box's Tailscale MagicDNS name for the same host
+(`http://cave.tail3f4c45.ts.net:4001/v1`, found via `tailscale status` /
+`getent hosts`) avoided it. `scripts/eval-routing.ts` calls
+`installDispatcher()` unconditionally (pre-existing, Task 3), so this
+matters for anyone re-running this eval against that gateway by IP; it is
+not a Task 6 change and is not fixed here - `src/utils/dispatcher.ts` is
+out of this task's file list. Flagged as a concern in the task report.
+
+**Catalog cache isolation**: `buildCatalog()`'s disk cache
+(`ALEXANDRIA_CATALOG_CACHE`) keys each entry by `sha256(entryText)` only,
+not by embedding model - a model change reusing the default
+`eval/catalog-embeddings.json` would silently serve vectors from whatever
+model built it. No such file existed yet in this repo, but every
+embeddings run below pointed `ALEXANDRIA_CATALOG_CACHE` at a
+model-specific path, `eval/catalog-embeddings-bge-m3.json`, to keep it
+that way going forward. That per-text (not per-model) cache key is a
+pre-existing design choice (Task 3), not changed here.
+
+**Method**: each of the 8 runs is a separate process with
+`ALEXANDRIA_STATE_DB=:memory:`, so the Task 6 routing cache starts empty
+every time and one run's cached decisions can never leak into another's
+numbers. `ALEXANDRIA_ROUTER_SKIP_MARGIN=1000` stands in for "never skip"
+on the two "with the LLM router" rows (`parseSkipMargin`'s upper bound was
+deliberately left open for exactly this - see its comment in
+`libraryAsk.ts`) rather than leaving the var unset, which would apply
+whatever `DEFAULT_ROUTER_SKIP_MARGIN` this change ships.
+
+| stage-1 mode | router mode | stage-1 nDCG@5 | stage-1+2 nDCG@5 | stage-1+2 recall@5 | LLM calls / `library_ask` | stage2 llm / skipped |
+|---|---|---|---|---|---|---|
+| BM25 | always router | 0.8882 | 0.896 | 0.903 | 1.000 | 62 / 0 |
+| BM25 | skip @ 0.2 | 0.8882 | 0.872 | 0.906 | 0.032 | 2 / 60 |
+| BM25 | skip @ 0.3 | 0.8882 | 0.872 | 0.906 | 0.032 | 2 / 60 |
+| BM25 | skip @ 0.4 | 0.8882 | 0.872 | 0.906 | 0.032 | 2 / 60 |
+| embeddings (bge-m3) | always router | 0.9101 | 0.937 | 0.946 | 2.000 | 62 / 0 |
+| embeddings (bge-m3) | skip @ 0.2 | 0.9101 | 0.925 | 0.938 | 1.274 | 17 / 45 |
+| embeddings (bge-m3) | skip @ 0.3 | 0.9101 | 0.937 | 0.944 | 1.597 | 37 / 25 |
+| embeddings (bge-m3) | skip @ 0.4 | 0.9101 | 0.944 | 0.960 | 1.935 | 58 / 4 |
+
+`stage1_recall_at_20` was 0.9516 (BM25) and 0.9785 (embeddings) in every
+row of its own mode, unaffected by the router/skip setting (recall@20 is
+a stage-1-only metric); both are well above the 0.80 gate floor, and both
+stage-1 nDCG@5 numbers clear the 0.60 floor, so `npm run eval:routing`
+exited 0 in every one of the 8 runs (the gate only ever fires below those
+floors).
+
+All three BM25 skip margins land on the identical 2 LLM / 60 skipped
+split: this golden set's BM25 margin distribution is bimodal for this
+catalog - a query either has one term-dominant source (margin well above
+0.4) or several similarly-scored candidates (margin well below 0.2) - so
+0.2/0.3/0.4 draw the same line through it. Embeddings' cosine margins are
+smoother, so the three thresholds there do move the split meaningfully
+(45/25/4 skipped).
+
+### Choosing the default `routerSkipMargin`
+
+Per the brief: the largest tested margin whose stage-1+2 nDCG@5 is within
+0.01 of the "always call the router" number, on the better of the two
+stage-1 modes.
+
+1. **Better stage-1 mode**: embeddings, nDCG@5 0.9101 vs BM25's 0.8882
+   (`0.9101 > 0.8882`, checked with `calc`).
+2. **Target**: embeddings' always-router stage-1+2 nDCG@5, 0.937.
+3. **Within 0.01, largest margin wins** (`calc cmp`, exact):
+   - margin 0.2: `|0.937 - 0.925| = 0.012` - **not** within 0.01.
+   - margin 0.3: `|0.937 - 0.937| = 0` - within 0.01.
+   - margin 0.4: `|0.937 - 0.944| = 0.007` - within 0.01 (and, on this
+     golden set, margin 0.4 actually scored a touch *above* the
+     always-router baseline - noise at n=62, not a claim that skipping
+     improves routing quality).
+4. **Default: `routerSkipMargin = 0.4`** - the largest of the three that
+   qualifies. At that margin, 58 of 62 golden queries (94%) still route
+   through the LLM; only the 4 most stage-1-dominant queries skip it. The
+   LLM-call savings scale with how often real traffic looks like those 4
+   (a single obviously-dominant source) rather than the golden set's
+   overall skip rate at that margin, since the golden set is
+   deliberately weighted toward genuinely ambiguous queries.
+
+`DEFAULT_ROUTER_SKIP_MARGIN` in `src/tools/libraryAsk.ts` is set to `0.4`;
+override per deployment with `ALEXANDRIA_ROUTER_SKIP_MARGIN`.
+
+### Routing cache
+
+Independent of the margin: `planRoute()` caches the full routing decision
+(intent, routes, and which path produced it) by normalised query +
+`max_sources`, through the Task 4 `stateStore`, for `config.
+ALEXANDRIA_CACHE_TTL_MS` (the same TTL `searchCache` uses - `src/utils/
+resultCache.ts`'s `routingCache`). A cache hit skips stage 1 *and* stage
+2 entirely: no router call and no query embed. This isn't exercised by
+`eval:routing` (each golden query runs once, so nothing repeats within a
+run - each of the 8 runs here uses a fresh `:memory:` store precisely so
+routing decisions don't leak between runs); it's covered by `src/tools/
+libraryAsk.test.ts`'s "router skip margin and routing cache" tests
+instead, which count calls on a fake router server directly.
+
+To re-run this eval: point `ALEXANDRIA_ROUTER_*` and (for the embeddings
+rows) `ALEXANDRIA_EMBEDDINGS_*` at a real provider, set
+`ALEXANDRIA_ROUTER_SKIP_MARGIN` to the margin under test (or leave it
+unset for the shipped default, or set it above 1 for "always route"), and
+run `npm run eval:routing`.

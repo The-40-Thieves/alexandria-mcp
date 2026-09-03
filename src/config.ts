@@ -118,6 +118,14 @@ const schema = z
         'Set to "llm" to rerank fused results with a chat call (the rerank role); otherwise the fused order is kept.',
       ),
 
+    // ── Routing (src/tools/libraryAsk.ts, src/utils/catalogIndex.ts) ────────
+    ALEXANDRIA_ROUTER_SKIP_MARGIN: z
+      .string()
+      .optional()
+      .describe(
+        "Stage-1 confidence margin (0-1: top candidate score minus the score at max_sources+1, normalised by the top score) at or above which library_ask skips the LLM router call and fans out to stage 1's top max_sources directly with the raw query. Unset or invalid uses the built-in default (see docs/routing-eval.md for how it was chosen).",
+      ),
+
     // ── Caches / state / ledger ─────────────────────────────────────────────
     ALEXANDRIA_CACHE_TTL_MS: z
       .string()
