@@ -15,6 +15,7 @@ import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
+import { TOOL_COUNT } from './toolCount.ts';
 import { formatResult } from './tools/format.ts';
 import {
   type AnswerProgressCallback,
@@ -36,11 +37,10 @@ import './sources/all.ts';
 // The ten public tools registered below (library_list_sources, library_ask,
 // library_search, library_read, library_index, library_ingest,
 // library_recommend, library_answer, library_research,
-// library_health_check). Kept as a literal count rather than introspected
-// from the SDK: tools/list must not vary per connection (see the plan's
-// Global Constraints), so this is a fixed fact about this file, not a
-// runtime measurement.
-const TOOL_COUNT = 10;
+// library_health_check). TOOL_COUNT itself lives in src/toolCount.ts, not
+// here, so scripts/gen-docs.ts's README /health example can read the same
+// value instead of carrying its own separate literal (task 2 review
+// finding: those two drifted).
 
 const SourceSchema = z
   .string()

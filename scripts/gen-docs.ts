@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import { CONFIG_FIELDS } from '../src/config.ts';
 import '../src/sources/all.ts';
 import { type Cluster, listSources, type SourceKind } from '../src/sources/registry.ts';
+import { TOOL_COUNT } from '../src/toolCount.ts';
 import { VERSION } from '../src/version.ts';
 
 const README_PATH = 'README.md';
@@ -122,7 +123,7 @@ function buildReadmeSourcesBlock(sources: Source[]): string {
   return lines.join('\n');
 }
 
-function buildHealthExample(sources: Source[]): string {
+function buildHealthExample(sources: Source[], toolCount: number): string {
   const hidden = sources.filter((s) => s.hidden).length;
   const byKind: Record<SourceKind, number> = { rest: 0, hub: 0, rss: 0, mcp: 0, scrape: 0 };
   for (const s of sources) byKind[s.kind]++;
@@ -136,7 +137,11 @@ function buildHealthExample(sources: Source[]): string {
   // configured, same condition createLedger() itself gates on.
   const quotaStr = '{ day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }';
   const cacheStr = '{ entries: 0 }';
-  return `{ status: "ok", version: "${VERSION}", sources: ${sourcesStr}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: 9 }`;
+  // toolCount is a caller-supplied parameter, not a literal here (task 2
+  // review finding): src/index.ts's TOOL_COUNT and this doc example used to
+  // carry two separate literals that silently drifted apart when a tool
+  // was added. Both now read src/toolCount.ts.
+  return `{ status: "ok", version: "${VERSION}", sources: ${sourcesStr}, byKind: ${kindStr}, quota: ${quotaStr}, cache: ${cacheStr}, tools: ${toolCount} }`;
 }
 
 function applyReadmeSubstitutions(content: string, sources: Source[]): string {
@@ -151,7 +156,7 @@ function applyReadmeSubstitutions(content: string, sources: Source[]): string {
   );
   out = out.replace(
     /Health check: `GET \/health` returns `\{[^`]*\}`\./,
-    `Health check: \`GET /health\` returns \`${buildHealthExample(sources)}\`.`,
+    `Health check: \`GET /health\` returns \`${buildHealthExample(sources, TOOL_COUNT)}\`.`,
   );
   return out;
 }
