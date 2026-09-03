@@ -22,6 +22,7 @@ import {
   libraryAnswer,
 } from './tools/libraryAnswer.ts';
 import { libraryAsk } from './tools/libraryAsk.ts';
+import { libraryHealth } from './tools/libraryHealth.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
 import type { LibrarySource } from './types.ts';
 import { closeDispatchers, installDispatcher } from './utils/dispatcher.ts';
@@ -32,13 +33,14 @@ import { VERSION } from './version.ts';
 
 import './sources/all.ts';
 
-// The nine public tools registered below (library_list_sources, library_ask,
+// The ten public tools registered below (library_list_sources, library_ask,
 // library_search, library_read, library_index, library_ingest,
-// library_recommend, library_answer, library_research). Kept as a literal
-// count rather than introspected from the SDK: tools/list must not vary per
-// connection (see the plan's Global Constraints), so this is a fixed fact
-// about this file, not a runtime measurement.
-const TOOL_COUNT = 9;
+// library_recommend, library_answer, library_research,
+// library_health_check). Kept as a literal count rather than introspected
+// from the SDK: tools/list must not vary per connection (see the plan's
+// Global Constraints), so this is a fixed fact about this file, not a
+// runtime measurement.
+const TOOL_COUNT = 10;
 
 const SourceSchema = z
   .string()
@@ -131,6 +133,18 @@ const LibrarySourceInfoSchema = z.object({
   verifiedAt: z.string().optional(),
   hidden: z.boolean(),
   optionalEnv: z.array(z.string()).optional(),
+});
+
+const SourceHealthSchema = z.object({
+  name: z.string(),
+  cluster: z.string(),
+  status: z.enum(['ok', 'degraded', 'down', 'key_missing', 'unknown']),
+  // Present in `response_format: "detailed"` only; concise rows omit them.
+  kind: z.string().optional(),
+  errorRate: z.number().optional(),
+  avgLatencyMs: z.number().optional(),
+  quotaUsed: z.number().optional(),
+  note: z.string().optional(),
 });
 
 const ChunkMetadataSchema = z.object({
@@ -226,7 +240,7 @@ function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise
 }
 
 /**
- * Build a fresh McpServer with the nine public tools registered.
+ * Build a fresh McpServer with the ten public tools registered.
  *
  * HTTP mode calls this once per request: Protocol.connect rejects a second
  * transport attaching to a server that already has one (SdkErrorCode
@@ -265,6 +279,39 @@ export function createServer(): McpServer {
           )
           .join('\n');
         return { content: [{ type: 'text', text }], structuredContent: { sources } };
+      }),
+  );
+
+  // ── library_health_check ─────────────────────────────────────────────────────
+  server.registerTool(
+    'library_health_check',
+    {
+      title: 'Check Source Health',
+      description: `Report per-source health: 'ok', 'degraded', 'down', 'key_missing', or 'unknown', merging this process's live error rate and latency with the last off-process probe run. Use before relying on a source that has been erroring, or to check whether a key is configured. Optionally filter by source or cluster. Set response_format: "detailed" for error rate, latency, and quota usage.`,
+      inputSchema: z.object({
+        source: SourceSchema.optional(),
+        cluster: z.string().optional().describe('Restrict to sources in this cluster'),
+        response_format: ResponseFormatSchema,
+      }),
+      outputSchema: z.object({
+        generatedAt: z.string(),
+        probeAt: z.string().optional(),
+        sources: z.array(SourceHealthSchema),
+      }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ source, cluster, response_format }) =>
+      withRequestContext('library_health_check', async () => {
+        const result = libraryHealth({ source, cluster, response_format });
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          structuredContent: toStructured(result),
+        };
       }),
   );
 

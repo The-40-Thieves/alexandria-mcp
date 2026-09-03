@@ -10,6 +10,7 @@ import {
   utcDay,
 } from '../utils/quotaLedger.ts';
 import { rateLimited } from '../utils/rateLimit.ts';
+import { READ_CACHE_TTL_MS, readCache } from '../utils/readCache.ts';
 import { cacheKey, searchCache } from '../utils/resultCache.ts';
 import { stateStore } from '../utils/stateStore.ts';
 
@@ -281,12 +282,26 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
       }
     },
     async read(id) {
+      const metrics = sourceMetrics(name);
+      // Task 2: a read cache ahead of everything else, same shape as
+      // search()'s above - a hit skips pacing, quota, and the adapter call
+      // entirely. TTL is chosen by freshness (static 24h, daily 10min,
+      // realtime never); ttlMs <= 0 means "never cached", so a realtime
+      // source's read() never even checks the cache, matching
+      // ReadCache#set's own guard.
+      const ttlMs = READ_CACHE_TTL_MS[adapter.freshness];
+      if (ttlMs > 0) {
+        const cached = readCache.get(name, id);
+        if (cached) {
+          metrics.cacheHits++;
+          return cached;
+        }
+      }
       const controller = new AbortController();
       const unchain = chainAbort(controller);
-      const metrics = sourceMetrics(name);
       metrics.calls++;
       try {
-        return await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
+        const result = await rateLimited(name, adapter.pacing?.minIntervalMs ?? 0, async () => {
           await reserveQuota(name, adapter.pacing?.dailyCap, getLedger());
           const start = Date.now();
           try {
@@ -299,6 +314,8 @@ function withGuards(name: string, adapter: RegisteredEntry): SourceAdapter {
             metrics.latencyMsTotal += Date.now() - start;
           }
         });
+        if (ttlMs > 0) readCache.set(name, id, result, ttlMs);
+        return result;
       } catch (err) {
         recordFailure(metrics, err);
         throw err;

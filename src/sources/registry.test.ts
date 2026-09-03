@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import test, { describe, it } from 'node:test';
 import { fetchJSON } from '../utils/http.ts';
+import { sourceMetrics } from '../utils/metrics.ts';
 import { stateStore } from '../utils/stateStore.ts';
 import {
   catalog,
@@ -147,6 +148,52 @@ test('registry v2', async (t) => {
     await adapter.search('same query', 3);
     await adapter.search('same query', 3);
     assert.equal(calls, 1);
+  });
+
+  await t.test(
+    'getAdapter caches an identical read (static freshness) without re-calling the adapter',
+    async () => {
+      let calls = 0;
+      register('t_read_cached_static', {
+        description: 'x',
+        supportsIngest: true,
+        freshness: 'static',
+        async search() {
+          return [];
+        },
+        async read() {
+          calls++;
+          return { title: 'cached', authors: [] };
+        },
+      });
+      const adapter = getAdapter('t_read_cached_static');
+      const before = sourceMetrics('t_read_cached_static').cacheHits;
+      const first = await adapter.read('id-1');
+      const second = await adapter.read('id-1');
+      assert.deepEqual(second, first);
+      assert.equal(calls, 1);
+      assert.equal(sourceMetrics('t_read_cached_static').cacheHits, before + 1);
+    },
+  );
+
+  await t.test('a realtime source never caches reads', async () => {
+    let calls = 0;
+    register('t_read_realtime', {
+      description: 'x',
+      supportsIngest: true,
+      freshness: 'realtime',
+      async search() {
+        return [];
+      },
+      async read() {
+        calls++;
+        return { title: 'live', authors: [] };
+      },
+    });
+    const adapter = getAdapter('t_read_realtime');
+    await adapter.read('id-1');
+    await adapter.read('id-1');
+    assert.equal(calls, 2);
   });
 
   await t.test('getAdapter returns a stable wrapped instance per name', () => {

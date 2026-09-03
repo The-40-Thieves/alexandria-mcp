@@ -1,0 +1,9 @@
+{
+  "generatedAt": "2026-09-01T00:00:00.000Z",
+  "results": {
+    "t_health_down": { "status": "ERROR", "ms": 120, "count": 0, "message": "HTTP 500" },
+    "t_health_down_no_calls": { "status": "TIMEOUT", "ms": 15000, "count": 0 },
+    "t_health_regression": { "status": "EMPTY_REGRESSION", "ms": 80, "count": 0 },
+    "t_health_ok_probe": { "status": "OK", "ms": 200, "count": 3 }
+  }
+}

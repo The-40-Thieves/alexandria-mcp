@@ -15,10 +15,11 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 | `library_recommend(id, limit?)` | Get similar papers via Semantic Scholar's recommendation engine (up to 500) |
 | `library_answer(query, max_sources?, results_per_source?, read_top?)` | Ask a question and get a synthesized answer with inline `[n]` citations, fused across sources with reciprocal rank fusion; `warnings[]` flags an uncited or all-dropped answer |
 | `library_research(query, depth?, breadth?, max_minutes?)` | Recursive multi-round research: generates queries, answers each, extracts learnings, and writes a final cited report over every source found |
+| `library_health_check(source?, cluster?)` | Report per-source health (`ok`, `degraded`, `down`, `key_missing`, `unknown`), merging this process's live error rate/latency with the last off-process probe run |
 
-`library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results.
+`library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results. `library_health_check` tells you whether a source is worth calling before you call it.
 
-`library_ask`, `library_search`, `library_answer`, and `library_research` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations), detailed returns the full payload, including routing reasons, relevance scores, and per-stage diagnostics.
+`library_ask`, `library_search`, `library_answer`, `library_research`, and `library_health_check` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations; name, cluster, status), detailed returns the full payload, including routing reasons, relevance scores, per-stage diagnostics, and per-source error rate/latency/quota usage.
 
 <!-- sources:start -->
 ## Sources (138)
