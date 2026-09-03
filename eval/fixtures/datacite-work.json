@@ -1,0 +1,42 @@
+{
+  "data": {
+    "id": "10.25434/elia-ines_phd2021",
+    "type": "dois",
+    "attributes": {
+      "doi": "10.25434/elia-ines_phd2021",
+      "titles": [
+        {
+          "title": "SNAI1 target genes in myoblasts"
+        }
+      ],
+      "creators": [
+        {
+          "name": "Elia, Ines",
+          "nameType": "Personal",
+          "givenName": "INES",
+          "familyName": "ELIA",
+          "affiliation": [],
+          "nameIdentifiers": []
+        }
+      ],
+      "publisher": "Universit\ufffd degli Studi di Siena",
+      "publicationYear": 2021,
+      "language": "en",
+      "types": {
+        "ris": "RPRT",
+        "bibtex": "article",
+        "citeproc": "article-journal",
+        "schemaOrg": "ScholarlyArticle",
+        "resourceType": "\n\tText\n",
+        "resourceTypeGeneral": "Text"
+      },
+      "descriptions": [
+        {
+          "descriptionType": "Abstract",
+          "description": "SNAI proteins are zinc finger transcription factors that act as transcriptional repressors through a conserved domain (SNAG domain) located in the N-terminus of the protein. These factors bind to a palindromic sequence of the E-box group (CANNTG) in the regulatory regions of their target genes. The role of SNAI11 and SNAI2 is well known in the epithelial mesenchymal transition, where they act as r"
+        }
+      ],
+      "url": "https://usiena-air.unisi.it//handle/11365/1142998"
+    }
+  }
+}

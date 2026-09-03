@@ -1,0 +1,27 @@
+{
+  "pages": [
+    {
+      "id": 1208,
+      "key": "Alan_Turing",
+      "title": "Alan Turing",
+      "excerpt": "algorithm and computation with the <span class=\"searchmatch\">Turing</span> machine, which can be considered a model of a general-purpose computer.",
+      "matched_title": null,
+      "description": "English computer scientist (1912-1954)",
+      "thumbnail": {
+        "mimetype": "image/jpeg",
+        "width": 60,
+        "height": 80,
+        "url": "//upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Alan_turing_header.jpg/60px-Alan_turing_header.jpg"
+      }
+    },
+    {
+      "id": 31093,
+      "key": "Turing_Award",
+      "title": "Turing Award",
+      "excerpt": "Staff (2014). &quot;ACM&#039;s <span class=\"searchmatch\">Turing</span> Award prize raised to $1 million&quot;.",
+      "matched_title": null,
+      "description": "American annual computer science prize",
+      "thumbnail": null
+    }
+  ]
+}

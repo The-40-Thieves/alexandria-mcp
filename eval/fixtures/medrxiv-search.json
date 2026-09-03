@@ -1,0 +1,47 @@
+{
+  "messages": [
+    {
+      "status": "ok",
+      "count": 4,
+      "total": "432"
+    }
+  ],
+  "collection": [
+    {
+      "doi": "10.64898/2026.03.27.26349549",
+      "title": "HLA-Resolve: Four-field HLA typing and MHC variant detection from long-read hybrid capture",
+      "authors": "Glasenapp, M. R.; Yee, M.-C.; Symons, A. E.; Sheh, J. G.; Garcia, O. A.; Cornejo, O. E.",
+      "date": "2026-08-27",
+      "category": "genetic and genomic medicine",
+      "abstract": "The major histocompatibility complex (MHC) is among the most polymorphic and difficult-to-genotype regions of the human genome. Accurate typing of its HLA genes, which encode antigen-presenting molecules, is critical for transplantation, pharmacogenomics, and disease-risk predict",
+      "server": "medRxiv"
+    },
+    {
+      "doi": "10.64898/2026.08.18.26360601",
+      "title": "Detecting early loss of kidney function in a Sri Lankan cohort study of working age adults",
+      "authors": "Chulasiri, P.; Rutter, C. E.; Gunawardena, N.; Wickramasinghe, S.; Niyas, R.; Pearce, N.; Caplin, B.; Ruwanpathirana, T.",
+      "date": "2026-08-27",
+      "category": "epidemiology",
+      "abstract": "ObjectivesChronic kidney disease of undetermined cause (CKDu) is a form of kidney disease not associated with traditional risk factors such as hypertension, diabetes or heavy proteinuria. 11.2% of men and 3.7% of women demonstrated low eGFR (a surrogate for CKDu) in the absence o",
+      "server": "medRxiv"
+    },
+    {
+      "doi": "10.64898/2026.08.18.26360681",
+      "title": "Effectiveness of dual-mobility cups for preventing dislocation after primary total hip arthroplasty by a posterolateral approach and their cost-effectiveness compared to unipolar cups in elderly patients.",
+      "authors": "Hoonhout, O.; Scheijbeler, E.; van Beers, L. W. A. H.; Moojen, D. J. F.; Klaassen, A. D.; Willigenburg, N. W.; Poolman, R. W.; REDEP collaborators,  ",
+      "date": "2026-08-27",
+      "category": "orthopedics",
+      "abstract": "RationaleDislocation is the leading reason for early revision surgery. To address the problem of dislocation, the dual-mobility (DM) cup was developed in France in the 1970s. This cup should provide more stability and biomechanically reduce the risk of dislocation. In the Netherl",
+      "server": "medRxiv"
+    },
+    {
+      "doi": "10.1101/2025.11.17.25338859",
+      "title": "Towards a participatory European social contact observatory",
+      "authors": "Kelley, K. N.; Backer, J.; Coletti, P.; Gozzi, N.; Hermans, L.; Hens, N.; Loedy, N.; Mazzoli, M.; Torneri, A.; van Hoek, A. J.; Paolotti, D.",
+      "date": "2026-08-27",
+      "category": "epidemiology",
+      "abstract": "Social contacts shape infectious disease transmission, but most contact data come from infrequent, resource-intensive stand-alone surveys that are difficult to link with longitudinal health information. Digital participatory surveillance offers an alternative for continuous colle",
+      "server": "medRxiv"
+    }
+  ]
+}

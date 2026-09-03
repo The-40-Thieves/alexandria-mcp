@@ -21,6 +21,12 @@
   expected: [osf]
 - query: Cambridge University theses and working papers
   expected: [apollo]
+- query: look up a DOI's reference list and publisher metadata
+  expected: [crossref]
+- query: MeSH indexed biomedical journal article search by PMID
+  expected: [pubmed]
+- query: find the DOI for a dataset deposited on Zenodo or Figshare
+  expected: [datacite]
 
 # ── ai_research ─────────────────────────────────────────────────────────────
 - query: machine learning papers with their code implementations
@@ -75,6 +81,10 @@
   expected: [frankfurter]
 - query: international merchandise trade statistics by HS commodity code
   expected: [comtrade]
+- query: World Bank development indicator data by country over time
+  expected: [worldbank]
+- query: search SEC EDGAR 10-K filings for a public company
+  expected: [secedgar]
 
 # ── geopolitical ─────────────────────────────────────────────────────────────
 - query: Hormuz shipping disruption this week
@@ -161,6 +171,8 @@
   expected: [nasaads]
 - query: biology preprints on bioRxiv
   expected: [biorxiv]
+- query: clinical medicine preprints on medRxiv
+  expected: [medrxiv]
 - query: Department of Energy nuclear and materials science research
   expected: [osti]
 - query: NIH funded research project abstracts
@@ -209,3 +221,7 @@
   expected: [searxng]
 - query: web search API purpose built for LLM agents
   expected: [tavily]
+- query: Wikipedia encyclopedia article summary of a historical figure
+  expected: [wikipedia]
+- query: Wikidata structured entity lookup and knowledge base identifiers
+  expected: [wikidata]

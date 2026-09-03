@@ -1,0 +1,80 @@
+{
+  "status": "ok",
+  "message-type": "work-list",
+  "message-version": "1.0.0",
+  "message": {
+    "total-results": 325547,
+    "items": [
+      {
+        "DOI": "10.62311/nesx/68113",
+        "title": [
+          "The CRISPR Code: Gene Editing, Biotechnology, and the Future of Humanity"
+        ],
+        "author": [
+          {
+            "ORCID": "https://orcid.org/0009-0007-1023-7035",
+            "authenticated-orcid": false,
+            "given": "Murali Krishna",
+            "family": "Pasupuleti",
+            "sequence": "first",
+            "affiliation": [],
+            "role": [
+              {
+                "role": "author",
+                "vocabulary": "crossref"
+              }
+            ]
+          }
+        ],
+        "issued": {
+          "date-parts": [
+            [
+              2025,
+              2,
+              21
+            ]
+          ]
+        },
+        "container-title": [
+          "The CRISPR Revolution: Gene Editing, Biotechnology, and the Future of Humanity"
+        ],
+        "language": null,
+        "URL": "https://doi.org/10.62311/nesx/68113",
+        "abstract": "<jats:p>Abstract:\nThe CRISPR revolution has ushered in a new era of gene editing, synthetic biology, and precision medicine, allowing humanity to rewrite the genetic blueprint of life. This chapter explores the profound impact of CRISPR-Cas9 and next-generation gene-editing technologies on medicine, agriculture, and human evolution. From curing genetic diseases and engineering resilient crops to enhancing human traits and addressing ethical dilemmas, CRISPR presents both groundbreaking possibilities and existential challenges. The discussion delves into the potential elimination of inherited disorders, the ethical debate over designer genes, the rise of bioengineered organisms, and the regulatory complexities of genetic modification. As CRISPR technology advances, humanity stands at the crossroads of scientific progress and ethical responsibility, shaping the future of evolution, health, and society.\n\nKeywords:\nCRISPR, gene editing, biotechnology, genome engineering, precision medicine, genetic enhancement, synthetic biology, human evolution, designer babies, germline editing, biohacking, genome sequencing, regenerative medicine, genetic ethics, post-human biology, DNA modification, AI-driven genomics, genetic inequality, gene drives, future of biotechnology.</jats:p>"
+      },
+      {
+        "DOI": "10.17504/protocols.io.j8nlk9xxdv5r/v1",
+        "title": [
+          "CRISPR/Cas9 gene editing in hiPSC v1"
+        ],
+        "author": [
+          {
+            "given": "Laura",
+            "family": "Mahoney",
+            "sequence": "first",
+            "affiliation": [],
+            "role": [
+              {
+                "role": "author",
+                "vocabulary": "crossref"
+              }
+            ]
+          }
+        ],
+        "issued": {
+          "date-parts": [
+            [
+              2025,
+              2,
+              21
+            ]
+          ]
+        },
+        "container-title": null,
+        "language": null,
+        "URL": "https://doi.org/10.17504/protocols.io.j8nlk9xxdv5r/v1",
+        "abstract": "<p>This protocol is adapted from Skarnes et al., 2019 and describes the steps to follow for knocking-in point mutation via CRISP/Cas9 in humain inducible pluripotent cells (hiPSC) </p>"
+      }
+    ]
+  }
+}
