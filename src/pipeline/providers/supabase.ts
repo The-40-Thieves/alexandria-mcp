@@ -19,14 +19,21 @@ export class SupabaseVectorStoreProvider implements VectorStoreProvider {
   private client: SupabaseClient;
   private table: string;
 
-  constructor() {
+  // Review round 1: an optional injected client lets
+  // supabase.test.ts exercise query()'s argument-passing and row-mapping
+  // against a fake `rpc()` without a live Supabase project, the same way
+  // src/pipeline/index.ts's ingestText() takes an injectable
+  // embedder/store. Every real caller (src/pipeline/providers/index.ts's
+  // buildVectorStoreProvider()) omits it and still requires
+  // SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY to be set.
+  constructor(client?: SupabaseClient) {
     const url = config.SUPABASE_URL;
     const key = config.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!url) throw new Error('SUPABASE_URL is not set');
     if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
 
-    this.client = createClient(url, key);
+    this.client = client ?? createClient(url, key);
     this.table = config.SUPABASE_TABLE || 'knowledge_chunks';
   }
 
@@ -83,6 +90,13 @@ export class SupabaseVectorStoreProvider implements VectorStoreProvider {
   // similarity search through supabase-js. min_similarity is left at 0
   // here (return the raw top-k); the caller (src/pipeline/corpusSearch.ts)
   // applies ALEXANDRIA_CORPUS_MIN_SIM itself.
+  //
+  // Review round 1 (Important 3): `filter.sources` is passed through
+  // as-is, including an empty array - `??` only substitutes on null/
+  // undefined, so `[]` reaches the RPC call unchanged. match_knowledge_
+  // chunks() treats a NULL *and* an empty sources array as "no filter"
+  // (see its cardinality(sources) = 0 check), so omitting `filter` and
+  // passing `{ sources: [] }` behave identically: search the whole store.
   async query(
     embedding: number[],
     k: number,

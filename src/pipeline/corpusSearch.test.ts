@@ -53,11 +53,16 @@ class FakeStore implements VectorStoreProvider {
   }
 }
 
-function registerStaticSource(name: string): void {
+function registerStaticSource(
+  name: string,
+  overrides: { homepage?: string; cluster?: 'science' | 'literature' } = {},
+): void {
   register(name, {
     description: `test static source ${name}`,
     supportsIngest: true,
     freshness: 'static',
+    homepage: overrides.homepage,
+    cluster: overrides.cluster,
     async search() {
       return [];
     },
@@ -162,9 +167,12 @@ test('corpusSearch', async (t) => {
     },
   );
 
-  await t.test('respects a custom ALEXANDRIA_CORPUS_MIN_SIM', async () => {
+  await t.test('respects a custom ALEXANDRIA_CORPUS_MIN_SIM', async (t) => {
     process.env.SUPABASE_URL = 'https://fake.supabase.test';
     process.env.ALEXANDRIA_CORPUS_MIN_SIM = '0.99';
+    t.after(() => {
+      delete process.env.ALEXANDRIA_CORPUS_MIN_SIM;
+    });
     registerStaticSource('zzfcorpus_static2');
 
     const store = new FakeStore([
@@ -174,4 +182,103 @@ test('corpusSearch', async (t) => {
     const results = await corpusSearch('a query', { store, embed: async () => [[1, 2, 3]] });
     assert.deepEqual(results, [], '0.95 similarity does not clear a 0.99 threshold');
   });
+
+  // Review round 1 (Important 1): a corpus citation needs a URL and the
+  // real registry cluster, or it silently defaults the citation grader's
+  // tier and carries no link.
+  await t.test('sets url and cluster from the chunk metadata when present', async () => {
+    process.env.SUPABASE_URL = 'https://fake.supabase.test';
+    registerStaticSource('zzfcorpus_url', { homepage: 'https://registry.test/homepage' });
+
+    const store = new FakeStore([
+      hit({
+        metadata: chunkMetadata({
+          source: 'zzfcorpus_url',
+          url: 'https://example.test/stamped-doc',
+          cluster: 'science',
+        }),
+      }),
+    ]);
+
+    const [r] = await corpusSearch('a query', { store, embed: async () => [[1, 2, 3]] });
+    assert.equal(r.url, 'https://example.test/stamped-doc', 'the stamped url wins');
+    assert.equal(r.cluster, 'science');
+  });
+
+  await t.test(
+    'falls back to the registry homepage/cluster for a chunk with no stamped url/cluster',
+    async () => {
+      process.env.SUPABASE_URL = 'https://fake.supabase.test';
+      registerStaticSource('zzfcorpus_no_url', {
+        homepage: 'https://registry.test/fallback',
+        cluster: 'literature',
+      });
+
+      const store = new FakeStore([
+        // No url/cluster in metadata - simulates a chunk ingested before
+        // ChunkMetadata gained those fields.
+        hit({ metadata: chunkMetadata({ source: 'zzfcorpus_no_url' }) }),
+      ]);
+
+      const [r] = await corpusSearch('a query', { store, embed: async () => [[1, 2, 3]] });
+      assert.equal(r.url, 'https://registry.test/fallback');
+      assert.equal(r.cluster, 'literature');
+    },
+  );
+
+  // Review round 1 (Important 2): a timeboxed ingest's expiresAt must be
+  // honored on the read path, not just enforced at write time.
+  await t.test('drops a hit whose metadata.expiresAt is in the past', async () => {
+    process.env.SUPABASE_URL = 'https://fake.supabase.test';
+    registerStaticSource('zzfcorpus_expiry');
+
+    const expired = hit({
+      metadata: chunkMetadata({
+        source: 'zzfcorpus_expiry',
+        sourceId: 'expired-doc',
+        expiresAt: '2000-01-01T00:00:00.000Z',
+      }),
+    });
+    const live = hit({
+      metadata: chunkMetadata({
+        source: 'zzfcorpus_expiry',
+        sourceId: 'live-doc',
+        expiresAt: '2999-01-01T00:00:00.000Z',
+      }),
+    });
+    const noExpiry = hit({
+      metadata: chunkMetadata({ source: 'zzfcorpus_expiry', sourceId: 'no-expiry-doc' }),
+    });
+    const store = new FakeStore([expired, live, noExpiry]);
+
+    const results = await corpusSearch('a query', { store, embed: async () => [[1, 2, 3]] });
+
+    const ids = results.map((r) => r.id).sort();
+    assert.deepEqual(ids, ['zzfcorpus_expiry:live-doc:0', 'zzfcorpus_expiry:no-expiry-doc:0']);
+  });
+
+  // Minor 2: the gate is "SUPABASE_URL set AND an embeddings role
+  // configured" - either alone is not enough.
+  await t.test(
+    'returns [] without calling the store or embed when no embeddings role is configured',
+    async () => {
+      process.env.SUPABASE_URL = 'https://fake.supabase.test';
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.ALEXANDRIA_API_KEY;
+      delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+      registerStaticSource('zzfcorpus_no_embeddings');
+
+      const store = new FakeStore([
+        hit({ metadata: chunkMetadata({ source: 'zzfcorpus_no_embeddings' }) }),
+      ]);
+
+      // No `embed` override passed - corpusSearch must fall back to
+      // hasEmbeddingsConfigured() and bail before ever calling the real
+      // embed() or the store.
+      const results = await corpusSearch('a query', { store });
+
+      assert.deepEqual(results, []);
+      assert.equal(store.calls.length, 0, 'the store is never queried');
+    },
+  );
 });

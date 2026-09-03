@@ -720,6 +720,12 @@ export function createServer(): McpServer {
             ingestPolicy: adapter.ingestPolicy,
             homepage: adapter.homepage,
           });
+          // Review round 1 (Important 1): ReadResult never carries a
+          // url/previewUrl/downloadUrl (those are search()'s LibraryResult
+          // fields, unavailable here since library_ingest is only given an
+          // id) - externalUrl is the one URL-shaped signal read() ever
+          // returns, falling back to the source's registry homepage.
+          const url = result.externalUrl ?? adapter.homepage;
           const ingestResult = await ingestText(
             result.text,
             source as LibrarySource,
@@ -728,6 +734,7 @@ export function createServer(): McpServer {
             result.authors,
             result.year,
             result.language,
+            url,
             chunkStamp,
           );
           await report(

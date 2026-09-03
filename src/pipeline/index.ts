@@ -1,5 +1,6 @@
 import { config } from '../config.ts';
 import type { IngestMetadata } from '../sources/ingestPolicy.ts';
+import { listSources } from '../sources/registry.ts';
 import type {
   Chunk,
   ChunkMetadata,
@@ -181,6 +182,12 @@ export async function ingestText(
   authors: string[],
   year?: number,
   language?: string,
+  // Review round 1 (Important 1): the best link available at read time for
+  // this document (the adapter's ReadResult.externalUrl, falling back to
+  // the source's registry homepage - see src/index.ts's library_ingest
+  // handler), stamped onto every chunk's metadata.url so a corpus-as-cache
+  // citation (src/pipeline/corpusSearch.ts) has a real URL instead of none.
+  url?: string,
   // The ingest-policy stamp (src/sources/ingestPolicy.ts's ingestMetadata())
   // to merge onto every chunk's metadata before it's embedded and written,
   // so license/attribution/an expiry survive alongside the chunk in the
@@ -210,6 +217,12 @@ export async function ingestText(
     };
   }
 
+  // Review round 1 (Important 1): the cluster a corpus-as-cache citation
+  // needs for the grader (src/utils/citationGrade.ts) comes from the
+  // registry's SourceMeta at ingest time, not from a caller-supplied value
+  // - there's exactly one source of truth for a source's cluster.
+  const cluster = listSources().find((s) => s.name === source)?.cluster;
+
   const raw = chunkSemantic(text, {
     source,
     sourceId,
@@ -217,6 +230,8 @@ export async function ingestText(
     authors,
     year,
     language,
+    url,
+    cluster,
   });
 
   const stamped = chunkStamp

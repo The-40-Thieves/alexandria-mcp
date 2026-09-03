@@ -47,7 +47,22 @@ as $$
     knowledge_chunks.metadata
   from knowledge_chunks
   where 1 - (knowledge_chunks.embedding <=> query_embedding) >= min_similarity
-    and (sources is null or knowledge_chunks.metadata ->> 'source' = any(sources))
+    -- Review round 1 (Important 3): an empty array (as opposed to a NULL
+    -- one) must also mean "no filter", not "match nothing" - `= any('{}')`
+    -- is always false, so without the cardinality check corpusSearch.ts
+    -- (or any other caller) passing `[]` would silently get zero rows back.
+    and (
+      sources is null
+      or cardinality(sources) = 0
+      or knowledge_chunks.metadata ->> 'source' = any(sources)
+    )
+    -- Review round 1 (Important 2): honor a timeboxed ingest's retention
+    -- deadline (src/sources/ingestPolicy.ts's ingestMetadata() stamps
+    -- metadata.expiresAt) on the read path too, not just at write time.
+    and (
+      knowledge_chunks.metadata ->> 'expiresAt' is null
+      or (knowledge_chunks.metadata ->> 'expiresAt')::timestamptz > now()
+    )
   order by knowledge_chunks.embedding <=> query_embedding
   limit match_count;
 $$;
@@ -62,3 +77,11 @@ drop index if exists knowledge_chunks_embedding_idx;
 
 create index if not exists knowledge_chunks_embedding_hnsw_idx
   on knowledge_chunks using hnsw (embedding vector_cosine_ops);
+
+-- Minor: HNSW's query-time recall/speed tradeoff is controlled by
+-- hnsw.ef_search (default 40, the size of the dynamic candidate list a
+-- search scans) rather than an index-build parameter - raise it (e.g. to
+-- 100) in a session or transaction if corpus-as-cache hits are missing
+-- results a straight `<=>` scan would have found, at the cost of a slower
+-- match_knowledge_chunks() call.
+-- set hnsw.ef_search = 100;

@@ -187,7 +187,10 @@ create index if not exists knowledge_chunks_embedding_hnsw_idx
 If you set this schema up before Task 12, you had an `ivfflat` index instead
 (`knowledge_chunks_embedding_idx`) - `docs/sql/match_chunks.sql` drops it and
 creates the `hnsw` one shown above, since HNSW builds incrementally and needs
-no `lists` tuning constant as the table grows.
+no `lists` tuning constant as the table grows. If corpus-as-cache hits seem to
+be missing results a plain `<=>` scan would have found, raise the query-time
+`hnsw.ef_search` session setting (default 40) at the cost of a slower query -
+see the commented recommendation in `docs/sql/match_chunks.sql`.
 
 ### Corpus as cache
 

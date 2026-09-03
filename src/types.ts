@@ -55,6 +55,16 @@ export interface ChunkMetadata {
   license?: string;
   attribution?: string;
   expiresAt?: string;
+  // Review round 1 (Important 1): stamped by ingestText() so a
+  // corpus-as-cache citation (src/pipeline/corpusSearch.ts) has a real URL
+  // and cluster instead of defaulting the citation grader's tier. `url` is
+  // the best link ingestText had at read time (the adapter's ReadResult.
+  // externalUrl, falling back to the source's registry homepage); `cluster`
+  // is the source's registry cluster at ingest time. Both absent on a chunk
+  // ingested before this field existed - corpusSearch.ts falls back to the
+  // *current* registry entry for the chunk's source in that case.
+  url?: string;
+  cluster?: string;
 }
 
 export interface IndexPreview {
@@ -140,7 +150,9 @@ export interface VectorStoreProvider {
   isDuplicate(sourceId: string, mcpName: string): Promise<boolean>;
   // Task 12: corpus-as-cache. Nearest-neighbor search over previously
   // ingested chunks, ranked by cosine similarity descending. `filter.
-  // sources`, when given, restricts to chunks whose metadata.source is in
-  // the list; omitted means search the whole store.
+  // sources`, when given as a NON-EMPTY array, restricts to chunks whose
+  // metadata.source is in the list. Omitting `filter`/`filter.sources`
+  // entirely, and passing an EMPTY array, are equivalent - both mean
+  // "search the whole store" (Review round 1, Important 3).
   query(embedding: number[], k: number, filter?: { sources?: string[] }): Promise<VectorQueryHit[]>;
 }

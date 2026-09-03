@@ -882,4 +882,65 @@ test('libraryAnswer', async (t) => {
 
     assert.equal(calls, 0, 'corpusSearch is never called when every routed source is realtime');
   });
+
+  // Review round 1 (Important 1): a corpus citation must carry a real
+  // URL and grade using its stamped cluster, not silently default the
+  // citation grader's tier for lack of one.
+  await t.test('a corpus citation carries a url and grades using its stamped cluster', async () => {
+    registerFakeSources();
+    resetCatalogCacheForTests();
+
+    const router = await startFakeChatServer(() => ({
+      intent: `find info about ${TOKEN}`,
+      routes: [{ source: 'zzftest_full', query: TOKEN, reason: 'full text match' }],
+    }));
+    t.after(() => router.close());
+
+    // Cites both possible sources so the assertions below don't depend on
+    // which one RRF/rerank happened to rank first.
+    const synth = await startFakeChatServer(() => 'Two things happened [1][2].');
+    t.after(() => synth.close());
+    const verify = await startFakeChatServer(allSupportedVerifyDecide);
+    t.after(() => verify.close());
+
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_VERIFY_BASE_URL = verify.url;
+    process.env.ALEXANDRIA_VERIFY_API_KEY = 'test-key';
+
+    const originalSearch = corpusSearchRef.search;
+    corpusSearchRef.search = async () => [
+      {
+        id: 'zzftest_full:cached-doc:0',
+        source: 'corpus',
+        title: 'Cached Corpus Chunk',
+        authors: [],
+        hasFullText: true,
+        fullText: `Cached info about ${TOKEN}.`,
+        url: 'https://example.test/cached-doc',
+        cluster: 'academic',
+      },
+    ];
+    t.after(() => {
+      corpusSearchRef.search = originalSearch;
+    });
+
+    const result = await libraryAnswer(`what changed in ${TOKEN}`, {
+      maxSources: 5,
+      resultsPerSource: 5,
+      readTop: 4,
+    });
+
+    const citation = result.citations.find((c) => c.source === 'corpus');
+    assert.ok(citation, 'the corpus hit is cited');
+    assert.equal(citation.url, 'https://example.test/cached-doc', 'the stamped url is cited');
+    assert.equal(
+      citation.grade?.signals.sourceTier,
+      1,
+      'the academic cluster grades tier 1, not the default tier 3 a missing cluster would produce',
+    );
+    assert.equal(citation.grade?.tier, 'A');
+  });
 });
