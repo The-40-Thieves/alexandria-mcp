@@ -53,11 +53,12 @@ const LEXICON = new Set(COMMON_ENGLISH_WORDS);
 // one unlucky word (or zero words) swing the whole chunk.
 const MIN_CHECKABLE_TOKENS = 3;
 
-// A token only goes through the lexicon: an ALL-CAPS run is left alone
-// (acronyms like "ASCII" or "NASA" are not garbage, and a 5,000-word
-// lexicon built from ordinary prose will never contain them anyway), and a
-// token with no ASCII Latin letter at all (Greek/Arabic/Chinese/...) is
-// outside what an English word list can judge one way or the other.
+// A token only goes through the lexicon check when it's checkable at all:
+// an ALL-CAPS run is left alone (acronyms like "ASCII" or "NASA" are not
+// garbage, and a 5,000-word lexicon built from ordinary prose will never
+// contain them anyway), and a token with no ASCII Latin letter at all
+// (Greek/Arabic/Chinese/...) is outside what an English word list can
+// judge one way or the other.
 function isCheckable(token: string): boolean {
   return /[a-z]/i.test(token) && token !== token.toUpperCase();
 }
