@@ -20,7 +20,21 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 `library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results. `library_health_check` tells you whether a source is worth calling before you call it. `library_citations` walks the citation graph around an item and can export it as a bibliography.
 
-`library_ask`, `library_search`, `library_answer`, `library_research`, `library_health_check`, and `library_citations` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations; name, cluster, status), detailed returns the full payload, including routing reasons, relevance scores, per-stage diagnostics, and per-source error rate/latency/quota usage.
+`library_ask`, `library_search`, `library_answer`, `library_research`, `library_health_check`, and `library_citations` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations; name, cluster, status), detailed returns the full payload, including routing reasons, relevance scores, per-stage diagnostics, and per-source error rate/latency/quota usage. In `detailed` mode, `library_search` also attaches a `resource_link` content item for each full-text result, pointing at that item's `library://doc/{source}/{id}` resource (see below) — a client with resource support can read the full text directly instead of a second `library_read` call.
+
+## Prompts
+
+Three ready-made research workflows, surfaced by MCP clients as slash commands (Claude Code's `/alexandria:<name>`, VS Code's `/alexandria.prompt`). Each returns a single message naming the tools to call, in order — it does not call any tool itself.
+
+| Prompt | Description |
+|---|---|
+| `literature_review(topic, depth?)` | Survey a topic across sources and produce a cited report |
+| `fact_check_claim(claim)` | Check one claim against the library and report whether it is supported |
+| `verify_bibliography(references)` | Check that a list of references (one per line) resolves to real, findable items |
+
+## Resources
+
+`library://doc/{source}/{id}` reads the same text `library_read(id, source)` returns (including the open-access fallback below), addressed by the `source`/`id` pair `library_search` or `library_ask` returned. Clients that support MCP resources (Claude Code's `@srv:uri`, VS Code's Add Context) can pull an item's full text directly.
 
 <!-- sources:start -->
 ## Sources (152)
@@ -266,13 +280,19 @@ is always allowed regardless) and a per-client-IP rate limit
 error body once exceeded). See `docs/fetch-tier-runtime.md` for the
 details and `src/httpGuards.ts` for the implementation.
 
-Speaks the 2025-era MCP protocol on the wire (the `@modelcontextprotocol/*` v2
-SDK's default for a hand-wired `NodeStreamableHTTPServerTransport` /
-`StdioServerTransport`, which is what `src/index.ts` uses). Opting into the
-2026-07-28 revision is a server-construction change, not a config flag: swap
-the HTTP handler for `createMcpHandler(factory, { legacy: 'stateless' | 'reject' })`
-and the stdio one for `serveStdio(factory, { legacy: 'reject' })`, both from
-`@modelcontextprotocol/server`.
+Serves both eras of the MCP protocol on the same `/mcp` endpoint:
+`createMcpHandler(factory, { legacy: 'stateless' })` (`@modelcontextprotocol/server`,
+adapted to `node:http` by `toNodeHandler()` from `@modelcontextprotocol/node`)
+answers a 2026-07-28 `server/discover` probe or per-request envelope on the
+modern path, and falls back to the same stateless idiom the pre-2026 SDK used
+for a 2025-era `initialize` handshake — one `createServer()` factory backs
+both. stdio uses the connection-pinned `serveStdio(factory)` from
+`@modelcontextprotocol/server/stdio`, which selects the era from the
+connection's opening exchange. Note: the 2025-era fallback path answers over
+`text/event-stream` (SSE) rather than a bare JSON body, since the SDK exposes
+no equivalent to v1's `enableJsonResponse` for that path — any MCP client
+built on a Streamable HTTP transport (the SDK's own `StreamableHTTPClientTransport`
+included) already parses either format transparently.
 
 Set those (plus any source keys) in the Railway dashboard and deploy:
 

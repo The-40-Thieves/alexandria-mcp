@@ -5,15 +5,23 @@ import {
   type Server,
   type ServerResponse,
 } from 'node:http';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
-import { isJsonContentType, McpServer, type ServerContext } from '@modelcontextprotocol/server';
-import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { type NodeMcpRequestHandler, toNodeHandler } from '@modelcontextprotocol/node';
+import {
+  type CallToolResult,
+  createMcpHandler,
+  isJsonContentType,
+  McpServer,
+  type ServerContext,
+} from '@modelcontextprotocol/server';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
 import { checkOrigin, checkRateLimit } from './httpGuards.ts';
 import { buildInstructions } from './instructions.ts';
 import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
+import { registerPrompts } from './prompts.ts';
+import { registerResources } from './resources.ts';
 import { assertIngestAllowed, ingestMetadata } from './sources/ingestPolicy.ts';
 import { getAdapter, healthSummary, listSources, truncateText } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
@@ -555,7 +563,27 @@ export function createServer(): McpServer {
             formatted.results.length === 0
               ? `No results for "${query}" on ${source}.`
               : JSON.stringify(formatted.results, null, 2);
-          return { content: [{ type: 'text', text }], structuredContent: formatted };
+          // Task 14: detailed mode adds a resource_link per full-text result,
+          // pointing at the library://doc/{source}/{id} template registered
+          // in resources.ts - a client with resource support (Claude Code's
+          // `@srv:uri`, VS Code's Add Context) can then pull the full text
+          // directly, without a second library_read call. Concise mode skips
+          // this: it is meant to stay small.
+          const resourceLinks: CallToolResult['content'] =
+            response_format === 'detailed'
+              ? results
+                  .filter((r) => r.hasFullText)
+                  .map((r) => ({
+                    type: 'resource_link' as const,
+                    uri: `library://doc/${r.source}/${r.id}`,
+                    name: r.title,
+                    title: r.title,
+                  }))
+              : [];
+          return {
+            content: [{ type: 'text', text }, ...resourceLinks],
+            structuredContent: formatted,
+          };
         } catch (err) {
           return {
             content: [
@@ -1001,6 +1029,12 @@ export function createServer(): McpServer {
       }),
   );
 
+  // Task 14: prompts and the `library://doc/{source}/{id}` resource
+  // template, registered on the same per-request server as the tools above
+  // so both eras get the same surface from one factory.
+  registerPrompts(server);
+  registerResources(server, withOpenAccessFallback);
+
   return server;
 }
 
@@ -1047,13 +1081,22 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 }
 
 /**
- * Handle one MCP HTTP request on its own server and transport.
- *
- * Stateless: nothing is shared between requests, so overlapping requests cannot
- * collide on a single Protocol instance. Errors are forwarded to the JSON-RPC
- * error handler below rather than leaking an HTML page or a stack trace.
+ * Handle one MCP HTTP request through the dual-era handler (Task 14):
+ * `createMcpHandler(factory, { legacy: 'stateless' })` builds a fresh
+ * `McpServer` per request either way (2026-07-28 per its own per-request
+ * envelope, 2025-era through the same stateless idiom the old hand-wired
+ * transport used), so overlapping requests still cannot collide on a single
+ * Protocol instance. `mcpHandler` never rejects - `toNodeHandler`'s adapter
+ * catches a conversion/`fetch` failure and writes its own 500 - so the
+ * try/catch here exists for `readJsonBody`'s cap (below), not the handler
+ * itself. Errors are forwarded to the JSON-RPC error handler below rather
+ * than leaking an HTML page or a stack trace.
  */
-async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleMcpRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  mcpHandler: NodeMcpRequestHandler,
+): Promise<void> {
   // Captured up front, deliberately not read off `req` later (final wave,
   // A10 review round 2): by the time readJsonBody()'s `for await` throws
   // on an oversize body, Node's async-iterator protocol has already
@@ -1065,21 +1108,11 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Prom
   // nothing left to close). The raw net.Socket captured here, before any
   // of that happens, is the one reference still guaranteed connected.
   const sock = req.socket;
-  const server = createServer();
-  const transport = new NodeStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
-  res.on('close', () => {
-    void transport.close();
-    void server.close();
-  });
   try {
     const body = isJsonContentType(req.headers['content-type'])
       ? await readJsonBody(req)
       : undefined;
-    await server.connect(transport);
-    await transport.handleRequest(req, res, body);
+    await mcpHandler(req, res, body);
   } catch (err) {
     jsonRpcErrorHandler(err, res);
     if (err instanceof PayloadTooLargeError) {
@@ -1149,6 +1182,18 @@ function requestPath(req: IncomingMessage): string {
 
 /** Build the HTTP server without binding a port, so tests can drive it in process. */
 export function createHttpApp(): Server {
+  // Task 14: one dual-era handler per app (not per request - the handler
+  // itself constructs a fresh McpServer per request via `createServer`
+  // below). `legacy: 'stateless'` keeps serving 2025-era traffic exactly as
+  // the hand-wired NodeStreamableHTTPServerTransport it replaces did; a
+  // 2026-07-28 `server/discover` probe or per-request envelope now also
+  // succeeds against the same endpoint.
+  const mcpHandler = createMcpHandler((_ctx) => createServer(), {
+    legacy: 'stateless',
+    onerror: (err) => log.error({ err: err.message }, 'mcp handler error'),
+  });
+  const nodeMcpHandler = toNodeHandler(mcpHandler);
+
   return createHttpServer((req, res) => {
     // Guards the whole dispatch below, not just handleMcpRequest's own try
     // block: a throw from requestPath (see its comment), or from
@@ -1176,7 +1221,7 @@ export function createHttpApp(): Server {
         // do here but stop.
         if (!checkOrigin(req, res)) return;
         if (!checkRateLimit(req, res)) return;
-        void handleMcpRequest(req, res);
+        void handleMcpRequest(req, res, nodeMcpHandler);
         return;
       }
       // HEAD alongside GET (final wave, A10): Express's default HEAD
@@ -1224,10 +1269,14 @@ async function runHTTP(): Promise<void> {
   );
 }
 
+// Task 14: `serveStdio` owns the era decision for the connection - the
+// opening exchange (a 2026-07-28 `server/discover` probe or a 2025-era
+// `initialize`) selects it, and one `createServer()` instance is pinned for
+// the connection's lifetime, same as the hand-wired
+// `server.connect(new StdioServerTransport())` this replaces did for the
+// single 2025-era session it could ever serve.
 async function runStdio(): Promise<void> {
-  const server = createServer();
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  serveStdio(() => createServer());
   log.info({ sources: listSources().length }, 'alexandria started');
 }
 
