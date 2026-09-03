@@ -249,6 +249,66 @@ test('libraryResearch', async (t) => {
     assert.deepEqual(result.coverage, [true, true]);
   });
 
+  // Review round 1 (Important 1): generateObjectives()'s chatJSON call is
+  // enrichment, not core to the loop - a failure there (two failed schema
+  // validations here; a network/gateway outage in production) must not
+  // sink the whole research run. Returning a structurally invalid shape
+  // for the "scoping a research pass" prompt makes chatJSON's own
+  // validate-retry-validate-throw path throw for real, rather than
+  // simulating the failure by other means.
+  await t.test('a failing objective outline call does not sink the research run', async () => {
+    function decide(system: string): unknown {
+      if (system.includes('planning a research pass')) return { queries: ['a single query'] };
+      if (system.includes('extract structured learnings')) {
+        return { learnings: ['a learning'], followUps: [] };
+      }
+      if (system.includes('write a research report')) {
+        return { report: 'Report body about the topic [1].' };
+      }
+      // Wrong shape (objectives must be an array of strings) - fails
+      // ObjectivesSchema validation on both the first attempt and
+      // chatJSON's one retry, so chatJSON throws for real.
+      if (system.includes('scoping a research pass')) return { objectives: 'not an array' };
+      // Never reached: with objectives === [], runRound's `if
+      // (objectives.length > 0)` guard skips updateCoverage entirely -
+      // if that guard regressed, this throw would fail the test with a
+      // clear message instead of silently passing.
+      if (system.includes('track coverage of a research outline')) {
+        throw new Error('updateCoverage must not run when the outline failed');
+      }
+      throw new Error(`unexpected research prompt: ${system.slice(0, 80)}`);
+    }
+
+    const research = await startFakeChatServer(decide);
+    t.after(() => research.close());
+    const synth = await startFakeChatServer(decideSynthNoop);
+    t.after(() => synth.close());
+
+    process.env.ALEXANDRIA_RESEARCH_BASE_URL = research.url;
+    process.env.ALEXANDRIA_RESEARCH_API_KEY = 'test-key';
+    process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+    process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+
+    const answerFn = async (): Promise<LibraryAnswerResult> => fakeAnswer('id', 1);
+
+    const result = await libraryResearch(
+      'a topic whose outline call fails',
+      { depth: 1, breadth: 1, maxMinutes: 6 },
+      undefined,
+      { answerFn },
+    );
+
+    assert.match(result.report, /Report body about the topic/, 'the report is still produced');
+    assert.deepEqual(result.objectives, []);
+    assert.deepEqual(result.coverage, []);
+    assert.ok(
+      result.warnings.includes(
+        'objective outline unavailable; stopping on depth, breadth, and time only',
+      ),
+      `expected the outline-failure warning, got: ${JSON.stringify(result.warnings)}`,
+    );
+  });
+
   await t.test('stops when the time budget is exhausted', async () => {
     // 30ms per LLM call: one round's generateQueries + several sequential
     // extractLearnings calls already exceeds a 60ms (0.001 min) budget, so

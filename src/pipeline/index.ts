@@ -150,7 +150,14 @@ export function indexText(
   });
 
   const { passed, dropped } = filterChunks(raw);
-  const estimatedTokens = passed.reduce((sum, c) => sum + Math.ceil(c.text.length / 4), 0);
+  // Review round 1 (Minor): estimate against what actually gets embedded
+  // (embedText, when the title/heading-chain prefix is on) rather than
+  // the shorter displayed text, so this dry-run preview isn't an
+  // undercount of the real embedding call's token volume.
+  const estimatedTokens = passed.reduce(
+    (sum, c) => sum + Math.ceil((c.embedText ?? c.text).length / 4),
+    0,
+  );
 
   return {
     sourceId,

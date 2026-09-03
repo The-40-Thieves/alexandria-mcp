@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertIngestAllowed, ingestMetadata } from '../sources/ingestPolicy.ts';
 import type { Chunk, EmbeddingProvider, VectorStoreProvider } from '../types.ts';
-import { chunkSemantic, ingestText } from './index.ts';
+import { chunkSemantic, indexText, ingestText } from './index.ts';
 
 // A paragraph of clean ASCII prose, long enough (and well above the
 // quality threshold) to survive chunkSemantic()/filterChunks() unscathed.
@@ -215,6 +215,31 @@ test('chunkSemantic: title/heading-chain prefix on embedText, not on text', asyn
       assert.equal(store.lastChunks[0].text, LONG_TEXT);
       assert.equal(embedder.received.length, 1);
       assert.equal(embedder.received[0], `My Book Title > Chapter One\n\n${LONG_TEXT}`);
+    },
+  );
+
+  // Review round 1 (Minor): indexText()'s estimatedTokens is a preview of
+  // the real ingestText() embedding call, so it must size against the same
+  // string that call actually sends (embedText when the prefix is on) -
+  // not the shorter displayed text, which would undercount.
+  await t.test(
+    'indexText: estimatedTokens sizes against embedText, not the shorter display text',
+    () => {
+      delete process.env.ALEXANDRIA_CHUNK_PREFIX;
+      const withPrefix = indexText(withHeading, 'gutenberg', 'book3', 'My Book Title', ['Author']);
+
+      process.env.ALEXANDRIA_CHUNK_PREFIX = 'off';
+      const withoutPrefix = indexText(withHeading, 'gutenberg', 'book3', 'My Book Title', [
+        'Author',
+      ]);
+      delete process.env.ALEXANDRIA_CHUNK_PREFIX;
+
+      assert.equal(withPrefix.totalChunks, 1);
+      assert.equal(withoutPrefix.totalChunks, 1);
+      assert.ok(
+        withPrefix.estimatedTokens > withoutPrefix.estimatedTokens,
+        `expected the prefixed estimate (${withPrefix.estimatedTokens}) to exceed the unprefixed one (${withoutPrefix.estimatedTokens})`,
+      );
     },
   );
 });

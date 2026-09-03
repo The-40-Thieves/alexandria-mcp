@@ -127,6 +127,47 @@ Post-text`;
       const score = ocrQualityScore(raw);
       assert.strictEqual(score, 0);
     });
+
+    // Review round 1 (Important 2): the reviewer measured clean, real
+    // prose/data scoring below the 0.75 threshold (statistics prose 0.542,
+    // a JSON object 0.400, finance prose 0.737) because the lexicon is
+    // 19th-century Gutenberg vocabulary and the old sample-size floor
+    // looked only at raw token count, not how much of the chunk was even
+    // alphabetic. Fixed by (a) skipping the lexicon score entirely when
+    // alphabetic tokens are under 60% of all word-like tokens (numeric-
+    // heavy chunks lean on the character-class regex alone), and (b)
+    // crediting an out-of-lexicon token as a hit when it has a plausible
+    // word shape (vowel present, reasonable length, no absurd repeats or
+    // consonant runs, camelCase-aware).
+    test('clean statistics prose clears the lexicon gate', () => {
+      const raw =
+        'The regression coefficient was 0.842 with a standard error of 0.031, yielding a ' +
+        't-statistic of 27.16 and a p-value below 0.001. The R-squared value of 0.756 ' +
+        'indicates that approximately 75.6% of the variance in the dependent variable is ' +
+        'explained by the model, while the adjusted R-squared of 0.748 accounts for the ' +
+        'number of predictors included in the analysis.';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
+
+    test('a numeric-heavy JSON object clears the lexicon gate', () => {
+      const raw =
+        '{"id": 48291, "code": "SKU-2024-8871", "price": 149.99, "qty": 12, ' +
+        '"total": 1799.88, "tax": 8.25, "discount": 0.15, "shipping": 9.99, ' +
+        '"grandTotal": 1908.12, "timestamp": 1717029123, "lat": 37.7749, "lng": -122.4194}';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
+
+    test('clean finance prose clears the lexicon gate', () => {
+      const raw =
+        'Quarterly revenue increased 12.4% year-over-year to $4.2 billion, driven primarily ' +
+        'by a 340 basis point expansion in gross margin and a 7.8% reduction in operating ' +
+        'expenses. EBITDA rose to $912 million, while free cash flow reached $618 million, ' +
+        'up from $503 million in the prior-year period.';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
+    });
   });
 
   describe('cleanGutenbergText', () => {

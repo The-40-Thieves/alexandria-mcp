@@ -7,6 +7,7 @@
 // claims and trimmed.
 import pLimit from 'p-limit';
 import { z } from 'zod';
+import { requestLogger } from '../log.ts';
 import { gradeCitation, retractedWarning } from '../utils/citationGrade.ts';
 import { chatJSON, requireRoleForTool } from '../utils/providers.ts';
 import {
@@ -290,6 +291,11 @@ export async function libraryResearch(
   const seenSourceKeys = new Set<string>();
   let learnings: string[] = [];
   let roundNumber = 0;
+  // Declared here (not after the loop, as before this task) so the
+  // objective-outline/coverage failure paths below can push onto it - the
+  // final block appends checkCitations()'s warnings rather than
+  // overwriting, so nothing pushed early is lost.
+  const warnings: string[] = [];
 
   // Task 11: outline once before round 1, then re-checked after every
   // round that runs. The "every objective covered" stop check below is
@@ -297,8 +303,28 @@ export async function libraryResearch(
   // role declining to name any) never trips it by vacuous truth on an
   // empty array - it just falls back to today's depth/breadth/time/
   // no-new-sources stop conditions.
-  const objectives = await generateObjectives(query);
+  //
+  // Review round 1 (Important 1): generateObjectives()/updateCoverage()
+  // are enrichment on top of the pre-existing stop rules, not core to the
+  // research loop - chatJSON throwing (two failed schema validations, or
+  // an exhausted network retry) must not sink an otherwise-working
+  // research run the way an unguarded await would (the exception
+  // propagating out of libraryResearch() to the tool handler's catch,
+  // turning the whole call into `isError: true`). Same failure-isolation
+  // shape as libraryAnswer.ts's claim-verification/grading try/catches:
+  // log at debug, warn, and keep going under today's rules.
+  let objectives: string[] = [];
+  try {
+    objectives = await generateObjectives(query);
+  } catch (err) {
+    requestLogger().debug(
+      { err: err instanceof Error ? err.message : String(err) },
+      'objective outline generation failed',
+    );
+    warnings.push('objective outline unavailable; stopping on depth, breadth, and time only');
+  }
   let coverage: boolean[] = objectives.map(() => false);
+  let coverageFailureWarned = false;
 
   async function runRound(depthRemaining: number, breadthNow: number): Promise<void> {
     if (depthRemaining <= 0 || breadthNow <= 0) return;
@@ -356,7 +382,23 @@ export async function libraryResearch(
 
     rounds.push({ round: thisRound, queries, newSources: newSourceCount, truncated });
     learnings = [...learnings, ...newLearnings];
-    if (objectives.length > 0) coverage = await updateCoverage(objectives, learnings);
+    if (objectives.length > 0) {
+      try {
+        coverage = await updateCoverage(objectives, learnings);
+      } catch (err) {
+        requestLogger().debug(
+          { err: err instanceof Error ? err.message : String(err) },
+          'objective coverage check failed',
+        );
+        // coverage is left as whatever it was last round (unchanged), per
+        // review round 1's ruling - not reset to all-false, which could
+        // wrongly re-open an objective a previous round already covered.
+        if (!coverageFailureWarned) {
+          warnings.push('objective outline unavailable; stopping on depth, breadth, and time only');
+          coverageFailureWarned = true;
+        }
+      }
+    }
 
     await emitProgress(onProgress, {
       round: thisRound,
@@ -374,14 +416,13 @@ export async function libraryResearch(
 
   const finalCitations = renumber(unionCitations);
   let report: string;
-  let warnings: string[] = [];
   if (finalCitations.length === 0) {
     report = 'No sources were found for this topic; not found in the sources.';
   } else {
     const draft = await writeReport(query, learnings, finalCitations);
     const checked = await checkCitations(draft, finalCitations);
     report = checked.report;
-    warnings = checked.warnings;
+    warnings.push(...checked.warnings);
     applyChainSupport(finalCitations, draft, report);
     // "Retracted means tier D and a warning" - each citation's own
     // retracted signal was already set by whichever round's libraryAnswer()
