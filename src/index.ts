@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import express from 'express';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
@@ -52,9 +52,9 @@ function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise
 /**
  * Build a fresh McpServer with the nine public tools registered.
  *
- * HTTP mode calls this once per request: SDK 1.30's Protocol.connect throws
- * "Already connected to a transport" if a second transport attaches to a server
- * that already has one, which a single shared instance hits as soon as two
+ * HTTP mode calls this once per request: Protocol.connect rejects a second
+ * transport attaching to a server that already has one (SdkErrorCode
+ * AlreadyConnected), which a single shared instance hits as soon as two
  * requests overlap. A server and transport per request is the SDK's documented
  * stateless pattern. stdio keeps one long-lived server for its single session.
  */
@@ -67,7 +67,7 @@ export function createServer(): McpServer {
     {
       title: 'List Available Library Sources',
       description: `List all ${listSources().length} library sources (count computed from the live registry at startup) with descriptions and capabilities.`,
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -104,7 +104,7 @@ export function createServer(): McpServer {
 
   Requires OPENAI_API_KEY (already set for embeddings).
   Returns: { query, intent, sources_searched, total_results, results[], routing[], stage1 ('embeddings'|'bm25'), stage2 ('llm'|'skipped'), errors[] }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z
           .string()
           .min(1)
@@ -124,7 +124,7 @@ export function createServer(): McpServer {
           .max(10)
           .default(5)
           .describe('Results to fetch per source (default 5)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -162,11 +162,11 @@ export function createServer(): McpServer {
   Sources marked [metadata] return discovery info and external URLs only.
 
   Returns: Array of { id, source, title, authors, year, language, subjects, hasFullText, previewUrl, description }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).max(300).describe('Title, author, subject, or keywords'),
         source: SourceSchema,
         limit: z.number().int().min(1).max(20).default(10).describe('Max results'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -202,10 +202,10 @@ export function createServer(): McpServer {
       description: `Fetch text from a library source. Full-text sources return cleaned text (truncated at 200k chars). Metadata sources return item details and an external URL.
 
   Returns: { title, authors, year?, language?, text?, charCount?, truncated?, metadataOnly?, externalUrl?, note? }`,
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().min(1).describe('Item identifier from library_search or library_ask'),
         source: SourceSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -239,7 +239,7 @@ export function createServer(): McpServer {
       title: 'Preview Chunking (Dry Run)',
       description: `Dry run: fetch text, chunk semantically, score OCR quality. No writes. Full-text sources only.
   Returns: { totalChunks, droppedChunks, avgQualityScore, estimatedTokens, sampleChunks[0..2] }`,
-      inputSchema: { id: z.string().min(1), source: SourceSchema },
+      inputSchema: z.object({ id: z.string().min(1), source: SourceSchema }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -293,7 +293,7 @@ export function createServer(): McpServer {
       title: 'Ingest Into Vector Database',
       description: `Chunk, embed, and store a text. Idempotent. Full-text sources only. Requires OPENAI_API_KEY + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.
   Returns: { chunksWritten, chunksDropped, skippedDuplicate, title, sourceId }`,
-      inputSchema: { id: z.string().min(1), source: SourceSchema },
+      inputSchema: z.object({ id: z.string().min(1), source: SourceSchema }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -346,10 +346,10 @@ export function createServer(): McpServer {
     {
       title: 'Get Similar Papers (Semantic Scholar)',
       description: `Get papers similar to a given paper using Semantic Scholar's recommendation engine. Pass a paperId from a semanticscholar search result. Returns up to 500 similar papers.`,
-      inputSchema: {
+      inputSchema: z.object({
         id: z.string().min(1).describe('Semantic Scholar paperId'),
         limit: z.number().int().min(1).max(500).default(20),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -388,7 +388,7 @@ export function createServer(): McpServer {
 
   Requires OPENAI_API_KEY (or ALEXANDRIA_SYNTH_API_KEY).
   Returns: { answer, citations[], results[], routing[], warnings[] }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Natural language question'),
         max_sources: z
           .number()
@@ -411,7 +411,7 @@ export function createServer(): McpServer {
           .max(10)
           .default(4)
           .describe('How many top full-text results to read and cite (default 4)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -451,7 +451,7 @@ export function createServer(): McpServer {
 
   Requires OPENAI_API_KEY (or ALEXANDRIA_RESEARCH_API_KEY / ALEXANDRIA_SYNTH_API_KEY).
   Returns: { report, citations[], rounds[], elapsedMs, warnings[] }`,
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string().min(1).max(1000).describe('Research topic or question'),
         depth: z.number().int().min(1).max(5).default(2).describe('Recursion depth (default 2)'),
         breadth: z
@@ -467,7 +467,7 @@ export function createServer(): McpServer {
           .max(30)
           .default(6)
           .describe('Wall-clock time budget in minutes (default 6)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -475,13 +475,13 @@ export function createServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ query, depth, breadth, max_minutes }, extra) =>
+    async ({ query, depth, breadth, max_minutes }, ctx) =>
       withRequestContext('library_research', async () => {
         try {
-          const progressToken = extra._meta?.progressToken;
+          const progressToken = ctx.mcpReq._meta?.progressToken;
           const onProgress: ProgressCallback = async (info) => {
             if (progressToken !== undefined) {
-              await extra.sendNotification({
+              await ctx.mcpReq.notify({
                 method: 'notifications/progress',
                 params: { progressToken, progress: info.round, message: info.message },
               });
@@ -526,7 +526,7 @@ async function handleMcpRequest(
   next: express.NextFunction,
 ): Promise<void> {
   const server = createServer();
-  const transport = new StreamableHTTPServerTransport({
+  const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });

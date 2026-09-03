@@ -4,8 +4,7 @@
 // defineMcpSource() to delegate a source's search()/read() to a remote
 // MCP server's tools/call.
 import { createHash } from 'node:crypto';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { requestContext } from './http.ts';
 
 export interface RemoteServerConfig {
@@ -32,11 +31,13 @@ const TOOLS_CACHE_MS = 60 * 60 * 1000; // 1 hour, per the task-5.1 brief
 // transport itself is broken (a dead session, a connection reset, an HTTP
 // 4xx, a request timeout) as opposed to a normal tool-level error inside
 // an otherwise successful response. Only the former should drop the
-// cached client and retry. The SDK's StreamableHTTPError carries the
-// status as a numeric `.code`, not in `.message` text, and a raw
-// connection failure (server killed) surfaces as `fetch failed` with the
-// real reason (e.g. ECONNREFUSED) on `.cause`, so both are checked
-// alongside the message text.
+// cached client and retry. In SDK v2 a non-2xx response is wrapped in an
+// SdkHttpError whose `.code` is a symbolic string (e.g.
+// CLIENT_HTTP_NOT_IMPLEMENTED) and whose numeric status lives on
+// `.data.status`, not in `.message` or `.code` the way v1's
+// StreamableHTTPError carried it directly on `.code` - both are checked. A
+// raw connection failure (server killed) still surfaces as `fetch failed`
+// with the real reason (e.g. ECONNREFUSED) on `.cause`.
 //
 // Deliberately NOT matched: /timeout/ and /timed out/. An aborted call is
 // usually the CALLER's guard firing (registry.ts's withTimeout aborts the
@@ -53,6 +54,8 @@ export function isTransportTrouble(err: unknown): boolean {
       parts.push(current.message);
       const code = (current as { code?: unknown }).code;
       if (code !== undefined) parts.push(String(code));
+      const status = (current as { data?: { status?: unknown } }).data?.status;
+      if (status !== undefined) parts.push(String(status));
       current = (current as { cause?: unknown }).cause;
     } else {
       parts.push(String(current));
@@ -197,7 +200,7 @@ export class McpClientPool {
     // is thrown below, entirely outside that scope, so it never triggers
     // a reconnect, a retry, or (per kinds/mcp.ts) a fallback.
     const result = await this.withClient(server, (client) =>
-      client.callTool({ name: tool, arguments: args }, undefined, { timeout: timeoutMs, signal }),
+      client.callTool({ name: tool, arguments: args }, { timeout: timeoutMs, signal }),
     );
     const { text, structured, isError } = this.extractCallResult(result);
     if (isError) throw new Error(`${TOOL_ERROR_PREFIX} ${text}`);

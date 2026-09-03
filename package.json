@@ -51,7 +51,9 @@
     "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@supabase/supabase-js": "^2.104.0",
     "defuddle": "^0.19.3",
     "express": "^5.2.1",

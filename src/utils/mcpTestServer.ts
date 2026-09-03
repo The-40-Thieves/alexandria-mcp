@@ -7,8 +7,8 @@
 // import it so they exercise the pool and the mcp kind against a real (if
 // fake) MCP server instead of a mocked fetch.
 import type { Server } from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import express from 'express';
 import { z } from 'zod';
 
@@ -64,13 +64,13 @@ export async function startTestMcpServer(
     'search',
     {
       description: 'fake search',
-      inputSchema: { query: z.string(), limit: z.number().optional() },
+      inputSchema: z.object({ query: z.string(), limit: z.number().optional() }),
     },
     async (args) => (opts.search ? opts.search(args) : defaultResult('search', args)),
   );
   server.registerTool(
     'read',
-    { description: 'fake read', inputSchema: { id: z.string() } },
+    { description: 'fake read', inputSchema: z.object({ id: z.string() }) },
     async (args) => (opts.read ? opts.read(args) : defaultResult('read', args)),
   );
 
@@ -83,7 +83,7 @@ export async function startTestMcpServer(
       res.status(opts.failStatus ?? 400).json({ error: 'simulated transport trouble' });
       return;
     }
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
