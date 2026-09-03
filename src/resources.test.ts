@@ -58,6 +58,29 @@ test('an unknown source rejects rather than returning empty content', async () =
   );
 });
 
+test('a quota/upstream error from adapter.read() surfaces its own message, not "not found"', async () => {
+  register('t_resources_unit_quota_error', {
+    description: 'fixture source whose read() fails with a non-lookup error',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read() {
+      throw new Error('quota exceeded for t_resources_unit_quota_error');
+    },
+  });
+  const client = await connectedClient(async (result) => result);
+  await assert.rejects(
+    () => client.readResource({ uri: 'library://doc/t_resources_unit_quota_error/x1' }),
+    (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      assert.match(message, /quota exceeded for t_resources_unit_quota_error/);
+      assert.doesNotMatch(message.toLowerCase(), /not found/);
+      return true;
+    },
+  );
+});
+
 test('no text and no note falls back to a "no full text available" message', async () => {
   register('t_resources_unit_metadata_only', {
     description: 'fixture source with no full text',

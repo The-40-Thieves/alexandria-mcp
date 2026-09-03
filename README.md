@@ -20,11 +20,11 @@ A Model Context Protocol (MCP) server for querying, reading, and ingesting texts
 
 `library_ask` is the primary entry point. `library_search` is for targeted queries against a known source. `library_index` / `library_ingest` are for building a vector knowledge base from retrieved texts. `library_answer` and `library_research` synthesize a cited answer or report instead of returning raw results. `library_health_check` tells you whether a source is worth calling before you call it. `library_citations` walks the citation graph around an item and can export it as a bibliography.
 
-`library_ask`, `library_search`, `library_answer`, `library_research`, `library_health_check`, and `library_citations` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations; name, cluster, status), detailed returns the full payload, including routing reasons, relevance scores, per-stage diagnostics, and per-source error rate/latency/quota usage. In `detailed` mode, `library_search` also attaches a `resource_link` content item for each full-text result, pointing at that item's `library://doc/{source}/{id}` resource (see below) — a client with resource support can read the full text directly instead of a second `library_read` call.
+`library_ask`, `library_search`, `library_answer`, `library_research`, `library_health_check`, and `library_citations` take a `response_format: "concise" | "detailed"` parameter (default `concise`); concise trims results and citations to the high-signal fields (title, source, id, year, hasFullText, url; answer/report + citations; name, cluster, status), detailed returns the full payload, including routing reasons, relevance scores, per-stage diagnostics, and per-source error rate/latency/quota usage. In `detailed` mode, `library_search` also attaches a `resource_link` content item for each full-text result, pointing at that item's `library://doc/{source}/{id}` resource (see below): a client with resource support can read the full text directly instead of a second `library_read` call.
 
 ## Prompts
 
-Three ready-made research workflows, surfaced by MCP clients as slash commands (Claude Code's `/alexandria:<name>`, VS Code's `/alexandria.prompt`). Each returns a single message naming the tools to call, in order — it does not call any tool itself.
+Three ready-made research workflows, surfaced by MCP clients as slash commands (Claude Code's `/alexandria:<name>`, VS Code's `/alexandria.prompt`). Each returns a single message naming the tools to call, in order. It does not call any tool itself.
 
 | Prompt | Description |
 |---|---|
@@ -285,12 +285,12 @@ Serves both eras of the MCP protocol on the same `/mcp` endpoint:
 adapted to `node:http` by `toNodeHandler()` from `@modelcontextprotocol/node`)
 answers a 2026-07-28 `server/discover` probe or per-request envelope on the
 modern path, and falls back to the same stateless idiom the pre-2026 SDK used
-for a 2025-era `initialize` handshake — one `createServer()` factory backs
+for a 2025-era `initialize` handshake. One `createServer()` factory backs
 both. stdio uses the connection-pinned `serveStdio(factory)` from
 `@modelcontextprotocol/server/stdio`, which selects the era from the
 connection's opening exchange. Note: the 2025-era fallback path answers over
 `text/event-stream` (SSE) rather than a bare JSON body, since the SDK exposes
-no equivalent to v1's `enableJsonResponse` for that path — any MCP client
+no equivalent to v1's `enableJsonResponse` for that path. Any MCP client
 built on a Streamable HTTP transport (the SDK's own `StreamableHTTPClientTransport`
 included) already parses either format transparently.
 

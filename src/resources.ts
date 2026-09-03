@@ -11,7 +11,7 @@ import {
   ResourceNotFoundError,
   ResourceTemplate,
 } from '@modelcontextprotocol/server';
-import { getAdapter } from './sources/registry.ts';
+import { getAdapter, type SourceAdapter } from './sources/registry.ts';
 import type { ReadResult } from './types.ts';
 
 // A URI template variable expands to a string, except when the template
@@ -49,13 +49,18 @@ export function registerResources(
           `library://doc/{source}/{id} needs both segments, got "${uri.href}"`,
         );
       }
-      let raw: ReadResult;
+      // Only the source lookup is translated to "not found" - an error
+      // thrown by adapter.read() itself (quota exceeded, rate-limited,
+      // timed out, a real upstream network failure) must reach the caller
+      // as-is, the way library_read's handler in src/index.ts preserves
+      // err.message rather than relabeling every failure "not found".
+      let adapter: SourceAdapter;
       try {
-        const adapter = getAdapter(sourceName);
-        raw = await adapter.read(itemId);
+        adapter = getAdapter(sourceName);
       } catch {
         throw new ResourceNotFoundError(uri.href);
       }
+      const raw = await adapter.read(itemId);
       const result = await withOpenAccessFallback(raw);
       const text =
         result.text ?? result.note ?? `No full text available for ${sourceName}:${itemId}.`;
