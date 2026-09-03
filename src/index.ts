@@ -103,7 +103,7 @@ export function createServer(): McpServer {
     "open access books on cognitive science"
 
   Requires OPENAI_API_KEY (already set for embeddings).
-  Returns: { query, intent, sources_searched, total_results, results[], routing[], errors[] }`,
+  Returns: { query, intent, sources_searched, total_results, results[], routing[], stage1 ('embeddings'|'bm25'), stage2 ('llm'|'skipped'), errors[] }`,
       inputSchema: {
         query: z
           .string()

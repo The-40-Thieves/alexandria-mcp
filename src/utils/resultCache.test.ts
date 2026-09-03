@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cacheKey, parseTtlMs, ResultCache } from './resultCache.ts';
+import { cacheKey, parseTtlMs, ResultCache, routingCacheKey } from './resultCache.ts';
 import { MemoryStateStore } from './stateStore.ts';
 
 test('resultCache', async (t) => {
@@ -55,4 +55,30 @@ test('resultCache', async (t) => {
       assert.equal(parseTtlMs('not-a-number', 600_000), 600_000);
     },
   );
+
+  await t.test('routingCacheKey normalizes whitespace and case', () => {
+    assert.equal(
+      routingCacheKey('  Attention   Is All  ', 5),
+      routingCacheKey('attention is all', 5),
+    );
+  });
+
+  await t.test('routingCacheKey distinguishes max_sources', () => {
+    assert.notEqual(routingCacheKey('q', 5), routingCacheKey('q', 6));
+  });
+
+  await t.test('routingCacheKey cannot collide with a cacheKey for a plausible source name', () => {
+    // searchCache and routingCache share one physical stateStore table
+    // (both go through defaultStateStore), so a cacheKey(source, ...) and
+    // a routingCacheKey(...) must never produce the identical string for
+    // any registry source name this repo would plausibly register. A
+    // shorter prefix like "route" would collide the moment a source were
+    // literally named "route" (cacheKey('route', q, n) ===
+    // routingCacheKey(q, n)); "routing-decision" is not a registry source
+    // name shape (registry names are single short words, per every source
+    // in src/sources/*.ts).
+    for (const source of ['route', 'router', 'arxiv', 'gutenberg', 'routing', 'decision']) {
+      assert.notEqual(routingCacheKey('q', 5), cacheKey(source, 'q', 5));
+    }
+  });
 });

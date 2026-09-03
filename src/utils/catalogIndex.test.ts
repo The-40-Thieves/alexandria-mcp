@@ -11,6 +11,8 @@ import {
   buildCatalog,
   type CatalogEntry,
   candidates,
+  candidatesWithMargin,
+  marginFromScores,
   resetCatalogCacheForTests,
   withClusterFloor,
 } from './catalogIndex.ts';
@@ -157,6 +159,88 @@ test('withClusterFloor', async (t) => {
     assert.deepEqual(
       result.map((e) => e.name),
       ['best', 'middle'],
+    );
+  });
+});
+
+// A fixed, hand-written score list (no buildCatalog()/live ranking
+// involved) - Task 6 step 6's "margin computation on a fixed catalog".
+test('marginFromScores', async (t) => {
+  await t.test('the runner-up at maxSources+1 is close to the top: a low margin', () => {
+    // maxSources=3 -> position 4 (index 3) is 9, only 10% below the top's 10.
+    assert.equal(marginFromScores([10, 9.5, 9.2, 9, 1, 0.5], 3), (10 - 9) / 10);
+  });
+
+  await t.test('nothing else comes close: a margin near 1', () => {
+    assert.equal(marginFromScores([10, 1, 0.5, 0.1, 0.01, 0], 3), (10 - 0.1) / 10);
+  });
+
+  await t.test(
+    'fewer than maxSources+1 scored entries: margin is 1 (nothing to compare against)',
+    () => {
+      assert.equal(marginFromScores([10, 5], 3), 1);
+    },
+  );
+
+  await t.test('an empty score list: margin is 0, not NaN', () => {
+    assert.equal(marginFromScores([], 3), 0);
+  });
+
+  await t.test('a top score of 0 (no signal at all): margin is 0, not NaN from 0/0', () => {
+    assert.equal(marginFromScores([0, 0, 0, 0], 3), 0);
+  });
+
+  await t.test('a negative score at the cutoff (cosine mode) pushes the margin above 1', () => {
+    assert.equal(marginFromScores([0.5, 0.4, 0.3, -0.3], 3), (0.5 + 0.3) / 0.5);
+  });
+
+  await t.test('maxSources=0: the cutoff position IS the top score, so margin is 0', () => {
+    assert.equal(marginFromScores([10, 9, 8], 0), 0);
+  });
+});
+
+test('candidatesWithMargin', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+    resetCatalogCacheForTests();
+  });
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  resetCatalogCacheForTests();
+
+  await t.test('returns a shortlist, a 0-1 margin, and the top-scoring cluster', async () => {
+    const result = await candidatesWithMargin('astronomy telescope observatory', 5, 3);
+    assert.ok(result.candidates.length > 0);
+    assert.ok(result.margin >= 0, 'margin is never negative under BM25 (no negative scores)');
+    assert.ok(result.margin <= 1, 'margin is never above 1 under BM25 (no negative scores)');
+    assert.equal(result.topCluster, result.candidates[0]?.cluster);
+  });
+
+  await t.test(
+    'a query with one dominant, distinctively-named match scores a higher margin than a generic one',
+    async () => {
+      // "left-pad" and "depsdev" are specific enough that one source
+      // (depsdev, per catalogIndex.test.ts's own BM25 regression test
+      // above) dominates the ranking; "books" matches many literature
+      // sources roughly equally.
+      const distinctive = await candidatesWithMargin('npm package left-pad maintainers', 20, 3);
+      const generic = await candidatesWithMargin('books', 20, 3);
+      assert.ok(
+        distinctive.margin > generic.margin,
+        `expected a distinctive query's margin (${distinctive.margin}) to exceed a generic one's (${generic.margin})`,
+      );
+    },
+  );
+
+  await t.test('the shortlist matches candidates() for the same query/k', async () => {
+    const withMargin = await candidatesWithMargin('public domain books', 5, 3);
+    const plain = await candidates('public domain books', 5);
+    assert.deepEqual(
+      withMargin.candidates.map((c) => c.name),
+      plain.map((c) => c.name),
     );
   });
 });

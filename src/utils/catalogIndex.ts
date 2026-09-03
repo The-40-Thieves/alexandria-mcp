@@ -214,15 +214,22 @@ const CLUSTER_KEYWORD_BOOST = 1.5;
 const FRESHNESS_RANK: Record<Freshness, number> = { realtime: 2, daily: 1, static: 0 };
 const FRESHNESS_BOOST = 1.3;
 
-// Full corpus ranked best-first; bm25Candidates() below just slices this.
-function rankBm25(
+export interface ScoredEntry {
+  entry: CatalogEntry;
+  score: number;
+}
+
+// Full corpus ranked best-first, scores kept: rankBm25() below (used by
+// bm25Candidates()/candidates()) just drops the scores, and
+// candidatesWithMargin() needs them to compute the stage-1 margin.
+function rankBm25Scored(
   query: string,
   entries: CatalogEntry[],
   preferredFreshness?: Freshness,
-): CatalogEntry[] {
+): ScoredEntry[] {
   if (entries.length === 0) return [];
   const queryTerms = tokenize(query);
-  if (queryTerms.length === 0) return entries;
+  if (queryTerms.length === 0) return entries.map((entry) => ({ entry, score: 0 }));
 
   const docTokens = entries.map((e) => tokenize(e.text));
   const docLengths = docTokens.map((t) => t.length);
@@ -261,7 +268,15 @@ function rankBm25(
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.map((s) => s.entry);
+  return scored;
+}
+
+function rankBm25(
+  query: string,
+  entries: CatalogEntry[],
+  preferredFreshness?: Freshness,
+): CatalogEntry[] {
+  return rankBm25Scored(query, entries, preferredFreshness).map((s) => s.entry);
 }
 
 // Token overlap with cluster keyword boosts; the fallback stage-1 path when
@@ -285,11 +300,14 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-async function rankCosine(
+// Scores kept: see rankBm25Scored's comment. Costs one embed() call for the
+// query - callers that also need the margin (candidatesWithMargin) must
+// reuse this result rather than calling it a second time.
+async function rankCosineScored(
   query: string,
   entries: CatalogEntry[],
   preferredFreshness?: Freshness,
-): Promise<CatalogEntry[]> {
+): Promise<ScoredEntry[]> {
   const [queryVector] = await embed([query]);
   const preferredRank = preferredFreshness ? FRESHNESS_RANK[preferredFreshness] : undefined;
   const scored = entries.map((entry) => {
@@ -300,7 +318,15 @@ async function rankCosine(
     return { entry, score };
   });
   scored.sort((a, b) => b.score - a.score);
-  return scored.map((s) => s.entry);
+  return scored;
+}
+
+async function rankCosine(
+  query: string,
+  entries: CatalogEntry[],
+  preferredFreshness?: Freshness,
+): Promise<CatalogEntry[]> {
+  return (await rankCosineScored(query, entries, preferredFreshness)).map((s) => s.entry);
 }
 
 // Every entry of the rank-0 cluster is guaranteed a slot (up to k total),
@@ -335,6 +361,22 @@ export function withClusterFloor(ranked: CatalogEntry[], k: number): CatalogEntr
   return result;
 }
 
+// Score of the top-ranked entry minus the score at position maxSources + 1
+// (1-indexed, so index `maxSources` 0-indexed), normalised by the top
+// score - a plain arithmetic helper kept separate from
+// candidatesWithMargin() below so it can be unit-tested directly against a
+// fixed list of scores instead of only indirectly through a live
+// buildCatalog() pass. 0 when the top score itself is 0 (no signal at all,
+// division would otherwise be 0/0); 1 when there is no score at position
+// maxSources + 1 at all (fewer candidates scored than that, or every one
+// past the top scored exactly 0) - maximal confidence, since nothing else
+// in the pool even tied the runner-up spot.
+export function marginFromScores(scores: number[], maxSources: number): number {
+  const topScore = scores[0] ?? 0;
+  const marginScore = scores[maxSources] ?? 0;
+  return topScore > 0 ? (topScore - marginScore) / topScore : 0;
+}
+
 // Cosine top-k when the catalog carries vectors, else BM25. Always includes
 // every entry of the top-scoring cluster, up to k total.
 export async function candidates(
@@ -350,4 +392,62 @@ export async function candidates(
     : rankBm25(query, pool, opts?.freshness);
 
   return withClusterFloor(ranked, k);
+}
+
+// Which ranker actually produced the shortlist/margin: 'embeddings' when
+// every catalog entry carries a vector (buildCatalog() embedded it), else
+// the BM25 fallback. libraryAsk.ts's planRoute() reads this to decide
+// whether the router-skip margin applies at all: BM25's normalised scores
+// run structurally higher (see review 3.5's ruling, recorded in
+// docs/routing-eval.md) - the same three margins that measure real
+// confidence in cosine mode land on a near-saturated split under BM25, so
+// the default skip only ever applies in 'embeddings' mode; BM25 mode
+// needs an operator-set ALEXANDRIA_ROUTER_SKIP_MARGIN to opt in.
+export type Stage1Mode = 'embeddings' | 'bm25';
+
+export interface CandidatesWithMargin {
+  candidates: CatalogEntry[];
+  // Score of the top-ranked candidate minus the score at position
+  // maxSources + 1 (1-indexed), normalised by the top score - i.e. how
+  // much better stage 1's best guess is than the last candidate stage 2
+  // would otherwise have room to consider. 0-1, and 0 when the top score
+  // is 0 (no signal at all). Computed on the raw score-ranked list, before
+  // withClusterFloor's top-cluster regrouping, since that's what actually
+  // measures stage 1's confidence; the cluster floor only affects which
+  // *members* of the winning cluster get exposed to stage 2, not how
+  // decisively that cluster won.
+  margin: number;
+  topCluster: Cluster | undefined;
+  stage1: Stage1Mode;
+}
+
+// Same ranking as candidates(), but keeps the raw scored order long enough
+// to also compute the stage-1 margin above - one buildCatalog()/rank pass
+// shared between the returned shortlist and the margin, so a caller that
+// needs both (src/tools/libraryAsk.ts's planRoute()) doesn't pay for
+// embed()'ing the query twice.
+export async function candidatesWithMargin(
+  query: string,
+  k: number,
+  maxSources: number,
+  opts?: { freshness?: Freshness },
+): Promise<CandidatesWithMargin> {
+  const pool = await buildCatalog();
+  const hasVectors = pool.length > 0 && pool.every((e) => e.vector !== undefined);
+
+  const scored = hasVectors
+    ? await rankCosineScored(query, pool, opts?.freshness)
+    : rankBm25Scored(query, pool, opts?.freshness);
+
+  const ranked = scored.map((s) => s.entry);
+
+  return {
+    candidates: withClusterFloor(ranked, k),
+    margin: marginFromScores(
+      scored.map((s) => s.score),
+      maxSources,
+    ),
+    topCluster: ranked[0]?.cluster,
+    stage1: hasVectors ? 'embeddings' : 'bm25',
+  };
 }

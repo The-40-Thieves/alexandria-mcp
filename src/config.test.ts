@@ -71,6 +71,35 @@ test('loadConfig', async (t) => {
     assert.ok(!('CORE_API_KEY' in result));
     assert.ok(!('PATH' in result));
   });
+
+  // Task 6 fix round 1: an env-file loader commonly emits a declared but
+  // unset var as "" (KEY=), which downstream Number('') parsers
+  // (resultCache.ts's parseTtlMs, libraryAsk.ts's parseSkipMargin) would
+  // otherwise read as a valid, finite 0 instead of "not configured".
+  // These two fields normalize that shape to undefined at the schema
+  // boundary so neither parser has to special-case it itself.
+  await t.test('an empty ALEXANDRIA_ROUTER_SKIP_MARGIN normalizes to undefined, not ""', () => {
+    const result = loadConfig({ ALEXANDRIA_ROUTER_SKIP_MARGIN: '' } as NodeJS.ProcessEnv);
+    assert.equal(result.ALEXANDRIA_ROUTER_SKIP_MARGIN, undefined);
+  });
+
+  await t.test(
+    'a whitespace-only ALEXANDRIA_ROUTER_SKIP_MARGIN also normalizes to undefined',
+    () => {
+      const result = loadConfig({ ALEXANDRIA_ROUTER_SKIP_MARGIN: '   ' } as NodeJS.ProcessEnv);
+      assert.equal(result.ALEXANDRIA_ROUTER_SKIP_MARGIN, undefined);
+    },
+  );
+
+  await t.test('a real ALEXANDRIA_ROUTER_SKIP_MARGIN value passes through unchanged', () => {
+    const result = loadConfig({ ALEXANDRIA_ROUTER_SKIP_MARGIN: '0.4' } as NodeJS.ProcessEnv);
+    assert.equal(result.ALEXANDRIA_ROUTER_SKIP_MARGIN, '0.4');
+  });
+
+  await t.test('an empty ALEXANDRIA_CACHE_TTL_MS normalizes to undefined too (same shape)', () => {
+    const result = loadConfig({ ALEXANDRIA_CACHE_TTL_MS: '' } as NodeJS.ProcessEnv);
+    assert.equal(result.ALEXANDRIA_CACHE_TTL_MS, undefined);
+  });
 });
 
 test('config singleton', async (t) => {
