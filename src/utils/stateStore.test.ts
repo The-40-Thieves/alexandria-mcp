@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { destinationOverride } from '../log.ts';
 import {
@@ -74,6 +75,47 @@ function sharedContract(label: string, makeStore: () => StateStore) {
       store.close();
     });
 
+    // Final wave, A9: one row/key per source per UTC day accumulated
+    // forever before this fix. A reservation on a genuinely new day prunes
+    // anything older than 7 days; same-day reservations don't touch it.
+    // Each sub-case below uses a fresh store with exactly one "old day" ->
+    // "new day" transition: pruning runs relative to whatever day it sees
+    // next, so chaining several old days through the SAME store (08-01,
+    // then 08-27, then 09-02) would have the 08-27 reservation itself
+    // prune 08-01 before the test ever gets to the 09-02 assertion.
+    await t.test('a reservation 32 days later prunes an older-than-7-days row', () => {
+      const store = makeStore();
+      store.reserveQuota('arxiv', '2026-08-01', 100);
+      assert.equal(store.getQuota('arxiv', '2026-08-01'), 1);
+
+      store.reserveQuota('arxiv', '2026-09-02', 100); // 32 days later: triggers pruning
+
+      assert.equal(store.getQuota('arxiv', '2026-08-01'), 0, 'older than 7 days: pruned');
+      assert.equal(store.getQuota('arxiv', '2026-09-02'), 1);
+      store.close();
+    });
+
+    await t.test('a reservation 6 days later keeps a within-7-days row', () => {
+      const store = makeStore();
+      store.reserveQuota('arxiv', '2026-08-27', 100);
+      assert.equal(store.getQuota('arxiv', '2026-08-27'), 1);
+
+      store.reserveQuota('arxiv', '2026-09-02', 100); // 6 days later: within retention
+
+      assert.equal(store.getQuota('arxiv', '2026-08-27'), 1, 'within 7 days: kept');
+      assert.equal(store.getQuota('arxiv', '2026-09-02'), 1);
+      store.close();
+    });
+
+    await t.test('a second reservation on the same day does not re-run pruning', () => {
+      const store = makeStore();
+      store.reserveQuota('arxiv', '2026-08-01', 100);
+      store.reserveQuota('arxiv', '2026-09-02', 100); // triggers pruning once
+      store.reserveQuota('arxiv', '2026-09-02', 100); // same day again
+      assert.equal(store.getQuota('arxiv', '2026-09-02'), 2, 'both same-day reservations counted');
+      store.close();
+    });
+
     await t.test('cache returns undefined on miss', () => {
       const store = makeStore();
       assert.equal(store.getCache('missing'), undefined);
@@ -82,30 +124,30 @@ function sharedContract(label: string, makeStore: () => StateStore) {
 
     await t.test('cache returns the stored value before expiry', () => {
       const store = makeStore();
-      store.setCache('k', { hello: 'world' }, 1000);
+      store.setCache('k', { hello: 'world' }, 1000, 0);
       assert.deepEqual(store.getCache('k', 500), { hello: 'world' });
       store.close();
     });
 
     await t.test('cache expires entries at or after expiresAt', () => {
       const store = makeStore();
-      store.setCache('k', 42, 1000);
+      store.setCache('k', 42, 1000, 0);
       assert.equal(store.getCache('k', 1000), undefined);
       store.close();
     });
 
     await t.test('setCache on an existing key updates the value without evicting others', () => {
       const store = makeStore();
-      store.setCache('k', 1, 1000);
-      store.setCache('k', 2, 2000);
+      store.setCache('k', 1, 1000, 0);
+      store.setCache('k', 2, 2000, 0);
       assert.equal(store.getCache('k', 0), 2);
       store.close();
     });
 
     await t.test('evictExpired removes only expired entries and reports the count', () => {
       const store = makeStore();
-      store.setCache('a', 1, 100);
-      store.setCache('b', 2, 10_000);
+      store.setCache('a', 1, 100, 0);
+      store.setCache('b', 2, 10_000, 0);
       const removed = store.evictExpired(1000);
       assert.equal(removed, 1);
       assert.equal(store.cacheSize(), 1);
@@ -121,28 +163,74 @@ sharedContract('SqliteStateStore', () => new SqliteStateStore(tmpDbPath('contrac
 test('MemoryStateStore cache cap', async (t) => {
   await t.test('evicts the oldest entry once the cap is exceeded', () => {
     const store = new MemoryStateStore(2);
-    store.setCache('a', 1, 1000);
-    store.setCache('b', 2, 1000);
-    store.setCache('c', 3, 1000);
+    store.setCache('a', 1, 1000, 0);
+    store.setCache('b', 2, 1000, 0);
+    store.setCache('c', 3, 1000, 0);
     assert.equal(store.getCache('a', 0), undefined);
     assert.equal(store.getCache('b', 0), 2);
     assert.equal(store.getCache('c', 0), 3);
     assert.equal(store.cacheSize(), 2);
   });
+
+  // Final wave, A8: searchCache and routingCache share one StateStore
+  // instance (resultCache.ts). A burst of routing-decision entries filling
+  // the cap must not evict a search-result entry, and vice versa - each
+  // namespace (split on the "routing-decision|" prefix) gets its own
+  // independent cacheMax budget.
+  await t.test(
+    'the routing-decision namespace and everything else are capped independently',
+    () => {
+      const store = new MemoryStateStore(2);
+      store.setCache('arxiv|physics|5', 'search-a', 1000, 0);
+      store.setCache('routing-decision|q1|3|embeddings|0.4|gpt-4o-mini', 'route-a', 1000, 0);
+      // Two more search entries: at cap 2, this evicts the OLDEST search
+      // entry (arxiv|physics|5), never the routing entry.
+      store.setCache('gutenberg|books|5', 'search-b', 1000, 0);
+      store.setCache('depsdev|left-pad|5', 'search-c', 1000, 0);
+
+      assert.equal(
+        store.getCache('routing-decision|q1|3|embeddings|0.4|gpt-4o-mini', 0),
+        'route-a',
+      );
+      assert.equal(store.getCache('arxiv|physics|5', 0), undefined, 'oldest search entry evicted');
+      assert.equal(store.getCache('gutenberg|books|5', 0), 'search-b');
+      assert.equal(store.getCache('depsdev|left-pad|5', 0), 'search-c');
+    },
+  );
 });
 
 test('SqliteStateStore', async (t) => {
   await t.test('the 500-entry cap is enforced by count on insert', () => {
     const store = new SqliteStateStore(tmpDbPath('cap.db'), 2);
-    store.setCache('a', 1, 1000);
-    store.setCache('b', 2, 1000);
-    store.setCache('c', 3, 1000);
+    store.setCache('a', 1, 1000, 0);
+    store.setCache('b', 2, 1000, 0);
+    store.setCache('c', 3, 1000, 0);
     assert.equal(store.getCache('a', 0), undefined);
     assert.equal(store.getCache('b', 0), 2);
     assert.equal(store.getCache('c', 0), 3);
     assert.equal(store.cacheSize(), 2);
     store.close();
   });
+
+  await t.test(
+    'the routing-decision namespace and everything else are capped independently',
+    () => {
+      const store = new SqliteStateStore(tmpDbPath('namespace-cap.db'), 2);
+      store.setCache('arxiv|physics|5', 'search-a', 1000, 0);
+      store.setCache('routing-decision|q1|3|embeddings|0.4|gpt-4o-mini', 'route-a', 1000, 0);
+      store.setCache('gutenberg|books|5', 'search-b', 1000, 0);
+      store.setCache('depsdev|left-pad|5', 'search-c', 1000, 0);
+
+      assert.equal(
+        store.getCache('routing-decision|q1|3|embeddings|0.4|gpt-4o-mini', 0),
+        'route-a',
+      );
+      assert.equal(store.getCache('arxiv|physics|5', 0), undefined, 'oldest search entry evicted');
+      assert.equal(store.getCache('gutenberg|books|5', 0), 'search-b');
+      assert.equal(store.getCache('depsdev|left-pad|5', 0), 'search-c');
+      store.close();
+    },
+  );
 
   await t.test(
     '6 concurrent-shaped reservations against a cap of 3 yield exactly 3 successes',
@@ -207,6 +295,39 @@ test('SqliteStateStore', async (t) => {
     assert.equal(fs.statSync(dbPath).mode & 0o777, 0o600);
     assert.equal(fs.statSync(`${dbPath}-wal`).mode & 0o777, 0o600);
     store.close();
+  });
+
+  // Final wave, A7: a corrupt or truncated cache row (a partial write, a
+  // disk-level bit flip, a manual edit) must miss like any other cache
+  // miss, not throw JSON.parse's error into the guarded search()/
+  // planRoute() paths above this store.
+  await t.test('a hand-corrupted row is treated as a miss, deleted, and warned once', () => {
+    const dbPath = tmpDbPath('corrupt.db');
+    const store = new SqliteStateStore(dbPath);
+    store.close(); // release the file so a second connection can write it
+
+    const raw = new DatabaseSync(dbPath);
+    raw
+      .prepare('INSERT INTO cache (key, value, expiresAt) VALUES (?, ?, ?)')
+      .run('bad-key', '{not valid json', Date.now() + 60_000);
+    raw.close();
+
+    const lines: string[] = [];
+    destinationOverride.value = { write: (msg: string) => void lines.push(msg) };
+    try {
+      const reopened = new SqliteStateStore(dbPath);
+      assert.equal(reopened.getCache('bad-key'), undefined, 'a corrupt row is a miss');
+      assert.equal(lines.length, 1, 'warns once');
+      assert.equal(
+        reopened.getCache('bad-key'),
+        undefined,
+        'still a miss after the bad row is deleted',
+      );
+      assert.equal(lines.length, 1, 'does not warn again on a later read of the same key');
+      reopened.close();
+    } finally {
+      destinationOverride.value = undefined;
+    }
   });
 });
 

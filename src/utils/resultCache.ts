@@ -8,6 +8,7 @@ import type { LibraryResult } from '../types.ts';
 import {
   stateStore as defaultStateStore,
   MemoryStateStore,
+  ROUTING_CACHE_KEY_PREFIX,
   type StateStore,
 } from './stateStore.ts';
 
@@ -38,7 +39,7 @@ export class ResultCache<T> {
   set(key: string, value: T, now = Date.now()): void {
     const ttlMs = this.resolveTtlMs();
     if (ttlMs <= 0) return; // 0 disables caching
-    this.store.setCache(key, value, now + ttlMs);
+    this.store.setCache(key, value, now + ttlMs, now);
   }
 }
 
@@ -112,7 +113,7 @@ export function routingCacheKey(
   skipMargin: number,
   routerModel: string,
 ): string {
-  return `routing-decision|${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${maxSources}|${stage1}|${skipMargin}|${routerModel}`;
+  return `${ROUTING_CACHE_KEY_PREFIX}${query.trim().toLowerCase().replace(/\s+/g, ' ')}|${maxSources}|${stage1}|${skipMargin}|${routerModel}`;
 }
 
 // Test-only: clears every entry in the shared stateStore cache table (both
