@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import path from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
+import { VERSION } from '../version.ts';
+import { resetExtractWorkerForTests } from './extract.ts';
 import {
   assertConfiguredServiceUrl,
   assertFetchableUrl,
@@ -27,6 +29,11 @@ function samplePdfBytes(): Buffer {
 interface FixtureServer {
   url: string;
   crawlRequests: unknown[];
+  // Task 13: every /article request's incoming headers, in order - lets a
+  // test assert what User-Agent/Accept tryDefuddle actually sent without
+  // adding a dedicated echo endpoint that would need its own content-type
+  // branch in tryDefuddle to be readable back.
+  articleRequestHeaders: IncomingMessage['headers'][];
   close(): Promise<void>;
 }
 
@@ -38,17 +45,26 @@ interface FixtureServer {
 // redirect to itself, forever, to exercise the hop cap), /redirect-to-private
 // (a redirect to a private-network target, to exercise per-hop guarding),
 // /huge (a 6 MB body sent chunked with no Content-Length, to exercise the
-// streaming size cap), and /huge-declared (a 6 MB body with an honest,
-// oversized Content-Length, to exercise the fast-reject path). `hugeCrawl`
-// makes /crawl itself stream an oversized chunked body instead of its
-// normal JSON, to exercise the same streaming size cap on tier 3.
+// streaming size cap), /huge-declared (a 6 MB body with an honest,
+// oversized Content-Length, to exercise the fast-reject path), and
+// /markdown (task 13: a text/markdown response, to exercise the markdown
+// hop bypassing extraction). `hugeCrawl` makes /crawl itself stream an
+// oversized chunked body instead of its normal JSON, to exercise the same
+// streaming size cap on tier 3.
 function startFixtureServer(crawlResponse?: unknown, hugeCrawl = false): Promise<FixtureServer> {
   const crawlRequests: unknown[] = [];
+  const articleRequestHeaders: IncomingMessage['headers'][] = [];
   return new Promise((resolve) => {
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       if (req.method === 'GET' && req.url === '/article') {
+        articleRequestHeaders.push(req.headers);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(fixture('article.html'));
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/markdown') {
+        res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
+        res.end('# Agent-Ready Markdown\n\nThis body is used as-is, no extraction involved.');
         return;
       }
       if (req.method === 'GET' && req.url === '/tiny') {
@@ -160,11 +176,21 @@ function startFixtureServer(crawlResponse?: unknown, hugeCrawl = false): Promise
       resolve({
         url: `http://127.0.0.1:${port}`,
         crawlRequests,
+        articleRequestHeaders,
         close: () => new Promise((res) => server.close(() => res())),
       });
     });
   });
 }
+
+// Task 13: tier 1 now runs extraction on a lazily-started worker thread
+// (see extract.ts), and more than one test below extracts real article
+// HTML - a worker keeps the process alive on its own once started, so a
+// per-test t.after() covering only one of those tests isn't enough: the
+// process would still hang after whichever one runs last. A single
+// file-level after() runs once, after every test in this file, and covers
+// all of them regardless of which one happened to start the worker.
+after(() => resetExtractWorkerForTests());
 
 test('assertFetchableUrl', async (t) => {
   const originalEnv = { ...process.env };
@@ -389,6 +415,56 @@ test('fetchAsText', async (t) => {
     assert.ok(page.text.length >= 500, `expected >= 500 chars, got ${page.text.length}`);
     assert.equal(page.title, 'A Long Enough Article About Testing');
   });
+
+  await t.test('tier 1: sends the honest, version-carrying default User-Agent', async () => {
+    delete process.env.JINA_API_KEY;
+    delete process.env.ALEXANDRIA_JINA_READER;
+    delete process.env.CRAWL4AI_URL;
+    delete process.env.ALEXANDRIA_FETCH_UA;
+    const server = await startFixtureServer();
+    t.after(() => server.close());
+
+    await fetchAsText(`${server.url}/article`);
+    assert.equal(server.articleRequestHeaders.length, 1);
+    assert.equal(
+      server.articleRequestHeaders[0]?.['user-agent'],
+      `Alexandria/${VERSION} (+https://github.com/The-40-Thieves/alexandria-mcp)`,
+    );
+  });
+
+  await t.test('tier 1: ALEXANDRIA_FETCH_UA overrides the default User-Agent', async () => {
+    delete process.env.JINA_API_KEY;
+    delete process.env.ALEXANDRIA_JINA_READER;
+    delete process.env.CRAWL4AI_URL;
+    process.env.ALEXANDRIA_FETCH_UA = 'CustomBot/1.0 (+https://example.com/bot)';
+    const server = await startFixtureServer();
+    t.after(() => server.close());
+
+    await fetchAsText(`${server.url}/article`);
+    assert.equal(
+      server.articleRequestHeaders[0]?.['user-agent'],
+      'CustomBot/1.0 (+https://example.com/bot)',
+    );
+    delete process.env.ALEXANDRIA_FETCH_UA;
+  });
+
+  await t.test(
+    'tier 1: a text/markdown response (Markdown for Agents) is used as-is, skipping extraction',
+    async () => {
+      delete process.env.JINA_API_KEY;
+      delete process.env.ALEXANDRIA_JINA_READER;
+      delete process.env.CRAWL4AI_URL;
+      const server = await startFixtureServer();
+      t.after(() => server.close());
+
+      const page = await fetchAsText(`${server.url}/markdown`);
+      assert.equal(page.via, 'markdown');
+      assert.equal(
+        page.text,
+        '# Agent-Ready Markdown\n\nThis body is used as-is, no extraction involved.',
+      );
+    },
+  );
 
   await t.test(
     'tier 1: a PDF response (by content-type) is extracted via unpdf, per page',

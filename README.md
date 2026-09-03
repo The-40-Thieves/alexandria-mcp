@@ -259,6 +259,13 @@ load balancer.
 | `TRANSPORT` | `stdio` or `http` | `stdio` |
 | `PORT` | any port number, HTTP mode only | `3000` |
 
+`/mcp` (only) is guarded: DNS-rebinding-safe Host/Origin validation
+(`ALEXANDRIA_ALLOWED_ORIGINS`, a comma-separated hostname list - loopback
+is always allowed regardless) and a per-client-IP rate limit
+(`ALEXANDRIA_HTTP_RATE_LIMIT`, default 60/minute, `429` with a JSON-RPC
+error body once exceeded). See `docs/fetch-tier-runtime.md` for the
+details and `src/httpGuards.ts` for the implementation.
+
 Speaks the 2025-era MCP protocol on the wire (the `@modelcontextprotocol/*` v2
 SDK's default for a hand-wired `NodeStreamableHTTPServerTransport` /
 `StdioServerTransport`, which is what `src/index.ts` uses). Opting into the
