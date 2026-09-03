@@ -127,6 +127,22 @@ const rawFields = {
     .default(3000)
     .describe('HTTP transport port (TRANSPORT=http only).'),
 
+  // ── HTTP guards (src/httpGuards.ts, TRANSPORT=http only) ────────────────
+  ALEXANDRIA_ALLOWED_ORIGINS: z
+    .string()
+    .optional()
+    .describe(
+      'Comma-separated hostnames (no scheme/port) allowed to reach /mcp: checked against both the Host and Origin headers for DNS-rebinding protection. Loopback (localhost, 127.0.0.1, [::1]) is always allowed regardless of this setting.',
+    ),
+  ALEXANDRIA_HTTP_RATE_LIMIT: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60)
+    .describe(
+      'Max /mcp requests per client IP per minute (a token bucket refilling continuously toward this cap). Exceeding it returns 429 with a JSON-RPC error body.',
+    ),
+
   // ── Shared LLM provider table ───────────────────────────────────────────
   ALEXANDRIA_BASE_URL: z
     .string()
@@ -221,6 +237,12 @@ const rawFields = {
     ),
 
   // ── Fetch tier (src/web/fetchTier.ts) ───────────────────────────────────
+  ALEXANDRIA_FETCH_UA: z
+    .string()
+    .optional()
+    .describe(
+      'Overrides the User-Agent the defuddle fetch tier sends. Defaults to an honest, identifying string ("Alexandria/<version> (+https://github.com/The-40-Thieves/alexandria-mcp)"), not a browser impersonation.',
+    ),
   ALEXANDRIA_ALLOW_LOOPBACK: z
     .string()
     .optional()

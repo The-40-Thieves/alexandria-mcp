@@ -31,28 +31,18 @@
 // one documented residual gap (TOCTOU on tiers 2/3).
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
-import { parseHTML } from 'linkedom';
 import { config } from '../config.ts';
 import { type AddressPin, guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
+import { VERSION } from '../version.ts';
+import { extractHtml } from './extract.ts';
 import { extractPdf, type PdfPage } from './pdf.ts';
-
-// Loaded dynamically rather than with a static import so it is only pulled
-// in when tier 1 actually runs, not on every module load. Cached after the
-// first call so every tryDefuddle() call after the first is synchronous.
-let defuddlePromise: Promise<typeof import('defuddle/node').Defuddle> | undefined;
-function loadDefuddle(): Promise<typeof import('defuddle/node').Defuddle> {
-  if (!defuddlePromise) {
-    defuddlePromise = import('defuddle/node').then((mod) => mod.Defuddle);
-  }
-  return defuddlePromise;
-}
 
 export interface FetchedPage {
   url: string;
   title: string;
   text: string;
-  via: 'defuddle' | 'jina' | 'crawl4ai' | 'pdf';
+  via: 'defuddle' | 'jina' | 'crawl4ai' | 'pdf' | 'markdown';
   // Set only when via === 'pdf': one entry per PDF page, in order. `text`
   // above is these pages' text joined by pdf.ts's PDF_PAGE_JOINER - the
   // library_read handler (src/index.ts) walks that same join to turn this
@@ -64,8 +54,21 @@ const FETCH_TIMEOUT_MS = 15_000;
 const MIN_TEXT_CHARS = 500;
 const MAX_REDIRECTS = 5;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MB
-const BROWSER_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+// Task 13: an honest, identifying UA instead of impersonating Chrome. A
+// site that blocks unknown bots on the old Chrome-131 string may now block
+// this one too - see docs/fetch-tier-runtime.md for the before/after probe
+// diff and any adapter that needed its old UA kept through a `headers`
+// override to avoid a real regression.
+// Overridable per deployment, not just per adapter: some operators may
+// prefer a fully custom string (their own contact UA, or a browser UA if
+// their traffic mix needs it) without patching source.
+function browserUA(): string {
+  return (
+    config.ALEXANDRIA_FETCH_UA ||
+    `Alexandria/${VERSION} (+https://github.com/The-40-Thieves/alexandria-mcp)`
+  );
+}
 
 // ─── SSRF guard ──────────────────────────────────────────────────────────────
 //
@@ -522,7 +525,17 @@ async function fetchFollowingRedirects(
 async function tryDefuddle(url: string, pin: AddressPin | undefined): Promise<FetchedPage | null> {
   const { response, finalUrl } = await fetchFollowingRedirects(
     url,
-    { headers: { 'User-Agent': BROWSER_UA, Accept: 'text/html,application/xhtml+xml' } },
+    {
+      headers: {
+        'User-Agent': browserUA(),
+        // Task 13, Cloudflare's "Markdown for Agents": a zone that has this
+        // enabled answers a q=1 (default) `Accept: text/markdown` with
+        // `content-type: text/markdown` directly, skipping Defuddle
+        // entirely (see the branch below) - a zone that doesn't just
+        // answers its ordinary HTML at q=0.9, exactly as before.
+        Accept: 'text/markdown, text/html;q=0.9',
+      },
+    },
     FETCH_TIMEOUT_MS,
     pin,
   );
@@ -551,18 +564,25 @@ async function tryDefuddle(url: string, pin: AddressPin | undefined): Promise<Fe
       pages: extracted.pages,
     };
   }
+  // Task 13: the server answered the markdown hop - already agent-ready
+  // text, no DOM to build and nothing for Defuddle to strip. Used as-is,
+  // skipping extraction (and its worker hop) entirely.
+  if (contentType.includes('text/markdown')) {
+    const text = (await readCappedText(response, finalUrl, 'defuddle')).trim();
+    return { url: finalUrl, title: finalUrl, text, via: 'markdown' };
+  }
   if (!contentType.includes('html')) {
     throw new Error(
       `defuddle: response for ${finalUrl} is not HTML (content-type: ${contentType})`,
     );
   }
   const html = await readCappedText(response, finalUrl, 'defuddle');
-  const { document } = parseHTML(html);
-  const Defuddle = await loadDefuddle();
-  const result = await Defuddle(document, finalUrl, { markdown: true });
-  const text = (result.content ?? '').trim();
+  // Task 13: run off the main thread (see extract.ts) - Defuddle's DOM walk
+  // over a large page is slow enough (seconds) to stall every concurrent
+  // MCP request, including a plain /health check, if run inline here.
+  const { title, text } = await extractHtml(html, finalUrl);
   if (text.length < MIN_TEXT_CHARS) return null; // too short, fall through
-  return { url: finalUrl, title: result.title || finalUrl, text, via: 'defuddle' };
+  return { url: finalUrl, title: title || finalUrl, text, via: 'defuddle' };
 }
 
 // --- Tier 2: jina reader -----------------------------------------------------

@@ -10,6 +10,7 @@ import { isJsonContentType, McpServer, type ServerContext } from '@modelcontextp
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
+import { checkOrigin, checkRateLimit } from './httpGuards.ts';
 import { buildInstructions } from './instructions.ts';
 import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
@@ -1168,6 +1169,13 @@ export function createHttpApp(): Server {
         mcpPath.toLowerCase() === '/mcp' &&
         ['POST', 'GET', 'DELETE'].includes(req.method ?? '')
       ) {
+        // Task 13: Host/Origin validation (DNS-rebinding protection) and a
+        // per-client-IP rate limit, both applied before this request ever
+        // reaches the MCP transport. Each guard has already written its
+        // own rejection response when it returns false - nothing left to
+        // do here but stop.
+        if (!checkOrigin(req, res)) return;
+        if (!checkRateLimit(req, res)) return;
         void handleMcpRequest(req, res);
         return;
       }
