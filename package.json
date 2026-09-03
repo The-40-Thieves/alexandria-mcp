@@ -56,7 +56,6 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "@supabase/supabase-js": "^2.104.0",
     "defuddle": "^0.19.3",
-    "express": "^5.2.1",
     "fast-xml-parser": "^5.7.3",
     "feedsmith": "^2.9.6",
     "linkedom": "^0.18.13",
@@ -70,7 +69,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
-    "@types/express": "^5.0.6",
     "@types/node": "^24.0.0",
     "knip": "^6.34.0",
     "typescript": "^7.0.2"

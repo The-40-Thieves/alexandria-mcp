@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import express from 'express';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
 import { log } from './log.ts';
@@ -513,18 +518,46 @@ export function createServer(): McpServer {
 }
 
 // ── HTTP / stdio transport ────────────────────────────────────────────────────
+
+// express.json()'s default: reject a body over 100kb before it reaches
+// JSON.parse, rather than buffering an unbounded request in memory. Dropping
+// Express (SDK v2's NodeStreamableHTTPServerTransport has no size cap of its
+// own, it reads the whole stream) means this repo now enforces that cap
+// itself instead of getting it for free from body-parser.
+const JSON_BODY_LIMIT_BYTES = 100 * 1024;
+
+// Reads req's body up to JSON_BODY_LIMIT_BYTES and JSON.parses it, mirroring
+// express.json()'s size-then-parse behavior. Only called for a JSON
+// content-type; GET/DELETE /mcp (no body) and any other content-type pass
+// `undefined` through to the transport unchanged, same as express.json()
+// no-oping on those today.
+async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size > JSON_BODY_LIMIT_BYTES) {
+      throw new Error(`request entity too large (limit ${JSON_BODY_LIMIT_BYTES} bytes)`);
+    }
+    chunks.push(chunk);
+  }
+  if (size === 0) return undefined;
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+function hasJsonContentType(req: IncomingMessage): boolean {
+  const contentType = req.headers['content-type'];
+  return typeof contentType === 'string' && contentType.includes('application/json');
+}
+
 /**
  * Handle one MCP HTTP request on its own server and transport.
  *
  * Stateless: nothing is shared between requests, so overlapping requests cannot
  * collide on a single Protocol instance. Errors are forwarded to the JSON-RPC
- * error handler below rather than to Express's default HTML renderer.
+ * error handler below rather than leaking an HTML page or a stack trace.
  */
-async function handleMcpRequest(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-): Promise<void> {
+async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const server = createServer();
   const transport = new NodeStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
@@ -535,67 +568,70 @@ async function handleMcpRequest(
     void server.close();
   });
   try {
+    const body = hasJsonContentType(req) ? await readJsonBody(req) : undefined;
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await transport.handleRequest(req, res, body);
   } catch (err) {
-    next(err);
+    jsonRpcErrorHandler(err, res);
   }
 }
 
 /**
- * Express error handler. Returns a JSON-RPC error object so a thrown error can
- * never leak an HTML page or a stack trace to the caller.
+ * Returns a JSON-RPC error object so a thrown error can never leak an HTML
+ * page or a stack trace to the caller.
  */
-function jsonRpcErrorHandler(
-  err: unknown,
-  _req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-): void {
+function jsonRpcErrorHandler(err: unknown, res: ServerResponse): void {
   const message = err instanceof Error ? err.message : String(err);
   log.error({ err: message }, 'request failed');
   if (res.headersSent) {
-    next(err);
+    res.end();
     return;
   }
-  res.status(500).json({
-    jsonrpc: '2.0',
-    error: { code: -32603, message },
-    id: null,
-  });
+  res.writeHead(500, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32603, message }, id: null }));
 }
 
-/** Build the HTTP app without binding a port, so tests can drive it in process. */
-export function createHttpApp(): express.Express {
-  const app = express();
-  app.use(express.json());
-  app.post('/mcp', handleMcpRequest);
-  app.get('/mcp', handleMcpRequest);
-  app.delete('/mcp', handleMcpRequest);
-  app.get('/health', (_req, res) => {
-    const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
-    const { calls, errors } = sourceCallTotals();
-    res.json({
-      status: 'ok',
-      version: VERSION,
-      sources: { total: sources, visible, hidden, calls, errors },
-      byKind,
-      quota,
-      cache,
-      tools: TOOL_COUNT,
-    });
+function sendJson(res: ServerResponse, body: unknown): void {
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(body));
+}
+
+/** Build the HTTP server without binding a port, so tests can drive it in process. */
+export function createHttpApp(): Server {
+  return createHttpServer((req, res) => {
+    const { pathname } = new URL(req.url ?? '/', 'http://localhost');
+
+    if (pathname === '/mcp' && ['POST', 'GET', 'DELETE'].includes(req.method ?? '')) {
+      void handleMcpRequest(req, res);
+      return;
+    }
+    if (pathname === '/health' && req.method === 'GET') {
+      const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
+      const { calls, errors } = sourceCallTotals();
+      sendJson(res, {
+        status: 'ok',
+        version: VERSION,
+        sources: { total: sources, visible, hidden, calls, errors },
+        byKind,
+        quota,
+        cache,
+        tools: TOOL_COUNT,
+      });
+      return;
+    }
+    if (pathname === '/metrics' && req.method === 'GET') {
+      sendJson(res, metricsSnapshot());
+      return;
+    }
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('Not Found');
   });
-  app.get('/metrics', (_req, res) => {
-    res.json(metricsSnapshot());
-  });
-  app.use(jsonRpcErrorHandler);
-  return app;
 }
 
 async function runHTTP(): Promise<void> {
-  const app = createHttpApp();
+  const httpServer = createHttpApp();
   const port = config.PORT;
-  app.listen(port, () =>
+  httpServer.listen(port, () =>
     log.info(
       { sources: listSources().length, url: `http://localhost:${port}/mcp` },
       'alexandria started',
