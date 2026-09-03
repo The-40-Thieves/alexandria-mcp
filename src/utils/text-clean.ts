@@ -1,3 +1,5 @@
+import { COMMON_ENGLISH_WORDS } from './data/common-english-words.ts';
+
 // Project Gutenberg texts have a standard header and footer
 // that must be stripped before chunking.
 const GUTENBERG_HEADER = /^[\s\S]*?\*{3}\s*START OF (THIS|THE) PROJECT GUTENBERG EBOOK[^\n]*\n/i;
@@ -40,13 +42,60 @@ export function normaliseWhitespace(text: string): string {
     .trim();
 }
 
-// OCR quality score: ratio of "clean" characters to total.
-// Returns 0.0 (garbage) to 1.0 (clean).
+const LEXICON = new Set(COMMON_ENGLISH_WORDS);
+
+// A minimum sample size before the lexicon check is trusted to say
+// anything: a chunk that is mostly a table of numbers, a citation list, or
+// a run of punctuation naturally has few or no Latin word tokens to check,
+// and that is a property of the content (task 11's "per-chunk digit and
+// punctuation ratios"), not evidence of garbled OCR - so below this many
+// checkable tokens the lexicon score defaults to clean instead of letting
+// one unlucky word (or zero words) swing the whole chunk.
+const MIN_CHECKABLE_TOKENS = 3;
+
+// A token only goes through the lexicon: an ALL-CAPS run is left alone
+// (acronyms like "ASCII" or "NASA" are not garbage, and a 5,000-word
+// lexicon built from ordinary prose will never contain them anyway), and a
+// token with no ASCII Latin letter at all (Greek/Arabic/Chinese/...) is
+// outside what an English word list can judge one way or the other.
+function isCheckable(token: string): boolean {
+  return /[a-z]/i.test(token) && token !== token.toUpperCase();
+}
+
+// Lexicon-hit ratio: of the chunk's checkable (mixed-/lower-case Latin)
+// word tokens, what fraction are one of the 5,000 most common English
+// words (src/utils/data/common-english-words.ts)? This catches the OCR
+// failure mode the character-class ratio below is blind to: a run of
+// letters that individually look clean (right script, right case) but
+// don't spell real words ("kjhsdf oiuqwer zxcvbnm"), which a misrecognized
+// scan produces just as readily as legible text does not.
+function lexiconScore(text: string): number {
+  const tokens = text.match(/\p{L}+/gu) ?? [];
+  let checkable = 0;
+  let hits = 0;
+  for (const token of tokens) {
+    if (!isCheckable(token)) continue;
+    checkable += 1;
+    if (LEXICON.has(token.toLowerCase())) hits += 1;
+  }
+  return checkable < MIN_CHECKABLE_TOKENS ? 1 : hits / checkable;
+}
+
+// OCR quality score: the minimum of two independent 0.0-1.0 signals -
+// the character-class ratio (unchanged: the fraction of characters that
+// are letters, digits, whitespace or ordinary punctuation) and
+// lexiconScore() above. Neither alone is enough: a language the lexicon
+// doesn't cover would fail a lexicon-only check, and letter-soup garbage
+// sails through a character-class-only check outright. Taking the minimum
+// lets either signal veto a chunk without double-penalizing the same
+// defect.
 export function ocrQualityScore(text: string): number {
   if (!text || text.length === 0) return 0;
 
   const clean = (text.match(/[\p{L}\p{N}\s.,!?;:'"()\-–—]/gu) || []).length;
-  return clean / text.length;
+  const regexScore = clean / text.length;
+
+  return Math.min(regexScore, lexiconScore(text));
 }
 
 // Apply all cleaning passes appropriate for a given source.

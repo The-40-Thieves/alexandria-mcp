@@ -87,10 +87,25 @@ Post-text`;
 
   describe('ocrQualityScore', () => {
     test('scores near 1.0 for ASCII-only text', () => {
-      const raw = `Hello world, this is a clean sentence.`;
+      const raw = `Welcome world, this is a clean sentence.`;
       const score = ocrQualityScore(raw);
       assert.ok(score > 0.9);
       assert.ok(score <= 1.0);
+    });
+
+    test('scores low for letter soup that is not real words (the lexicon gate)', () => {
+      // Every character is a clean, in-alphabet letter (the pre-existing
+      // regex score alone would pass this), but none of the tokens are
+      // real English words - the failure mode the lexicon-hit ratio adds.
+      const raw = `kjhsdf oiuqwer zxcvbnm asdfgh qwerty poiuyt lkjhgf mnbvcx`;
+      const score = ocrQualityScore(raw);
+      assert.ok(score < 0.75, `expected a low score, got ${score}`);
+    });
+
+    test('a real English sentence clears the lexicon gate', () => {
+      const raw = `The old man came home with his dog and looked at the clean water near the great stone house.`;
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
     });
 
     test('scores correctly for Unicode text (Greek/Arabic/Chinese)', () => {

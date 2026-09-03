@@ -20,9 +20,12 @@ test('MIN_CHUNK_LENGTH is 100', () => {
 
 test('ocrQualityScore tests', async (t) => {
   await t.test('clean ASCII text', () => {
-    const text = 'This is clean ASCII text with some punctuation, right? Yes.';
+    const text =
+      'This is clean ASCII text with some common words and simple sentences, right? Yes.';
     const score = ocrQualityScore(text);
-    // Almost everything should match the clean regex
+    // Almost everything should match the clean regex, and every checkable
+    // word (ASCII is an all-caps acronym, exempt from the lexicon check)
+    // is a real one, so the lexicon score doesn't pull this down either.
     assert.ok(score > 0.9);
   });
 

@@ -40,6 +40,13 @@ export interface LibraryResearchResult {
   // Unsupported claims the fact-check flagged but that were left standing
   // because removing them was not safe (see checkCitations).
   warnings: string[];
+  // Task 11: the outline generateObjectives() produced before round 1, and
+  // coverage[i] = whether objectives[i] was covered by a learning as of
+  // the last round that ran (index-aligned with objectives). Detailed
+  // output only (src/tools/format.ts's research branch), same as rounds/
+  // elapsedMs.
+  objectives: string[];
+  coverage: boolean[];
 }
 
 export interface ProgressInfo {
@@ -84,6 +91,49 @@ Generate at most ${breadth} queries.`;
   const user = `Topic: ${topic}${learningsBlock}`;
   const decision = await chatJSON('research', system, user, QueriesSchema);
   return decision.queries.slice(0, breadth);
+}
+
+const ObjectivesSchema = z.object({ objectives: z.array(z.string().min(1)) });
+
+// Task 11 (brief 07): "Don't Stop Early" coverage-driven stopping (see
+// research/retrieval-sota.md section 3) - before round 1, ask the research
+// role to outline 3 to 7 concrete objectives a thorough answer on this
+// topic would need to cover. Loose like generateQueries()'s breadth
+// (instructional count in the prompt, clamped in code) rather than a hard
+// schema bound, since retrying a whole research run over an LLM returning
+// 2 or 8 objectives instead of "3 to 7" would be a worse failure mode than
+// just working with whatever count it gives.
+async function generateObjectives(topic: string): Promise<string[]> {
+  const system = `You are scoping a research pass on a topic. Outline 3 to 7 concrete coverage objectives: the distinct things a thorough answer would need to address.
+
+Return JSON: { "objectives": ["objective 1", "objective 2", ...] }
+Generate between 3 and 7 objectives.`;
+  const user = `Topic: ${topic}`;
+  const decision = await chatJSON('research', system, user, ObjectivesSchema);
+  return decision.objectives.slice(0, 7);
+}
+
+const CoverageSchema = z.object({ coveredIndices: z.array(z.number().int()) });
+
+// Re-derives coverage from scratch each round (cumulative learnings so
+// far), rather than merging into a running boolean[], so one bad round
+// can't leave a stale "covered" stuck from an earlier round's learnings
+// that turned out to be off-topic. One chatJSON call per round, per the
+// brief.
+async function updateCoverage(objectives: string[], learnings: string[]): Promise<boolean[]> {
+  const system = `You track coverage of a research outline. Given numbered objectives and the learnings gathered so far, list the objectives that are adequately addressed by at least one learning.
+
+Return JSON: { "coveredIndices": [0, 2, ...] } using the 0-based objective numbers below.`;
+  const objectivesBlock = objectives.map((o, i) => `${i}. ${o}`).join('\n');
+  const learningsBlock =
+    learnings.length > 0 ? learnings.map((l) => `- ${l}`).join('\n') : '(none yet)';
+  const user = `Objectives:\n${objectivesBlock}\n\nLearnings so far:\n${learningsBlock}`;
+  const decision = await chatJSON('research', system, user, CoverageSchema);
+  const covered = new Array(objectives.length).fill(false);
+  for (const idx of decision.coveredIndices) {
+    if (idx >= 0 && idx < covered.length) covered[idx] = true;
+  }
+  return covered;
 }
 
 const LearningsSchema = z.object({
@@ -241,6 +291,15 @@ export async function libraryResearch(
   let learnings: string[] = [];
   let roundNumber = 0;
 
+  // Task 11: outline once before round 1, then re-checked after every
+  // round that runs. The "every objective covered" stop check below is
+  // guarded on objectives.length > 0, so an empty outline (the research
+  // role declining to name any) never trips it by vacuous truth on an
+  // empty array - it just falls back to today's depth/breadth/time/
+  // no-new-sources stop conditions.
+  const objectives = await generateObjectives(query);
+  let coverage: boolean[] = objectives.map(() => false);
+
   async function runRound(depthRemaining: number, breadthNow: number): Promise<void> {
     if (depthRemaining <= 0 || breadthNow <= 0) return;
     if (Date.now() >= deadline) return;
@@ -297,6 +356,7 @@ export async function libraryResearch(
 
     rounds.push({ round: thisRound, queries, newSources: newSourceCount, truncated });
     learnings = [...learnings, ...newLearnings];
+    if (objectives.length > 0) coverage = await updateCoverage(objectives, learnings);
 
     await emitProgress(onProgress, {
       round: thisRound,
@@ -305,6 +365,7 @@ export async function libraryResearch(
 
     if (newSourceCount === 0) return;
     if (Date.now() >= deadline) return;
+    if (objectives.length > 0 && coverage.every(Boolean)) return;
 
     await runRound(depthRemaining - 1, Math.ceil(breadthNow / 2));
   }
@@ -337,5 +398,7 @@ export async function libraryResearch(
     rounds,
     elapsedMs: Date.now() - startedAt,
     warnings,
+    objectives,
+    coverage,
   };
 }

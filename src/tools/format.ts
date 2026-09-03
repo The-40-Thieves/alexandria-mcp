@@ -74,6 +74,12 @@ export interface ConciseAnswerLike {
   warnings?: string[];
 }
 
+// Task 11 (brief 07): a LibraryResearchResult also carries `rounds`,
+// `elapsedMs`, `objectives` and `coverage` (the outline generateObjectives()
+// produced and which of it is covered so far) - all detailed-output only,
+// same as `grade`/`resolves` on a citation. They fall out of the concise
+// shape below for free: ResearchLike doesn't declare them, so the concise
+// branch's object literal never has them to copy.
 interface ResearchLike {
   report: string;
   citations: Citation[];

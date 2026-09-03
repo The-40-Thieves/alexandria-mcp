@@ -1,3 +1,4 @@
+import { config } from '../config.ts';
 import type { IngestMetadata } from '../sources/ingestPolicy.ts';
 import type {
   Chunk,
@@ -29,16 +30,45 @@ function detectHeading(line: string): string | null {
   return HEADING_RE.test(line.trim()) ? line.trim() : null;
 }
 
+const MARKDOWN_HEADING_RE = /^(#{1,6})\s+(.+)$/;
+
+interface PendingChunk {
+  text: string;
+  // The single nearest heading (any style: markdown, ALL CAPS, "Chapter
+  // N", numbered) - metadata.section's value, same meaning as before.
+  section: string;
+  // The nesting path down to the nearest heading, markdown '#' levels
+  // only: e.g. a chunk under "## Section A" inside "# Chapter One" gets
+  // ['Chapter One', 'Section A']. A non-markdown heading has no nesting
+  // information, so it resets this to just itself.
+  headingChain: string[];
+}
+
 export function chunkSemantic(
   text: string,
   metadata: Omit<ChunkMetadata, 'chunkIndex' | 'totalChunks' | 'qualityScore' | 'section'>,
 ): Chunk[] {
   const paragraphs = text.split(/\n{2,}/);
-  const chunks: Omit<Chunk, 'metadata'>[] = [];
-  const sections: string[] = [];
+  const chunks: PendingChunk[] = [];
 
   let currentWords = 0;
   let currentText = '';
+  let currentSection = '';
+  // Stack of markdown '#'-heading text, indexed by level (0 = '#', 1 =
+  // '##', ...), truncated on every new heading to whatever level it's at
+  // so the stack always reflects the live path down to the last heading.
+  let headingStack: string[] = [];
+
+  const flush = () => {
+    if (!currentText.trim()) return;
+    chunks.push({
+      text: currentText.trim(),
+      section: currentSection,
+      headingChain: headingStack.filter(Boolean),
+    });
+    currentText = '';
+    currentWords = 0;
+  };
 
   for (const para of paragraphs) {
     const trimmed = para.trim();
@@ -46,51 +76,54 @@ export function chunkSemantic(
 
     const heading = detectHeading(trimmed);
     if (heading) {
-      sections.push(heading);
+      const md = heading.match(MARKDOWN_HEADING_RE);
+      if (md) {
+        const level = md[1].length - 1;
+        headingStack = headingStack.slice(0, level);
+        headingStack[level] = md[2].trim();
+      } else {
+        headingStack = [heading];
+      }
+      currentSection = heading;
       continue;
     }
 
     const wordCount = trimmed.split(/\s+/).length;
 
     if (currentWords + wordCount > TARGET_CHUNK_WORDS && currentText) {
-      chunks.push({ text: currentText.trim() });
-      currentText = '';
-      currentWords = 0;
+      flush();
     }
 
     currentText += (currentText ? '\n\n' : '') + trimmed;
     currentWords += wordCount;
   }
 
-  if (currentText.trim()) {
-    chunks.push({ text: currentText.trim() });
-  }
+  flush();
 
-  // Build final Chunk[] with section metadata
-  // We track which section each chunk falls under using a simple cursor
-  let sectionCursor = '';
-  let sectionIdx = 0;
+  // Task 11 (brief 07): prepend the source title and the nearest heading
+  // chain to each chunk's *embedded* text (Chunk.embedText), leaving the
+  // stored/displayed `text` untouched - free context for the embedding
+  // model that a bare 350-word chunk doesn't otherwise carry (see
+  // research/retrieval-sota.md section 5's "title-chain prefix" note).
+  // ALEXANDRIA_CHUNK_PREFIX=off turns this back off.
+  const prefixEnabled = config.ALEXANDRIA_CHUNK_PREFIX !== 'off';
 
   return chunks.map((c, i) => {
-    // Advance section cursor if this chunk contains a section transition
-    if (sectionIdx < sections.length) {
-      const sectionText = sections[sectionIdx];
-      if (c.text.includes(sectionText.replace(/^#+\s/, '').substring(0, 20))) {
-        sectionCursor = sectionText;
-        sectionIdx++;
-      }
-    }
-
     const chunk: Chunk = {
       text: c.text,
       metadata: {
         ...metadata,
-        section: sectionCursor || undefined,
+        section: c.section || undefined,
         chunkIndex: i,
         totalChunks: chunks.length,
         qualityScore: 0, // filled by scoreChunk
       },
     };
+
+    if (prefixEnabled) {
+      const prefix = [metadata.title, ...c.headingChain].filter(Boolean).join(' > ');
+      if (prefix) chunk.embedText = `${prefix}\n\n${c.text}`;
+    }
 
     return scoreChunk(chunk);
   });
@@ -196,7 +229,9 @@ export async function ingestText(
     };
   }
 
-  const embeddings = await embedder.embed(passed.map((c) => c.text));
+  // Task 11: embed embedText (title + heading-chain prefix) when present,
+  // but store/display c.text - see Chunk.embedText's doc comment.
+  const embeddings = await embedder.embed(passed.map((c) => c.embedText ?? c.text));
   const written = await store.upsert(passed, embeddings, mcpName);
 
   return {

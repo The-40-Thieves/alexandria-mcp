@@ -402,3 +402,68 @@ Same env as "To re-run (with claim verification and grading)" above, plus
 `ALEXANDRIA_RERANK=cohere|workers-ai|llm` (pointed at a reachable
 `/rerank`-shaped endpoint for `cohere`, or a Workers AI model run URL for
 `workers-ai`) and/or `ALEXANDRIA_MULTI_QUERY=1`.
+
+## 2026-09-03, Task 11: objective-driven research stopping (before/after)
+
+`library_research` did not have a `library_answer`-shaped question in the
+golden set to run through `eval:answer` (the harness scores `library_answer`
+citations, not a multi-round research loop), so this task's brief calls for
+one live `library_research` run before and after the change instead,
+recording rounds used, elapsed seconds, and objectives covered.
+
+**Before** (this repo's `e2874b6`, pre-Task 11: no outline/coverage step,
+stops only on depth, breadth, `max_minutes`, or a round with no new
+sources) and **after** (this branch): the same fixed topic, `{ depth: 3,
+breadth: 4, maxMinutes: 5 }`, against the Cave gateway
+(`http://100.78.123.100:4001/v1`, `ALEXANDRIA_API_KEY` read from
+`/data/llm-stack/.env`'s `LITELLM_AGENT_KEY` via `grep | cut`, never
+echoed/logged/committed), `ALEXANDRIA_EMBEDDINGS_MODEL=BAAI/bge-m3`, and
+`ALEXANDRIA_ROUTER_MODEL=ALEXANDRIA_SYNTH_MODEL=ALEXANDRIA_RESEARCH_MODEL=openai/gpt-4o-mini`
+(`_JSON_MODE=1` on all three) - the same gateway/model settings
+`docs/answer-eval.md`'s first baseline above used, extended with a
+`research`-role model since this run exercises that role directly (the
+answer eval harness never does).
+
+Topic: "What retrieval techniques improve citation grounding in
+LLM-based research agents?"
+
+```
+before: rounds=3 (queries 4,2,1; newSources 5,3,1) elapsed=103.3s citations=9  objectives=(n/a, pre-task)
+after:  rounds=3 (queries 4,2,1; newSources 8,3,0) elapsed=50.5s  citations=11 objectives=7 outlined, 6/7 covered
+```
+
+- **Both runs used all 3 rounds, for different reasons.** The `after` run's
+  round 3 found 0 new sources (`newSources=0`), so the pre-existing
+  no-new-sources stop condition is what actually ended it here - not the
+  new objective-coverage check, which had not yet reached 7/7 (one
+  objective, "user feedback and interaction patterns... concerning
+  citation grounding accuracy", was never covered by a learning on this
+  topic, plausibly because none of the sources found actually discuss user
+  feedback). This is an honest single-topic result, not a demonstration of
+  early stopping: on a topic whose objectives get covered before sources
+  run dry, the new stop condition would end the loop before round 3, but
+  this topic wasn't that case. `src/tools/libraryResearch.test.ts`'s
+  "stops early once every outlined objective is covered" test (mocked
+  LLM/network) is where the actual early-stop *mechanism* is verified;
+  this live run instead confirms the objectives/coverage plumbing produces
+  sane values (a 3-to-7-item outline, index-aligned coverage booleans) end
+  to end against a real gateway.
+- **Elapsed time and citation count are not a clean before/after
+  comparison** - same caveat as every other before/after in this file:
+  n=1 per side, live LLM/gateway variance (round 1 alone found 5 new
+  sources `before` vs. 8 `after` for the same queries-so-far budget), and
+  the `after` run makes two additional chatJSON calls per run (one
+  `generateObjectives` up front, one `updateCoverage` per round) that
+  the `before` code never made, yet still finished faster - not concluded
+  to mean anything beyond "the added calls aren't the bottleneck at this
+  scale".
+- `after`'s `warnings` was empty; `before`'s report had one sentence kept
+  with a "matched 0 times" warning (`checkCitations`'s conservative
+  removal, unrelated to this task).
+
+### To re-run
+
+Same gateway/model env as above. Not wired into `npm run eval:answer`
+(that harness scores `library_answer`, not `library_research`) - run
+`libraryResearch(topic, { depth, breadth, maxMinutes })` directly from a
+one-off script, same as this measurement did.

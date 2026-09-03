@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertIngestAllowed, ingestMetadata } from '../sources/ingestPolicy.ts';
 import type { Chunk, EmbeddingProvider, VectorStoreProvider } from '../types.ts';
-import { ingestText } from './index.ts';
+import { chunkSemantic, ingestText } from './index.ts';
 
 // A paragraph of clean ASCII prose, long enough (and well above the
 // quality threshold) to survive chunkSemantic()/filterChunks() unscathed.
@@ -13,7 +13,9 @@ const LONG_TEXT =
 
 class FakeEmbeddingProvider implements EmbeddingProvider {
   readonly dimensions = 3;
+  received: string[] = [];
   async embed(texts: string[]): Promise<number[][]> {
+    this.received = texts;
     return texts.map(() => [0, 0, 0]);
   }
 }
@@ -144,4 +146,75 @@ test('library_ingest flow: refusal and stamped chunk metadata', async (t) => {
       assert.equal(chunk.metadata.license, undefined);
     }
   });
+});
+
+// Task 11 (brief 07): chunkSemantic() prepends the title and nearest
+// heading chain to a chunk's embedText, keeping the raw chunk in `text`
+// unchanged - the embedding call must use embedText when present, and
+// storage/display (FakeVectorStore.upsert here stands in for both) must
+// still see the raw text.
+test('chunkSemantic: title/heading-chain prefix on embedText, not on text', async (t) => {
+  const original = process.env.ALEXANDRIA_CHUNK_PREFIX;
+  t.after(() => {
+    if (original === undefined) delete process.env.ALEXANDRIA_CHUNK_PREFIX;
+    else process.env.ALEXANDRIA_CHUNK_PREFIX = original;
+  });
+
+  const withHeading = `# Chapter One\n\n${LONG_TEXT}`;
+
+  await t.test('embedText carries "title > heading", text does not', () => {
+    delete process.env.ALEXANDRIA_CHUNK_PREFIX;
+    const chunks = chunkSemantic(withHeading, {
+      source: 'gutenberg',
+      sourceId: 'book1',
+      title: 'My Book Title',
+      authors: [],
+    });
+
+    assert.equal(chunks.length, 1);
+    const [chunk] = chunks;
+    assert.equal(chunk.text, LONG_TEXT, 'the displayed/stored text is the raw chunk, no prefix');
+    assert.equal(chunk.embedText, `My Book Title > Chapter One\n\n${LONG_TEXT}`);
+    assert.equal(chunk.metadata.section, '# Chapter One');
+  });
+
+  await t.test('ALEXANDRIA_CHUNK_PREFIX=off disables the prefix entirely', () => {
+    process.env.ALEXANDRIA_CHUNK_PREFIX = 'off';
+    const chunks = chunkSemantic(withHeading, {
+      source: 'gutenberg',
+      sourceId: 'book1',
+      title: 'My Book Title',
+      authors: [],
+    });
+
+    assert.equal(chunks.length, 1);
+    assert.equal(chunks[0].embedText, undefined);
+    assert.equal(chunks[0].text, LONG_TEXT);
+  });
+
+  await t.test(
+    'end to end via ingestText: the embedder receives the prefixed text, the store receives the raw text',
+    async () => {
+      delete process.env.ALEXANDRIA_CHUNK_PREFIX;
+      const store = new FakeVectorStore();
+      const embedder = new FakeEmbeddingProvider();
+
+      await ingestText(
+        withHeading,
+        'gutenberg',
+        'book2',
+        'My Book Title',
+        ['Author'],
+        1900,
+        'en',
+        undefined,
+        { embedder, store },
+      );
+
+      assert.equal(store.lastChunks.length, 1);
+      assert.equal(store.lastChunks[0].text, LONG_TEXT);
+      assert.equal(embedder.received.length, 1);
+      assert.equal(embedder.received[0], `My Book Title > Chapter One\n\n${LONG_TEXT}`);
+    },
+  );
 });
