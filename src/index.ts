@@ -6,7 +6,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
-import { McpServer } from '@modelcontextprotocol/server';
+import { isJsonContentType, McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
@@ -521,16 +521,22 @@ export function createServer(): McpServer {
 
 // express.json()'s default: reject a body over 100kb before it reaches
 // JSON.parse, rather than buffering an unbounded request in memory. Dropping
-// Express (SDK v2's NodeStreamableHTTPServerTransport has no size cap of its
-// own, it reads the whole stream) means this repo now enforces that cap
-// itself instead of getting it for free from body-parser.
+// Express (SDK v2's WebStandardStreamableHTTPServerTransport.handlePostRequest
+// calls `await req.json()` with no size cap of its own when no parsedBody is
+// supplied) means this repo now enforces that cap itself instead of getting
+// it for free from body-parser.
 const JSON_BODY_LIMIT_BYTES = 100 * 1024;
 
 // Reads req's body up to JSON_BODY_LIMIT_BYTES and JSON.parses it, mirroring
 // express.json()'s size-then-parse behavior. Only called for a JSON
-// content-type; GET/DELETE /mcp (no body) and any other content-type pass
-// `undefined` through to the transport unchanged, same as express.json()
-// no-oping on those today.
+// content-type, gated on the SDK's own isJsonContentType() - the same
+// case-insensitive, parameter-tolerant check handlePostRequest itself uses
+// to decide whether to read the body at all. A hand-rolled case-sensitive
+// `includes('application/json')` here previously let a header like
+// `Application/JSON` skip this cap entirely and reach the SDK's own
+// unbounded read. GET/DELETE /mcp (no body) and any non-JSON content-type
+// still pass `undefined` through to the transport unchanged, same as
+// express.json() no-oping on those today.
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -543,11 +549,6 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   }
   if (size === 0) return undefined;
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-}
-
-function hasJsonContentType(req: IncomingMessage): boolean {
-  const contentType = req.headers['content-type'];
-  return typeof contentType === 'string' && contentType.includes('application/json');
 }
 
 /**
@@ -568,7 +569,9 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Prom
     void server.close();
   });
   try {
-    const body = hasJsonContentType(req) ? await readJsonBody(req) : undefined;
+    const body = isJsonContentType(req.headers['content-type'])
+      ? await readJsonBody(req)
+      : undefined;
     await server.connect(transport);
     await transport.handleRequest(req, res, body);
   } catch (err) {
@@ -587,44 +590,86 @@ function jsonRpcErrorHandler(err: unknown, res: ServerResponse): void {
     res.end();
     return;
   }
+  // JSON.stringify before writeHead, deliberately: if this throws (it
+  // shouldn't, `message` is always a string, but see sendJson's comment for
+  // why the ordering matters regardless), no headers have gone out yet and
+  // whatever called this can still fall back to a plain res.end().
+  const payload = JSON.stringify({ jsonrpc: '2.0', error: { code: -32603, message }, id: null });
   res.writeHead(500, { 'content-type': 'application/json' });
-  res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32603, message }, id: null }));
+  res.end(payload);
 }
 
+// Serializes before writeHead, not after: writeHead commits the response's
+// status/headers immediately, so a JSON.stringify(body) that throws AFTER
+// writeHead(200, ...) has already run leaves a 200 response with no body on
+// the wire and nothing jsonRpcErrorHandler's `res.headersSent` check can
+// recover - the caller sees an empty 200, not a JSON-RPC error. Serializing
+// first means a throw here propagates to createHttpApp's try/catch before
+// any header has been sent, so jsonRpcErrorHandler can still send a clean
+// 500 envelope.
 function sendJson(res: ServerResponse, body: unknown): void {
+  const payload = JSON.stringify(body);
   res.writeHead(200, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(body));
+  res.end(payload);
+}
+
+// Strips a query string from a raw request target - deliberately NOT via
+// `new URL(req.url, base)`: Node's own HTTP request-line parser is far more
+// lenient than the WHATWG URL parser and hands a target like `//[`,
+// `http://[`, or `http://%/` straight through as `req.url` verbatim; feeding
+// that into `new URL()` throws synchronously inside a plain node:http
+// request listener, which Node treats as an uncaught exception and exits
+// the process on a single unauthenticated request. A plain string split
+// never throws, whatever the target looks like.
+function requestPath(req: IncomingMessage): string {
+  return (req.url ?? '/').split('?', 1)[0] ?? '/';
 }
 
 /** Build the HTTP server without binding a port, so tests can drive it in process. */
 export function createHttpApp(): Server {
   return createHttpServer((req, res) => {
-    const { pathname } = new URL(req.url ?? '/', 'http://localhost');
-
-    if (pathname === '/mcp' && ['POST', 'GET', 'DELETE'].includes(req.method ?? '')) {
-      void handleMcpRequest(req, res);
-      return;
+    // Guards the whole dispatch below, not just handleMcpRequest's own try
+    // block: a throw from requestPath (see its comment), or from
+    // healthSummary()/sourceCallTotals()/metricsSnapshot()/JSON.stringify
+    // while building /health or /metrics's response, would otherwise be an
+    // uncaught synchronous exception in this listener - fatal to the whole
+    // process - instead of a JSON-RPC error answer to the one request.
+    try {
+      const path = requestPath(req);
+      // /mcp alone gets Express's old case-insensitive, trailing-slash-
+      // tolerant matching back (`/MCP`, `/mcp/` both routed); /health and
+      // /metrics stay exact-match, as documented in the README.
+      const mcpPath = path.length > 1 ? path.replace(/\/+$/, '') || '/' : path;
+      if (
+        mcpPath.toLowerCase() === '/mcp' &&
+        ['POST', 'GET', 'DELETE'].includes(req.method ?? '')
+      ) {
+        void handleMcpRequest(req, res);
+        return;
+      }
+      if (path === '/health' && req.method === 'GET') {
+        const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
+        const { calls, errors } = sourceCallTotals();
+        sendJson(res, {
+          status: 'ok',
+          version: VERSION,
+          sources: { total: sources, visible, hidden, calls, errors },
+          byKind,
+          quota,
+          cache,
+          tools: TOOL_COUNT,
+        });
+        return;
+      }
+      if (path === '/metrics' && req.method === 'GET') {
+        sendJson(res, metricsSnapshot());
+        return;
+      }
+      res.writeHead(404, { 'content-type': 'text/plain' });
+      res.end('Not Found');
+    } catch (err) {
+      jsonRpcErrorHandler(err, res);
     }
-    if (pathname === '/health' && req.method === 'GET') {
-      const { sources, visible, hidden, byKind, quota, cache } = healthSummary();
-      const { calls, errors } = sourceCallTotals();
-      sendJson(res, {
-        status: 'ok',
-        version: VERSION,
-        sources: { total: sources, visible, hidden, calls, errors },
-        byKind,
-        quota,
-        cache,
-        tools: TOOL_COUNT,
-      });
-      return;
-    }
-    if (pathname === '/metrics' && req.method === 'GET') {
-      sendJson(res, metricsSnapshot());
-      return;
-    }
-    res.writeHead(404, { 'content-type': 'text/plain' });
-    res.end('Not Found');
   });
 }
 

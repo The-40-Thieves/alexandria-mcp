@@ -1,12 +1,17 @@
 // Shared in-process MCP server fixture for tests: McpServer +
 // NodeStreamableHTTPServerTransport on an ephemeral port via a plain
-// node:http server, exactly as src/index.ts's own HTTP transport
-// (stateless: a fresh transport per request), exposing a fake
-// `search`/`read` tool pair whose behavior each test controls. Not itself
-// a *.test.ts file, so the test runner glob skips it; mcpClientPool.test.ts
-// and sources/kinds/mcp.test.ts both import it so they exercise the pool
-// and the mcp kind against a real (if fake) MCP server instead of a
-// mocked fetch.
+// node:http server, stateless (a fresh transport per request) like
+// src/index.ts's own HTTP transport, exposing a fake `search`/`read` tool
+// pair whose behavior each test controls. One deliberate difference from
+// production: this calls `transport.handleRequest(req, res)` with no
+// parsedBody, letting the transport read+parse the body itself with no
+// size cap, rather than reimplementing index.ts's bounded readJsonBody() -
+// this is a loopback-only test fixture with no real attacker on the other
+// end, so the cap production needs (see index.ts's JSON_BODY_LIMIT_BYTES
+// comment) buys nothing here. Not itself a *.test.ts file, so the test
+// runner glob skips it; mcpClientPool.test.ts and sources/kinds/mcp.test.ts
+// both import it so they exercise the pool and the mcp kind against a real
+// (if fake) MCP server instead of a mocked fetch.
 import { createServer as createHttpServer, type Server } from 'node:http';
 import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { McpServer } from '@modelcontextprotocol/server';
