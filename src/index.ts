@@ -14,7 +14,7 @@ import { buildInstructions } from './instructions.ts';
 import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
 import { assertIngestAllowed, ingestMetadata } from './sources/ingestPolicy.ts';
-import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
+import { getAdapter, healthSummary, listSources, truncateText } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
 import { TOOL_COUNT } from './toolCount.ts';
 import { formatResult } from './tools/format.ts';
@@ -26,12 +26,21 @@ import {
 import { libraryAsk } from './tools/libraryAsk.ts';
 import { libraryHealth } from './tools/libraryHealth.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
-import type { LibrarySource } from './types.ts';
+import type { LibrarySource, ReadResult } from './types.ts';
 import { closeDispatchers, installDispatcher } from './utils/dispatcher.ts';
 import { requestContext } from './utils/http.ts';
 import { metricsSnapshot, sourceCallTotals, toolMetrics } from './utils/metrics.ts';
 import { closeStateStore } from './utils/stateStore.ts';
 import { VERSION } from './version.ts';
+import { type FetchedPage, fetchAsText } from './web/fetchTier.ts';
+import {
+  extractDoiFromUrl,
+  fetchBiocFullText,
+  OPEN_ACCESS_HOP_ORDER,
+  pmcidFromBiocUrl,
+  resolveOpenAccess,
+} from './web/openAccess.ts';
+import { PDF_PAGE_JOINER } from './web/pdf.ts';
 
 import './sources/all.ts';
 
@@ -179,6 +188,16 @@ const ReadResultSchema = z.object({
   metadataOnly: z.boolean().optional(),
   externalUrl: z.string().optional(),
   note: z.string().optional(),
+  doi: z.string().optional(),
+  pages: z
+    .array(z.object({ page: z.number(), charStart: z.number(), charEnd: z.number() }))
+    .optional(),
+  unavailable: z
+    .object({
+      reason: z.enum(['no_full_text', 'paywalled', 'not_found', 'too_large', 'blocked']),
+      triedTiers: z.array(z.string()),
+    })
+    .optional(),
 });
 
 // library_answer's four progress stages (src/tools/libraryAnswer.ts's
@@ -242,6 +261,89 @@ export function progressReporter(
 function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise<T> {
   toolMetrics(tool).invocations++;
   return requestContext.run({ reqId: randomUUID(), tool }, handler);
+}
+
+// Task 6: the open-access fallback chain, used by library_read's handler
+// below. An adapter that can only offer metadata (metadataOnly: true) but
+// names a DOI - its own `doi` field, or one embedded in `externalUrl` -
+// gets one more chance at real text before library_read gives up:
+// resolveOpenAccess() (openalex, pmc, core, fatcat, in that order) finds a
+// candidate URL, then this fetches it (fetchAsText for a PDF/HTML
+// candidate, fetchBiocFullText directly for a PMC one, since PMC's BioC
+// endpoint is neither HTML nor a PDF and fetchAsText's content-type gate
+// would refuse it). Anything short of real text becomes `unavailable` with
+// a reason and which OA sources were tried - never an empty `text` string.
+type UnavailableReason = NonNullable<ReadResult['unavailable']>['reason'];
+
+function classifyOpenAccessFailure(err: unknown): UnavailableReason {
+  const message = err instanceof Error ? err.message : String(err);
+  // fetchTier.ts's guard errors ("fetchAsText: refusing to fetch ...",
+  // "fetchAsText: could not resolve ...", "fetchAsText: not a valid
+  // URL ...") all start this way - see assertFetchableUrl's callers.
+  if (/refusing to fetch|could not resolve|not a valid URL/.test(message)) return 'blocked';
+  if (/byte cap/.test(message)) return 'too_large'; // readCappedBytes/readCappedText
+  if (/HTTP 40[123]\b/.test(message)) return 'paywalled';
+  return 'no_full_text';
+}
+
+// Mirrors pdf.ts's extractPdf(): `text` is these pages' text joined by
+// PDF_PAGE_JOINER, so walking the same join recovers each page's char
+// range in that (untruncated) text.
+function pdfPagesToCharPages(
+  pages: NonNullable<FetchedPage['pages']>,
+): NonNullable<ReadResult['pages']> {
+  let offset = 0;
+  return pages.map(({ page, text }) => {
+    const charStart = offset;
+    const charEnd = charStart + text.length;
+    offset = charEnd + PDF_PAGE_JOINER.length;
+    return { page, charStart, charEnd };
+  });
+}
+
+async function withOpenAccessFallback(result: ReadResult): Promise<ReadResult> {
+  if (!result.metadataOnly) return result;
+  const doi = result.doi ?? extractDoiFromUrl(result.externalUrl);
+  if (!doi) return result;
+
+  const allHops = [...OPEN_ACCESS_HOP_ORDER] as string[];
+  let oa: Awaited<ReturnType<typeof resolveOpenAccess>>;
+  try {
+    oa = await resolveOpenAccess(doi);
+  } catch (err) {
+    // A hop's own candidate URL was refused by assertFetchableUrl (see
+    // openAccess.ts's module comment) - a real refusal, not "nothing
+    // found", so it's reported rather than silently swallowed.
+    return {
+      ...result,
+      unavailable: { reason: classifyOpenAccessFailure(err), triedTiers: allHops },
+    };
+  }
+  if (!oa) {
+    return { ...result, unavailable: { reason: 'not_found', triedTiers: allHops } };
+  }
+
+  const triedTiers = allHops.slice(0, allHops.indexOf(oa.via) + 1);
+  try {
+    if (oa.via === 'pmc') {
+      const pmcid = pmcidFromBiocUrl(oa.url);
+      const text = pmcid ? await fetchBiocFullText(pmcid) : undefined;
+      if (!text) throw new Error(`no BioC full text available at ${oa.url}`);
+      return { ...result, metadataOnly: false, ...truncateText(text) };
+    }
+    const page = await fetchAsText(oa.url);
+    if (!page.text) throw new Error(`empty text fetching ${oa.url}`);
+    const enriched: ReadResult = {
+      ...result,
+      metadataOnly: false,
+      title: result.title || page.title,
+      ...truncateText(page.text),
+    };
+    if (page.via === 'pdf' && page.pages) enriched.pages = pdfPagesToCharPages(page.pages);
+    return enriched;
+  } catch (err) {
+    return { ...result, unavailable: { reason: classifyOpenAccessFailure(err), triedTiers } };
+  }
 }
 
 /**
@@ -451,7 +553,8 @@ export function createServer(): McpServer {
     async ({ id, source }) =>
       withRequestContext('library_read', async () => {
         try {
-          const result = await getAdapter(source).read(id);
+          const raw = await getAdapter(source).read(id);
+          const result = await withOpenAccessFallback(raw);
           return {
             content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
             structuredContent: toStructured(result),

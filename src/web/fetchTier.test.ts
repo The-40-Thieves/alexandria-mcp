@@ -17,6 +17,13 @@ function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/web', name), 'utf8');
 }
 
+// The same hand-built, two-page PDF pdf.test.ts exercises directly (see
+// scripts/gen-pdf-fixture.ts) - reused here to drive fetchAsText's PDF
+// branch end to end through a real HTTP response.
+function samplePdfBytes(): Buffer {
+  return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/sample.pdf'));
+}
+
 interface FixtureServer {
   url: string;
   crawlRequests: unknown[];
@@ -52,6 +59,18 @@ function startFixtureServer(crawlResponse?: unknown, hugeCrawl = false): Promise
       if (req.method === 'GET' && req.url === '/broken') {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('internal error');
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/sample.pdf') {
+        res.writeHead(200, { 'Content-Type': 'application/pdf' });
+        res.end(samplePdfBytes());
+        return;
+      }
+      if (req.method === 'GET' && req.url === '/octet.pdf') {
+        // Some OA hosts serve a PDF with a generic content-type; the .pdf
+        // path is what tryDefuddle's isPdf check falls back to.
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+        res.end(samplePdfBytes());
         return;
       }
       if (req.method === 'GET' && req.url === '/redirect-to-article') {
@@ -370,6 +389,44 @@ test('fetchAsText', async (t) => {
     assert.ok(page.text.length >= 500, `expected >= 500 chars, got ${page.text.length}`);
     assert.equal(page.title, 'A Long Enough Article About Testing');
   });
+
+  await t.test(
+    'tier 1: a PDF response (by content-type) is extracted via unpdf, per page',
+    async () => {
+      delete process.env.JINA_API_KEY;
+      delete process.env.ALEXANDRIA_JINA_READER;
+      delete process.env.CRAWL4AI_URL;
+      const server = await startFixtureServer();
+      t.after(() => server.close());
+
+      const page = await fetchAsText(`${server.url}/sample.pdf`);
+      assert.equal(page.via, 'pdf');
+      assert.equal(page.title, 'Alexandria Fixture PDF');
+      assert.equal(
+        page.text,
+        'Hello from page one of the fixture PDF.\n\nHello from page two of the fixture PDF.',
+      );
+      assert.deepEqual(page.pages, [
+        { page: 1, text: 'Hello from page one of the fixture PDF.' },
+        { page: 2, text: 'Hello from page two of the fixture PDF.' },
+      ]);
+    },
+  );
+
+  await t.test(
+    'tier 1: a PDF response is recognized by a .pdf URL path even with a generic content-type',
+    async () => {
+      delete process.env.JINA_API_KEY;
+      delete process.env.ALEXANDRIA_JINA_READER;
+      delete process.env.CRAWL4AI_URL;
+      const server = await startFixtureServer();
+      t.after(() => server.close());
+
+      const page = await fetchAsText(`${server.url}/octet.pdf`);
+      assert.equal(page.via, 'pdf');
+      assert.equal(page.pages?.length, 2);
+    },
+  );
 
   await t.test(
     'tier 2: falls through to jina when defuddle text is short and JINA_API_KEY is set',

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { type AddressInfo, connect as netConnect } from 'node:net';
+import path from 'node:path';
 import test from 'node:test';
 import type { McpServer, ServerContext } from '@modelcontextprotocol/server';
 import { createHttpApp, createServer, progressReporter } from './index.ts';
 import { register } from './sources/registry.ts';
 import { resetMetricsForTests } from './utils/metrics.ts';
+import { dnsResolver } from './web/fetchTier.ts';
 
 // Writes a raw, hand-built HTTP/1.1 request line straight to a socket
 // (bypassing fetch/undici, which would themselves reject an invalid
@@ -688,6 +691,152 @@ test('library_ingest and library_index honor the source ingestPolicy', async (t)
     const { result } = await call('library_index', { id: 'x1', source: 't_index_attribution' });
     assert.equal(result?.isError, undefined);
     assert.equal(result?.structuredContent?.ingestPolicy, 'attribution');
+  });
+});
+
+// Task 6: library_read's open-access fallback chain. Both fixture adapters
+// return metadataOnly: true with a DOI; the network is fully mocked
+// (openalex/idconv/fatcat responses, plus the PDF itself) rather than
+// fetched, per the brief's test constraints.
+test('library_read open-access fallback', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = { ...process.env };
+  const originalLookup = dnsResolver.lookup;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    process.env = originalEnv;
+    dnsResolver.lookup = originalLookup;
+  });
+  delete process.env.CORE_API_KEY;
+  // openalex/oa.example.org aren't real hosts under test - stub the
+  // resolver so assertFetchableUrl's guard sees an ordinary public address
+  // for them instead of a real DNS lookup.
+  dnsResolver.lookup = (async () => [
+    { address: '93.184.216.34', family: 4 },
+  ]) as typeof dnsResolver.lookup;
+
+  const samplePdfBytes = readFileSync(path.resolve(process.cwd(), 'eval/fixtures/sample.pdf'));
+
+  register('t_read_oa_pdf', {
+    description: 'fixture: metadataOnly with a DOI that resolves to a PDF via openalex',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read() {
+      return {
+        title: 'Fixture Paper',
+        authors: ['A. Author'],
+        metadataOnly: true,
+        doi: '10.9999/pdf-fixture',
+      };
+    },
+  });
+
+  register('t_read_oa_unavailable', {
+    description: 'fixture: metadataOnly with a DOI that no open-access hop can resolve',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read() {
+      return {
+        title: 'Unreachable Paper',
+        authors: ['B. Author'],
+        metadataOnly: true,
+        externalUrl: 'https://doi.org/10.9999/missing-fixture',
+      };
+    },
+  });
+
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const res = await originalFetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name, arguments: args },
+      }),
+    });
+    return (await res.json()) as {
+      result?: {
+        isError?: boolean;
+        content?: Array<{ type: string; text: string }>;
+        structuredContent?: Record<string, unknown>;
+      };
+    };
+  };
+
+  globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input);
+    if (url.includes('api.openalex.org')) {
+      if (url.includes('pdf-fixture')) {
+        return new Response(
+          JSON.stringify({ best_oa_location: { pdf_url: 'https://oa.example.org/paper.pdf' } }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (url === 'https://oa.example.org/paper.pdf') {
+      return new Response(new Uint8Array(samplePdfBytes), {
+        status: 200,
+        headers: { 'content-type': 'application/pdf' },
+      });
+    }
+    if (url.includes('idconv')) {
+      return new Response(JSON.stringify({ records: [{}] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (url.includes('api.fatcat.wiki')) {
+      return new Response('not found', { status: 404 });
+    }
+    return originalFetch(input as string, init);
+  }) as typeof fetch;
+
+  await t.test(
+    'resolves via openalex to a PDF: metadataOnly flips false, pages are set',
+    async () => {
+      const { result } = await call('library_read', { id: 'x1', source: 't_read_oa_pdf' });
+      assert.equal(result?.isError, undefined);
+      const structured = result?.structuredContent;
+      assert.equal(structured?.metadataOnly, false);
+      assert.equal(
+        structured?.text,
+        'Hello from page one of the fixture PDF.\n\nHello from page two of the fixture PDF.',
+      );
+      assert.deepEqual(structured?.pages, [
+        { page: 1, charStart: 0, charEnd: 39 },
+        { page: 2, charStart: 41, charEnd: 80 },
+      ]);
+      assert.equal(structured?.unavailable, undefined);
+    },
+  );
+
+  await t.test('reports unavailable with the tiers tried when every OA hop fails', async () => {
+    const { result } = await call('library_read', { id: 'x2', source: 't_read_oa_unavailable' });
+    assert.equal(result?.isError, undefined);
+    const structured = result?.structuredContent;
+    assert.equal(structured?.text, undefined);
+    assert.deepEqual(structured?.unavailable, {
+      reason: 'not_found',
+      triedTiers: ['openalex', 'pmc', 'core', 'fatcat'],
+    });
+    // metadataOnly is untouched (still true) - the fallback never got real text.
+    assert.equal(structured?.metadataOnly, true);
   });
 });
 
