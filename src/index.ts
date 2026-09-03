@@ -941,7 +941,7 @@ export function createServer(): McpServer {
     'library_citations',
     {
       title: 'Get References or Citations (with Bibliography Export)',
-      description: `List the works a scholarly item cites (direction: "references") or the works that cite it (direction: "citations"), resolved through OpenAlex's citation graph with OpenCitations as a fallback when OpenAlex has no record. Accepts an id/source from library_search or library_ask, or a bare DOI/arXiv id. Set format: "bibtex" | "ris" | "apa" to also return a \`formatted\` bibliography string; BibTeX prefers Crossref's own citation when a DOI is resolvable. Set response_format: "detailed" for full result fields.`,
+      description: `List the works a scholarly item cites (direction: "references") or the works that cite it (direction: "citations"), resolved through OpenAlex's citation graph with OpenCitations as a fallback when OpenAlex has no record. Accepts an id/source from library_search or library_ask, or a bare DOI/arXiv id. Set format: "bibtex" | "ris" | "apa" to also return a \`formatted\` bibliography string; BibTeX prefers Crossref's own citation when a DOI is resolvable, for the first 20 results only (a paced, one-at-a-time doi.org lookup per item), with later results using a locally generated entry instead. Set response_format: "detailed" for full result fields.`,
       inputSchema: z.object({
         id: z
           .string()

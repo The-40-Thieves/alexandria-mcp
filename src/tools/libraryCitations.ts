@@ -37,12 +37,20 @@ import { getAdapter } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
 import { type BibliographyStyle, formatBibliography } from '../utils/bibliography.ts';
 import { fetchJSON } from '../utils/http.ts';
+import { rateLimited } from '../utils/rateLimit.ts';
 
 const OPENALEX_BASE = 'https://api.openalex.org';
 // OpenAlex's `openalex_id:` filter accepts at most 50 `|`-separated ids
 // per call (see OpenAlex's batch-id-lookup docs).
 const OPENALEX_BATCH_SIZE = 50;
 const DEFAULT_LIMIT = 20;
+// format: 'bibtex' only (see buildFormatted's comment): the per-item
+// Crossref-preferred lookup is paced at the same interval crossref.ts's
+// own registration uses, and capped to the first N items so a large
+// `limit` cannot turn one call into an unbounded run of sequential doi.org
+// fetches.
+const CROSSREF_BIBTEX_INTERVAL_MS = 334;
+const CROSSREF_PREFERENCE_CAP = 20;
 
 export type CitationDirection = 'references' | 'citations';
 
@@ -134,7 +142,11 @@ async function resolveSeed(id: string, source: string): Promise<SeedResolution> 
   if (source === 'arxiv' || isArxivId(id)) {
     const doi = arxivDoi(id);
     const work = await fetchOpenAlexWork(`doi:${doi}`);
-    return work ? { work, doi: work.doi ? stripDoiUrl(work.doi) : doi } : {};
+    // The computed DOI is returned even when OpenAlex has no record for it
+    // yet (a brand-new preprint OpenAlex hasn't indexed): dropping it here
+    // would silently disable the OpenCitations fallback in
+    // libraryCitations() below, which only runs when `doi` is set.
+    return { work, doi: work?.doi ? stripDoiUrl(work.doi) : doi };
   }
   // Task 6: every scholarly adapter's read() may populate ReadResult.doi.
   try {
@@ -203,16 +215,30 @@ function extractItemDoi(item: LibraryResult): string | undefined {
 
 // BibTeX only: prefer Crossref's own content-negotiated BibTeX for any
 // item whose DOI is resolvable, falling back to the local formatter for
-// that one item when no DOI is known or the fetch fails. Sequential, not
-// parallel - these are best-effort doi.org lookups made directly (not
-// through the registered 'crossref' adapter's own pacing), so a tight loop
-// of unpaced parallel calls is avoided by simply doing them one at a time.
+// that one item when no DOI is known or the fetch fails.
+//
+// Two guards on this, since these are best-effort doi.org lookups made
+// directly rather than through the registered 'crossref' adapter (whose
+// own read() also does much more per call - a full metadata + reference
+// fetch - than this bibliography export needs):
+//   - Paced through the same rateLimited() utility crossref's own
+//     registration relies on (src/utils/rateLimit.ts), at the same
+//     interval crossref.ts paces itself to (CROSSREF_BIBTEX_INTERVAL_MS),
+//     keyed by 'doi.org' so this stays serialized across calls the way a
+//     registered adapter's calls are, rather than bursting doi.org.
+//   - Capped at CROSSREF_PREFERENCE_CAP items: `limit` allows up to 100
+//     results, and a Crossref lookup per item at the paced interval would
+//     otherwise turn one tool call into up to 100 * 334ms of sequential
+//     network waiting. Items beyond the cap use the local formatter
+//     directly (still a valid BibTeX entry, just not Crossref's own).
 async function buildFormatted(results: LibraryResult[], style: BibliographyStyle): Promise<string> {
   if (style !== 'bibtex') return formatBibliography(results, style);
   const entries: string[] = [];
-  for (const item of results) {
-    const doi = extractItemDoi(item);
-    const preferred = doi ? await fetchCrossrefBibtex(doi) : '';
+  for (const [index, item] of results.entries()) {
+    const doi = index < CROSSREF_PREFERENCE_CAP ? extractItemDoi(item) : undefined;
+    const preferred = doi
+      ? await rateLimited('doi.org', CROSSREF_BIBTEX_INTERVAL_MS, () => fetchCrossrefBibtex(doi))
+      : '';
     entries.push(preferred || formatBibliography([item], 'bibtex'));
   }
   return entries.join('\n\n');

@@ -164,6 +164,40 @@ test("libraryCitations: an arXiv seed resolves through arXiv's own DOI (10.48550
   assert.equal(calls.length, 1);
 });
 
+test('libraryCitations: an arXiv seed not yet indexed by OpenAlex still falls back to OpenCitations with its computed DOI', async (t) => {
+  // OpenAlex 404s for the constructed arXiv DOI (a brand-new preprint
+  // OpenAlex hasn't indexed yet); the computed DOI must still be returned
+  // from seed resolution so the OpenCitations fallback runs (review
+  // finding: it was previously dropped, silently returning empty results).
+  const { calls, restore } = stubFetchSequence([
+    { match: '/works/doi:10.48550/arXiv.2999.99999', respond: () => jsonResponse({}, 404) },
+    {
+      match: 'api.opencitations.net/index/v2/citations/doi:10.48550/arXiv.2999.99999',
+      respond: () =>
+        jsonResponse([
+          {
+            oci: 'a-b',
+            citing: 'doi:10.7777/citer',
+            cited: 'doi:10.48550/arXiv.2999.99999',
+          },
+        ]),
+    },
+  ]);
+  t.after(restore);
+
+  const result = await libraryCitations({
+    id: '2999.99999',
+    source: 'arxiv',
+    direction: 'citations',
+  });
+
+  assert.equal(result.seed.doi, '10.48550/arXiv.2999.99999');
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0]?.source, 'opencitations');
+  assert.equal(result.results[0]?.id, '10.7777/citer');
+  assert.equal(calls.length, 2);
+});
+
 test('libraryCitations: a generic source resolves via its own read().doi (Task 6)', async (t) => {
   register('t_citations_doi_source', {
     description: 'fixture',
@@ -379,4 +413,133 @@ test('libraryCitations: format', async (t) => {
       restore();
     }
   });
+});
+
+// Review finding (Important 2): the per-item Crossref-preferred BibTeX
+// lookup must be paced through the same rateLimited() utility a registered
+// adapter's own pacing relies on (src/utils/rateLimit.ts), keyed by
+// 'doi.org', and capped so a large `limit` cannot turn one call into an
+// unbounded run of sequential doi.org fetches.
+test('libraryCitations: format bibtex paces Crossref-preferred lookups under the doi.org key', async (t) => {
+  const timestamps: number[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    const u = String(url);
+    if (u.startsWith('https://doi.org/10.9100')) {
+      timestamps.push(Date.now());
+      return new Response('@article{paced}', { status: 200 });
+    }
+    if (u.includes('api.opencitations.net/index/v2/citations/doi:10.9100/seed')) {
+      return new Response(
+        JSON.stringify([
+          { oci: 'a', citing: 'doi:10.9100/item-0', cited: 'doi:10.9100/seed' },
+          { oci: 'b', citing: 'doi:10.9100/item-1', cited: 'doi:10.9100/seed' },
+        ]),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    if (u.includes('api.openalex.org')) return new Response('not found', { status: 404 });
+    throw new Error(`unexpected fetch: ${u}`);
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  register('t_citations_pacing_fixture', {
+    description: 'fixture',
+    supportsIngest: true,
+    async search() {
+      return [];
+    },
+    async read() {
+      return { title: 'x', authors: [], doi: '10.9100/seed' };
+    },
+  });
+
+  const result = await libraryCitations({
+    id: 'x',
+    source: 't_citations_pacing_fixture',
+    direction: 'citations',
+    limit: 2,
+    format: 'bibtex',
+  });
+
+  assert.equal(result.results.length, 2);
+  assert.equal(timestamps.length, 2, 'expected exactly two paced Crossref lookups');
+  const gap = (timestamps[1] ?? 0) - (timestamps[0] ?? 0);
+  assert.ok(
+    gap >= 300,
+    `expected the second Crossref lookup to wait out the doi.org pacing interval (>=300ms), got a ${gap}ms gap`,
+  );
+});
+
+test('libraryCitations: format bibtex caps Crossref-preferred lookups at 20; later items use the local formatter', async (t) => {
+  const ITEM_COUNT = 21;
+  let crossrefFetches = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) => {
+    const u = String(url);
+    if (u.startsWith('https://doi.org/10.9000')) {
+      crossrefFetches += 1;
+      return new Response('@article{crossref_hit}', { status: 200 });
+    }
+    if (u.includes('api.opencitations.net/index/v2/citations/doi:10.9000/seed')) {
+      const citations = Array.from({ length: ITEM_COUNT }, (_, i) => ({
+        oci: `oci-${i}`,
+        citing: `doi:10.9000/item-${i}`,
+        cited: 'doi:10.9000/seed',
+      }));
+      return new Response(JSON.stringify(citations), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    if (u.includes('api.openalex.org')) return new Response('not found', { status: 404 });
+    throw new Error(`unexpected fetch: ${u}`);
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  register('t_citations_cap_fixture', {
+    description: 'fixture',
+    supportsIngest: true,
+    async search() {
+      return [];
+    },
+    async read() {
+      return { title: 'x', authors: [], doi: '10.9000/seed' };
+    },
+  });
+
+  const result = await libraryCitations({
+    id: 'x',
+    source: 't_citations_cap_fixture',
+    direction: 'citations',
+    limit: ITEM_COUNT,
+    format: 'bibtex',
+  });
+
+  assert.equal(result.results.length, ITEM_COUNT);
+  assert.equal(
+    crossrefFetches,
+    20,
+    'expected the Crossref-preferred lookup to run for exactly the first 20 items',
+  );
+
+  const entries = (result.formatted ?? '').split('\n\n');
+  assert.equal(entries.length, ITEM_COUNT);
+  for (let i = 0; i < 20; i++) {
+    assert.equal(
+      entries[i],
+      '@article{crossref_hit}',
+      `entry ${i} should be Crossref's own BibTeX`,
+    );
+  }
+  assert.match(entries[20] ?? '', /^@article\{/);
+  assert.doesNotMatch(
+    entries[20] ?? '',
+    /crossref_hit/,
+    'the 21st item is beyond the cap and must use the local formatter',
+  );
 });
