@@ -216,16 +216,19 @@ const AlternateQueriesSchema = z.object({
 // resulting shortlists with `pool` by catalog entry name, so a source
 // surfaced by any of the three phrasings appears exactly once in the
 // result, in first-seen order (original pool first, then each alternate's
-// new entries). On any failure to get alternate phrasings (no router key,
-// a network error, a malformed response) this returns `pool` unchanged -
-// the same "degrade to the plain single-query path" shape every other
-// optional step in this file uses.
+// new entries). On any failure - no router key, a network error, a
+// malformed alternate-phrasings response, or an alternate's own stage-1
+// rerun throwing (e.g. an embed() timeout in embeddings mode) - this
+// returns `pool` unchanged: the same "degrade to the plain single-query
+// path" shape every other optional step in this file uses. The whole
+// function body is one try/catch, not just the chatJSON call, so a
+// mid-expansion failure never turns an opt-in quality feature into a
+// routing outage.
 async function expandCandidatesWithAlternates(
   query: string,
   pool: CatalogEntry[],
   freshness: 'realtime' | 'daily' | undefined,
 ): Promise<CatalogEntry[]> {
-  let alternates: string[];
   try {
     const decision = await chatJSON(
       'router',
@@ -233,19 +236,18 @@ async function expandCandidatesWithAlternates(
       query,
       AlternateQueriesSchema,
     );
-    alternates = decision.queries;
+
+    const union = new Map(pool.map((c) => [c.name, c]));
+    for (const alt of decision.queries) {
+      const altPool = await candidates(alt, CANDIDATE_POOL_SIZE, { freshness });
+      for (const c of altPool) {
+        if (!union.has(c.name)) union.set(c.name, c);
+      }
+    }
+    return [...union.values()];
   } catch {
     return pool;
   }
-
-  const union = new Map(pool.map((c) => [c.name, c]));
-  for (const alt of alternates) {
-    const altPool = await candidates(alt, CANDIDATE_POOL_SIZE, { freshness });
-    for (const c of altPool) {
-      if (!union.has(c.name)) union.set(c.name, c);
-    }
-  }
-  return [...union.values()];
 }
 
 export interface PlannedRoute {

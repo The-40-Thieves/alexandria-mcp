@@ -136,6 +136,50 @@ function startFakeEmbeddingServer(
   });
 }
 
+// Same shape as startFakeEmbeddingServer, but returns a 500 whenever the
+// request's input batch contains a text `failsOn` accepts - used to
+// simulate an embed() call throwing mid-request (a network error, a
+// gateway 5xx) for one specific query while every other embed call on the
+// same server still succeeds normally.
+function startFlakyEmbeddingServer(
+  failsOn: (text: string) => boolean,
+): Promise<FakeEmbeddingServer> {
+  return new Promise((resolve) => {
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      let raw = '';
+      req.on('data', (chunk) => {
+        raw += chunk;
+      });
+      req.on('end', () => {
+        const body = raw ? JSON.parse(raw) : {};
+        const input = (body.input as string[]) ?? [];
+        if (input.some(failsOn)) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: { message: 'simulated gateway failure' } }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            data: input.map((_text: string, i: number) => ({
+              embedding: toBase64Float32([1, 0, 0]),
+              index: i,
+            })),
+          }),
+        );
+      });
+    });
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      resolve({
+        url: `http://127.0.0.1:${port}/v1`,
+        close: () => new Promise((res) => server.close(() => res())),
+      });
+    });
+  });
+}
+
 test('detectFreshnessPreference', async (t) => {
   await t.test('a strong recency term prefers realtime', () => {
     assert.equal(detectFreshnessPreference('latest news on the strike'), 'realtime');
@@ -367,6 +411,62 @@ test('multi-query candidate expansion', async (t) => {
 
       delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
       delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+    },
+  );
+
+  await t.test(
+    'a failure embedding an alternate query degrades to the plain single-query shortlist, not a thrown error',
+    async () => {
+      // Only the two alternate-phrasing texts are poisoned; the original
+      // query still embeds fine, so stage 1 itself succeeds in embeddings
+      // mode and only expandCandidatesWithAlternates()'s own embed calls
+      // (one per alternate, inside candidates()) fail.
+      const embedServer = await startFlakyEmbeddingServer(
+        (text) => text === 'alt query one' || text === 'alt query two',
+      );
+      t.after(() => embedServer.close());
+
+      const router = await startFakeRouter((system) => {
+        if (system.includes('alternate phrasings')) {
+          return { queries: ['alt query one', 'alt query two'] };
+        }
+        return { intent: 'x', routes: [] };
+      });
+      t.after(() => router.close());
+
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL = embedServer.url;
+      process.env.ALEXANDRIA_EMBEDDINGS_API_KEY = 'test-key';
+      resetCatalogCacheForTests();
+      resetRoutingCacheForTests();
+
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      const plain = await planRoute('deep space telescope missions', { maxSources: 5 });
+      assert.equal(plain.stage1, 'embeddings', 'sanity check: stage 1 itself is unaffected');
+
+      resetRoutingCacheForTests();
+      process.env.ALEXANDRIA_MULTI_QUERY = '1';
+      // Must not throw: before the Task 10 fix round, an alternate's own
+      // candidates() call throwing (this flaky embed) propagated all the
+      // way out of planRoute() uncaught, turning an opt-in quality
+      // feature into a routing outage.
+      const expanded = await planRoute('deep space telescope missions', { maxSources: 5 });
+
+      assert.equal(expanded.stage2, 'llm');
+      assert.equal(
+        expanded.clusterBySource.size,
+        plain.clusterBySource.size,
+        'falls back to the plain stage-1 shortlist size, not a partial or thrown expansion',
+      );
+
+      delete process.env.ALEXANDRIA_ROUTER_BASE_URL;
+      delete process.env.ALEXANDRIA_ROUTER_API_KEY;
+      delete process.env.ALEXANDRIA_EMBEDDINGS_BASE_URL;
+      delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+      delete process.env.ALEXANDRIA_MULTI_QUERY;
+      resetCatalogCacheForTests();
+      resetRoutingCacheForTests();
     },
   );
 
