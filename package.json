@@ -21,6 +21,7 @@
     "probe": "node scripts/probe.ts",
     "probe:baseline": "node scripts/probe.ts --baseline",
     "eval:routing": "ALEXANDRIA_STATE_DB=:memory: node scripts/eval-routing.ts",
+    "eval:answer": "ALEXANDRIA_STATE_DB=:memory: node scripts/eval-answer.ts",
     "docs": "node scripts/gen-docs.ts",
     "lint": "biome check .",
     "knip": "knip",
