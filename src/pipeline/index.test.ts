@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertIngestAllowed, ingestMetadata } from '../sources/ingestPolicy.ts';
-import type { Chunk, EmbeddingProvider, VectorStoreProvider } from '../types.ts';
+import type { Chunk, EmbeddingProvider, VectorQueryHit, VectorStoreProvider } from '../types.ts';
 import { chunkSemantic, indexText, ingestText } from './index.ts';
 
 // A paragraph of clean ASCII prose, long enough (and well above the
@@ -30,6 +30,11 @@ class FakeVectorStore implements VectorStoreProvider {
   }
   async isDuplicate(): Promise<boolean> {
     return false;
+  }
+  // Task 12 added query() to the interface; unused by this ingest-path
+  // test, which never searches the store it writes to.
+  async query(): Promise<VectorQueryHit[]> {
+    return [];
   }
 }
 

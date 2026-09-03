@@ -180,10 +180,31 @@ create table if not exists source_docs (
   unique (source_url, mcp_name)
 );
 
-create index if not exists knowledge_chunks_embedding_idx
-  on knowledge_chunks using ivfflat (embedding vector_cosine_ops)
-  with (lists = 100);
+create index if not exists knowledge_chunks_embedding_hnsw_idx
+  on knowledge_chunks using hnsw (embedding vector_cosine_ops);
 ```
+
+If you set this schema up before Task 12, you had an `ivfflat` index instead
+(`knowledge_chunks_embedding_idx`) - `docs/sql/match_chunks.sql` drops it and
+creates the `hnsw` one shown above, since HNSW builds incrementally and needs
+no `lists` tuning constant as the table grows.
+
+### Corpus as cache
+
+`library_answer` can also read straight from `knowledge_chunks` - previously
+ingested text, already embedded - as one more ranked list next to the live
+per-source search, skipping the network entirely for a hit it already has
+the full text for. This only ever serves chunks from a source whose registry
+freshness is `static` or `daily` (never `realtime`), and only above
+`ALEXANDRIA_CORPUS_MIN_SIM` cosine similarity (default `0.92`).
+
+It needs one more piece of schema beyond the table above: run
+`docs/sql/match_chunks.sql` in the Supabase SQL editor. It defines
+`match_knowledge_chunks()`, the nearest-neighbor search function
+`SupabaseVectorStoreProvider.query()` calls via `.rpc()`, and the `hnsw`
+index above. This file was written against the current pgvector/supabase-js
+docs but has not been run against a live database - verify it against your
+own project before relying on it.
 
 ## Claude Desktop (stdio)
 

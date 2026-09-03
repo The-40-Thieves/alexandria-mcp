@@ -18,6 +18,11 @@ export interface LibraryResult {
   published?: string;
   url?: string;
   cluster?: string; // set by libraryAsk's fan-out from the source's registry.ts cluster
+  // Task 12 (corpus-as-cache, src/pipeline/corpusSearch.ts): the chunk's
+  // text, already in hand from a vector-store query. When set,
+  // src/tools/libraryAnswer.ts's readTopSources() uses it directly instead
+  // of calling the source adapter's read() - there is nothing to fetch.
+  fullText?: string;
 }
 
 export interface Chunk {
@@ -115,7 +120,27 @@ export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>;
 }
 
+// One row returned by VectorStoreProvider.query(). `source`/`sourceId`/
+// `chunkIndex` are read back out of the stored chunk's metadata (see
+// ChunkMetadata above) rather than being separate columns, and `metadata`
+// carries the full ChunkMetadata so a caller (src/pipeline/corpusSearch.ts)
+// doesn't need a second lookup to get title/authors/year/etc.
+export interface VectorQueryHit {
+  id: string;
+  source: LibrarySource;
+  sourceId: string;
+  chunkIndex: number;
+  text: string;
+  similarity: number;
+  metadata: ChunkMetadata;
+}
+
 export interface VectorStoreProvider {
   upsert(chunks: Chunk[], embeddings: number[][], mcpName: string): Promise<number>;
   isDuplicate(sourceId: string, mcpName: string): Promise<boolean>;
+  // Task 12: corpus-as-cache. Nearest-neighbor search over previously
+  // ingested chunks, ranked by cosine similarity descending. `filter.
+  // sources`, when given, restricts to chunks whose metadata.source is in
+  // the list; omitted means search the whole store.
+  query(embedding: number[], k: number, filter?: { sources?: string[] }): Promise<VectorQueryHit[]>;
 }

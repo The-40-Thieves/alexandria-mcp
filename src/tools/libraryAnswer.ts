@@ -6,7 +6,8 @@
 // src/utils/providers.ts; nothing here imports openai directly.
 import { config } from '../config.ts';
 import { requestLogger } from '../log.ts';
-import { getAdapter } from '../sources/registry.ts';
+import { corpusSearchRef } from '../pipeline/corpusSearch.ts';
+import { getAdapter, listSources } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
 import {
   type CitationGrade,
@@ -146,10 +147,18 @@ interface ReadSource {
 // hasFullText: true at search time and still fail to produce text for a
 // specific item, e.g. paywalled). Does not backfill past the initial
 // readTop candidates.
+//
+// Task 12: a corpus-as-cache hit (src/pipeline/corpusSearch.ts) already
+// carries its chunk text in `fullText` - it short-circuits straight to a
+// ReadSource with no adapter call, since there is nothing left to fetch.
 async function readTopSources(ranked: LibraryResult[], readTop: number): Promise<ReadSource[]> {
   const candidates = ranked.filter((r) => r.hasFullText).slice(0, readTop);
   const sources: ReadSource[] = [];
   for (const item of candidates) {
+    if (item.fullText) {
+      sources.push({ item, text: item.fullText.slice(0, READ_CHAR_LIMIT) });
+      continue;
+    }
     try {
       const result = await getAdapter(item.source).read(item.id);
       if (result.metadataOnly || !result.text) continue;
@@ -418,6 +427,21 @@ export async function libraryAnswer(
   const lists = Object.values(perSource);
   const knowledgeResults = await fetchKnowledgeResults(query, resultsPerSource);
   if (knowledgeResults.length > 0) lists.push(knowledgeResults);
+
+  // Task 12: fold in previously-ingested chunks as one more RRF list, but
+  // only when routing actually picked a source whose freshness makes a
+  // cached chunk safe to serve ('static' or 'daily') - a realtime-only
+  // routing (news, markets, ...) never calls corpusSearch at all, since a
+  // cache hit there could already be stale.
+  const freshnessBySource = new Map(listSources().map((s) => [s.name, s.freshness]));
+  const hasCacheableRoutedSource = routing.some((r) => {
+    const freshness = freshnessBySource.get(r.source);
+    return freshness === 'static' || freshness === 'daily';
+  });
+  if (hasCacheableRoutedSource) {
+    const corpusResults = await corpusSearchRef.search(query);
+    if (corpusResults.length > 0) lists.push(corpusResults);
+  }
 
   const fused = rrf(lists);
   const rerankPool = fused.slice(0, Math.min(fused.length, config.ALEXANDRIA_RERANK_POOL) || 1);

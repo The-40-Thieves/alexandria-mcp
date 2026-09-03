@@ -1,6 +1,19 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../../config.ts';
-import type { Chunk, VectorStoreProvider } from '../../types.ts';
+import type { Chunk, ChunkMetadata, VectorQueryHit, VectorStoreProvider } from '../../types.ts';
+
+// One row returned by the docs/sql/match_chunks.sql RPC function. source/
+// source_id/chunk_index/metadata all come from the stored chunk's JSONB
+// metadata column (see that file), not separate table columns.
+interface MatchChunkRow {
+  id: number | string;
+  source: string | null;
+  source_id: string | null;
+  chunk_index: number | null;
+  content: string;
+  similarity: number;
+  metadata: ChunkMetadata;
+}
 
 export class SupabaseVectorStoreProvider implements VectorStoreProvider {
   private client: SupabaseClient;
@@ -62,5 +75,36 @@ export class SupabaseVectorStoreProvider implements VectorStoreProvider {
     });
 
     return written;
+  }
+
+  // Task 12: corpus-as-cache. Calls the match_knowledge_chunks() function
+  // (docs/sql/match_chunks.sql) rather than building the `<=>` ORDER BY
+  // query inline, since PostgREST's .rpc() is the only way to run a
+  // similarity search through supabase-js. min_similarity is left at 0
+  // here (return the raw top-k); the caller (src/pipeline/corpusSearch.ts)
+  // applies ALEXANDRIA_CORPUS_MIN_SIM itself.
+  async query(
+    embedding: number[],
+    k: number,
+    filter?: { sources?: string[] },
+  ): Promise<VectorQueryHit[]> {
+    const { data, error } = await this.client.rpc('match_knowledge_chunks', {
+      query_embedding: embedding,
+      match_count: k,
+      min_similarity: 0,
+      sources: filter?.sources ?? null,
+    });
+
+    if (error) throw new Error(`match_knowledge_chunks failed: ${error.message}`);
+
+    return ((data ?? []) as MatchChunkRow[]).map((row) => ({
+      id: String(row.id),
+      source: row.source ?? row.metadata?.source ?? '',
+      sourceId: row.source_id ?? row.metadata?.sourceId ?? '',
+      chunkIndex: row.chunk_index ?? row.metadata?.chunkIndex ?? 0,
+      text: row.content,
+      similarity: row.similarity,
+      metadata: row.metadata,
+    }));
   }
 }
