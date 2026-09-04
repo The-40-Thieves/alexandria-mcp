@@ -9,6 +9,7 @@ import pLimit from 'p-limit';
 import { z } from 'zod';
 import { requestLogger } from '../log.ts';
 import { gradeCitation, retractedWarning } from '../utils/citationGrade.ts';
+import { dataBlock, escapeSourceText, UNTRUSTED_DATA_SENTENCE } from '../utils/promptData.ts';
 import { chatJSON, requireRoleForTool } from '../utils/providers.ts';
 import {
   type Citation,
@@ -74,6 +75,31 @@ async function emitProgress(
   await onProgress(info);
 }
 
+// Final wave (D2): the caller's topic, the learnings extracted from
+// earlier rounds (which are model output over retrieved page text), the
+// generated objectives, the source titles and ids, and the draft report
+// were all interpolated straight into these prompts, where a crafted value
+// reads as an instruction and can forge an "Objectives:"/"Learnings:"/
+// "Sources:" section of its own. Every one of them now goes through the
+// shared dataBlock() envelope, and each system prompt states that the
+// blocks are untrusted.
+function learningsList(learnings: string[]): string {
+  return learnings.map((l) => `- ${escapeSourceText(l)}`).join('\n');
+}
+
+// A source's title and id come from whatever upstream catalogue returned
+// them, so they are escaped like any other retrieved value.
+function sourcesList(citations: Citation[]): string {
+  return citations
+    .map((c) => `[${c.n}] ${escapeSourceText(c.title)} (${c.source}:${c.id})`)
+    .join('\n');
+}
+
+// A whole answer, a learnings set, or a draft report is legitimately much
+// longer than one query or title, so those blocks get a larger cap than
+// promptData's default rather than being cut to a fraction of themselves.
+const MAX_LONG_BLOCK_CHARS = 24_000;
+
 const QueriesSchema = z.object({ queries: z.array(z.string().min(1)) });
 
 async function generateQueries(
@@ -84,12 +110,14 @@ async function generateQueries(
   const system = `You are planning a research pass on a topic. Generate up to ${breadth} focused search queries that would surface new, useful information.
 
 Return JSON: { "queries": ["query 1", "query 2", ...] }
-Generate at most ${breadth} queries.`;
+Generate at most ${breadth} queries.
+
+${UNTRUSTED_DATA_SENTENCE}`;
   const learningsBlock =
     learnings.length > 0
-      ? `\n\nLearnings so far:\n${learnings.map((l) => `- ${l}`).join('\n')}`
+      ? `\n\n${dataBlock('learnings so far, one per line', 'learnings', learningsList(learnings))}`
       : '';
-  const user = `Topic: ${topic}${learningsBlock}`;
+  const user = `${dataBlock('research topic', 'topic', escapeSourceText(topic))}${learningsBlock}`;
   const decision = await chatJSON('research', system, user, QueriesSchema);
   return decision.queries.slice(0, breadth);
 }
@@ -108,8 +136,10 @@ async function generateObjectives(topic: string): Promise<string[]> {
   const system = `You are scoping a research pass on a topic. Outline 3 to 7 concrete coverage objectives: the distinct things a thorough answer would need to address.
 
 Return JSON: { "objectives": ["objective 1", "objective 2", ...] }
-Generate between 3 and 7 objectives.`;
-  const user = `Topic: ${topic}`;
+Generate between 3 and 7 objectives.
+
+${UNTRUSTED_DATA_SENTENCE}`;
+  const user = dataBlock('research topic', 'topic', escapeSourceText(topic));
   const decision = await chatJSON('research', system, user, ObjectivesSchema);
   return decision.objectives.slice(0, 7);
 }
@@ -124,11 +154,15 @@ const CoverageSchema = z.object({ coveredIndices: z.array(z.number().int()) });
 async function updateCoverage(objectives: string[], learnings: string[]): Promise<boolean[]> {
   const system = `You track coverage of a research outline. Given numbered objectives and the learnings gathered so far, list the objectives that are adequately addressed by at least one learning.
 
-Return JSON: { "coveredIndices": [0, 2, ...] } using the 0-based objective numbers below.`;
-  const objectivesBlock = objectives.map((o, i) => `${i}. ${o}`).join('\n');
-  const learningsBlock =
-    learnings.length > 0 ? learnings.map((l) => `- ${l}`).join('\n') : '(none yet)';
-  const user = `Objectives:\n${objectivesBlock}\n\nLearnings so far:\n${learningsBlock}`;
+Return JSON: { "coveredIndices": [0, 2, ...] } using the 0-based objective numbers inside the objectives block.
+
+${UNTRUSTED_DATA_SENTENCE}`;
+  const objectivesBlock = objectives.map((o, i) => `${i}. ${escapeSourceText(o)}`).join('\n');
+  const learningsBlock = learnings.length > 0 ? learningsList(learnings) : '(none yet)';
+  const user = [
+    dataBlock('numbered coverage objectives', 'objectives', objectivesBlock),
+    dataBlock('learnings gathered so far', 'learnings', learningsBlock),
+  ].join('\n\n');
   const decision = await chatJSON('research', system, user, CoverageSchema);
   const covered = new Array(objectives.length).fill(false);
   for (const idx of decision.coveredIndices) {
@@ -147,8 +181,16 @@ async function extractLearnings(
 ): Promise<{ learnings: string[]; followUps: string[] }> {
   const system = `You extract structured learnings from a cited research answer.
 
-Return JSON: { "learnings": ["concise factual learning", ...], "followUps": ["a follow-up question this raises", ...] }`;
-  return chatJSON('research', system, answer, LearningsSchema);
+Return JSON: { "learnings": ["concise factual learning", ...], "followUps": ["a follow-up question this raises", ...] }
+
+${UNTRUSTED_DATA_SENTENCE}`;
+  const user = dataBlock(
+    'research answer to extract learnings from',
+    'answer',
+    answer,
+    MAX_LONG_BLOCK_CHARS,
+  );
+  return chatJSON('research', system, user, LearningsSchema);
 }
 
 const ReportSchema = z.object({ report: z.string() });
@@ -162,13 +204,22 @@ async function writeReport(
 
 Rules:
 - Organize the report into sections with headers.
-- Every sentence that states a fact must end with one or more citation markers like [n], referencing the numbered sources below.
+- Every sentence that states a fact must end with one or more citation markers like [n], referencing the numbered sources in the sources block.
 - Only cite source numbers 1 through ${citations.length}. Never invent a source number.
 
-Return JSON: { "report": "the full report text" }`;
-  const sourcesBlock = citations.map((c) => `[${c.n}] ${c.title} (${c.source}:${c.id})`).join('\n');
-  const learningsBlock = learnings.map((l) => `- ${l}`).join('\n');
-  const user = `Topic: ${topic}\n\nLearnings:\n${learningsBlock}\n\nSources:\n${sourcesBlock}`;
+Return JSON: { "report": "the full report text" }
+
+${UNTRUSTED_DATA_SENTENCE}`;
+  const user = [
+    dataBlock('research topic', 'topic', escapeSourceText(topic)),
+    dataBlock(
+      'learnings to write the report from',
+      'learnings',
+      learningsList(learnings),
+      MAX_LONG_BLOCK_CHARS,
+    ),
+    dataBlock('numbered sources to cite', 'sources', sourcesList(citations)),
+  ].join('\n\n');
   const decision = await chatJSON('research', system, user, ReportSchema);
   return decision.report;
 }
@@ -204,9 +255,13 @@ export async function checkCitations(
   const system = `You fact-check a research report against its numbered sources. List every sentence in the report whose claim is not adequately supported by the cited source(s), verbatim as it appears in the report.
 
 Return JSON: { "unsupported": ["exact sentence 1", ...] }
-Return an empty array if every sentence is adequately supported.`;
-  const sourcesBlock = citations.map((c) => `[${c.n}] ${c.title} (${c.source}:${c.id})`).join('\n');
-  const user = `Report:\n${report}\n\nSources:\n${sourcesBlock}`;
+Return an empty array if every sentence is adequately supported.
+
+${UNTRUSTED_DATA_SENTENCE}`;
+  const user = [
+    dataBlock('research report to fact-check', 'report', report, MAX_LONG_BLOCK_CHARS),
+    dataBlock('numbered sources the report cites', 'sources', sourcesList(citations)),
+  ].join('\n\n');
   const result = await chatJSON('synth', system, user, CitationCheckSchema);
   if (result.unsupported.length === 0) return { report, warnings: [] };
 

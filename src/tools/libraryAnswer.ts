@@ -19,6 +19,7 @@ import { type ClaimVerdict, checkClaims } from '../utils/claimCheck.ts';
 import { rrf } from '../utils/fuse.ts';
 import { checkLiveness } from '../utils/liveness.ts';
 import { pool, type RemoteServerConfig } from '../utils/mcpClientPool.ts';
+import { CITATION_BRACKET_RE, escapeSourceText } from '../utils/promptData.ts';
 import { chatText, requireRoleForTool } from '../utils/providers.ts';
 import { rerank } from '../utils/rerank.ts';
 import { type RouteItem, runAsk } from './libraryAsk.ts';
@@ -173,28 +174,13 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
   return sources;
 }
 
-// Fetched page text is third-party content and can contain anything,
-// including text shaped like the delimiters around it. Neutralize any
-// <source ...> or </source> sequence so a page cannot close its own block
-// early and have the rest of its bytes read as prompt instructions, or
-// forge an extra numbered source. Entity-escaping the angle bracket keeps
-// the text readable while making the tag inert. Whitespace and zero-width
-// characters between the bracket, the slash, and the tag name are ignored
-// by lenient readers (a model included), so the match ignores them too;
-// otherwise "< source" or "<\u200B/source" would slip through.
-//
-// The same pass rewrites citation-shaped markers in the page text ("[3]",
-// "[1, 2]") to "[ref 3]". Citations are only ever extracted from the
-// model's answer, never from source text, but a model that echoes a page
-// sentence verbatim would carry its "[3]" along and mint a citation to
-// source 3 that the page, not the model, chose. "[ref 3]" reads the same
-// and does not match CITATION_BRACKET_RE.
-const SOURCE_TAG_BRACKET_RE = /<(?=[\s\u200B-\u200D\uFEFF]*\/?[\s\u200B-\u200D\uFEFF]*source)/gi;
-export function escapeSourceText(text: string): string {
-  // Escapes only the angle bracket, so the rest of the sequence (including
-  // its original casing and spacing) is preserved as readable text.
-  return text.replace(SOURCE_TAG_BRACKET_RE, '&lt;').replace(CITATION_BRACKET_RE, '[ref $1]');
-}
+// Final wave (D): the source fencing this module introduced (task 8) now
+// lives in src/utils/promptData.ts, so the research, ask, rerank and
+// claim-verification prompts fence the same way instead of each
+// interpolating retrieved text raw. Re-exported here because
+// src/utils/claimCheck.ts and scripts/eval-answer.ts already reach for
+// escapeSourceText at this path.
+export { escapeSourceText };
 
 // Same reasoning for the title, which lands inside a quoted attribute:
 // a quote or an angle bracket there would let a crafted title break out.
@@ -236,14 +222,15 @@ export function splitSentences(text: string): string[] {
 }
 
 // A citation marker is a bracketed, comma-separated list of up to
-// 3-digit numbers, e.g. "[1]", "[1,2]", "[1, 2]". A 4+ digit number never
-// matches (so "[2024]" isn't a marker at all), and a matched 3-digit
-// number >= 100 is still treated as ordinary prose (a page number, a
-// year written with only 3 digits is unlikely but harmless either way)
-// rather than a citation, since no source list realistically runs that
-// high. Only numbers in [1, PROSE_NUMBER_MAX] are citation candidates;
-// among those, anything beyond the actual source count is dangling.
-const CITATION_BRACKET_RE = /\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\]/g;
+// 3-digit numbers, e.g. "[1]", "[1,2]", "[1, 2]" (CITATION_BRACKET_RE, in
+// src/utils/promptData.ts alongside the escaping that rewrites the same
+// shape out of source text). A 4+ digit number never matches (so "[2024]"
+// isn't a marker at all), and a matched 3-digit number >= 100 is still
+// treated as ordinary prose (a page number; a year written with only 3
+// digits is unlikely but harmless either way) rather than a citation,
+// since no source list realistically runs that high. Only numbers in
+// [1, PROSE_NUMBER_MAX] are citation candidates; among those, anything
+// beyond the actual source count is dangling.
 const PROSE_NUMBER_MAX = 99;
 
 // Only ever called on the model's own answer (rawAnswer, then the filtered

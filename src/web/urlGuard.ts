@@ -46,9 +46,9 @@ type IpClass = 'loopback' | 'private' | null;
 // always refused, no override:
 //   0.0.0.0/8        "this network"
 //   10.0.0.0/8       RFC 1918 private
-//   100.64.0.0/10    carrier-grade NAT (RFC 6598) — includes cloud metadata
+//   100.64.0.0/10    carrier-grade NAT (RFC 6598) - includes cloud metadata
 //                    proxies on some platforms
-//   169.254.0.0/16   link-local — includes 169.254.169.254, the near-universal
+//   169.254.0.0/16   link-local - includes 169.254.169.254, the near-universal
 //                    cloud instance-metadata address
 //   172.16.0.0/12    RFC 1918 private
 //   192.168.0.0/16   RFC 1918 private
@@ -73,8 +73,8 @@ function classifyIpv4(a: number, b: number, c: number, d: number): IpClass {
 // parser already normalizes every other IPv4 literal shorthand (a bare
 // decimal integer like `2130706433`, octal octets like `0177.0.0.1`, the
 // 2/3-part shorthand like `127.1`) into this canonical form before this
-// code ever sees `parsed.hostname` — verified live against Node's URL
-// implementation — so there's no separate literal parser to maintain here.
+// code ever sees `parsed.hostname` - verified live against Node's URL
+// implementation - so there's no separate literal parser to maintain here.
 function parseDottedIPv4(host: string): [number, number, number, number] | null {
   const parts = host.split('.');
   if (parts.length !== 4) return null;
@@ -224,15 +224,15 @@ function stripBrackets(hostname: string): string {
 // Called once up front in fetchAsText() (covering all four tiers, since
 // they all share the same starting URL) and again, defensively, at the top
 // of tryJinaReader()/tryCrawl4ai() and on every redirect hop
-// (fetchFollowingRedirects) — a private target must never reach a tier's
+// (fetchFollowingRedirects) - a private target must never reach a tier's
 // delegate, however this function ends up being reached.
 //
 // Checks, in order: valid http(s) URL, no embedded credentials
 // (user:pass@host), then .internal/.local
-// and 'localhost' by string, then IP classification — directly for a
+// and 'localhost' by string, then IP classification - directly for a
 // literal IP host (skips DNS), or via dns.lookup(..., { all: true }) for an
 // ordinary hostname, checking EVERY returned address (closes the gap where
-// a hostname's *string* looks public but resolves to a private address —
+// a hostname's *string* looks public but resolves to a private address -
 // attacker-controlled DNS / DNS rebinding).
 //
 // TOCTOU: the address(es) validated here are not, on their own, what pins
