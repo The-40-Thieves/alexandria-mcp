@@ -17,7 +17,7 @@ import {
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { config, loadConfig } from './config.ts';
-import { checkOrigin, checkRateLimit } from './httpGuards.ts';
+import { checkOrigin, checkRateLimit, configuredOriginHostnames } from './httpGuards.ts';
 import { buildInstructions } from './instructions.ts';
 import { log, requestLogger } from './log.ts';
 import { indexText, ingestText } from './pipeline/index.ts';
@@ -1049,23 +1049,20 @@ export function createServer(): McpServer {
 // it for free from body-parser.
 const JSON_BODY_LIMIT_BYTES = 100 * 1024;
 
-// Reads req's body up to JSON_BODY_LIMIT_BYTES and JSON.parses it, mirroring
-// express.json()'s size-then-parse behavior. Only called for a JSON
-// content-type, gated on the SDK's own isJsonContentType() - the same
-// case-insensitive, parameter-tolerant check handlePostRequest itself uses
-// to decide whether to read the body at all. A hand-rolled case-sensitive
-// `includes('application/json')` here previously let a header like
-// `Application/JSON` skip this cap entirely and reach the SDK's own
-// unbounded read. GET/DELETE /mcp (no body) and any non-JSON content-type
-// still pass `undefined` through to the transport unchanged, same as
-// express.json() no-oping on those today.
+// Reads req's body up to JSON_BODY_LIMIT_BYTES, mirroring express.json()'s
+// size-then-parse behavior.
+//
 // Final wave, A10: distinguishes the oversize case from any other body-read
 // failure so handleMcpRequest's catch below can destroy the request's
 // socket - never stopped before - without touching the ordinary error
 // path used by every other kind of failure.
 class PayloadTooLargeError extends Error {}
 
-async function readJsonBody(req: IncomingMessage): Promise<unknown> {
+// Final wave, B3: an unsupported POST media type is answered here rather
+// than by the SDK, which buffers the whole request before deciding.
+class UnsupportedMediaTypeError extends Error {}
+
+async function readCappedBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Buffer>) {
@@ -1077,8 +1074,21 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
     }
     chunks.push(chunk);
   }
-  if (size === 0) return undefined;
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return Buffer.concat(chunks);
+}
+
+// A JSON-RPC error envelope under a specific HTTP status, the same body
+// shape httpGuards.ts's 403/429 rejections use. Distinct from
+// jsonRpcErrorHandler below, which is the catch-all 500 for an unexpected
+// throw; these two statuses are deliberate answers, not failures.
+function sendJsonRpcStatus(res: ServerResponse, status: number, message: string): void {
+  if (res.headersSent) {
+    res.end();
+    return;
+  }
+  const payload = JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message }, id: null });
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(payload);
 }
 
 /**
@@ -1089,9 +1099,18 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
  * transport used), so overlapping requests still cannot collide on a single
  * Protocol instance. `mcpHandler` never rejects - `toNodeHandler`'s adapter
  * catches a conversion/`fetch` failure and writes its own 500 - so the
- * try/catch here exists for `readJsonBody`'s cap (below), not the handler
+ * try/catch here exists for `readCappedBody`'s cap (below), not the handler
  * itself. Errors are forwarded to the JSON-RPC error handler below rather
  * than leaking an HTML page or a stack trace.
+ *
+ * Final wave (B3): EVERY POST body is read through the cap first, whatever
+ * its content type, and only then checked for a supported media type. The
+ * cap used to be gated on isJsonContentType(), so a `Content-Type:
+ * text/plain` POST skipped it entirely and the SDK adapter buffered the
+ * whole request before answering 415 - a 200 KB text/plain body was
+ * accepted in validation against a 100 KiB cap. Reading first is also what
+ * makes the oversized case a 413 regardless of type, since the size is
+ * known before the media type matters.
  */
 async function handleMcpRequest(
   req: IncomingMessage,
@@ -1099,7 +1118,7 @@ async function handleMcpRequest(
   mcpHandler: NodeMcpRequestHandler,
 ): Promise<void> {
   // Captured up front, deliberately not read off `req` later (final wave,
-  // A10 review round 2): by the time readJsonBody()'s `for await` throws
+  // A10 review round 2): by the time readCappedBody()'s `for await` throws
   // on an oversize body, Node's async-iterator protocol has already
   // called the stream's own `.return()` as part of unwinding the loop,
   // which destroys `req`'s readable side - so `req.destroyed` is already
@@ -1110,21 +1129,32 @@ async function handleMcpRequest(
   // of that happens, is the one reference still guaranteed connected.
   const sock = req.socket;
   try {
-    const body = isJsonContentType(req.headers['content-type'])
-      ? await readJsonBody(req)
-      : undefined;
+    let body: unknown;
+    if (req.method === 'POST') {
+      const raw = await readCappedBody(req);
+      if (!isJsonContentType(req.headers['content-type'])) {
+        throw new UnsupportedMediaTypeError('POST /mcp requires content-type: application/json');
+      }
+      body = raw.length === 0 ? undefined : JSON.parse(raw.toString('utf8'));
+    }
     await mcpHandler(req, res, body);
   } catch (err) {
-    jsonRpcErrorHandler(err, res);
     if (err instanceof PayloadTooLargeError) {
-      // Destroying the socket immediately (before the 500 response is
+      sendJsonRpcStatus(res, 413, err.message);
+      // Destroying the socket immediately (before the 413 response is
       // flushed) would sever the connection out from under
-      // jsonRpcErrorHandler's own res.end() above - res 'finish' fires
+      // sendJsonRpcStatus's own res.end() above - res 'finish' fires
       // once that response is fully handed off, only then is it safe to
       // stop a peer that was still sending (possibly megabytes) more than
       // this request needed.
       res.on('finish', () => sock?.destroy());
+      return;
     }
+    if (err instanceof UnsupportedMediaTypeError) {
+      sendJsonRpcStatus(res, 415, err.message);
+      return;
+    }
+    jsonRpcErrorHandler(err, res);
   }
 }
 
@@ -1262,6 +1292,18 @@ export function createHttpApp(): Server {
 async function runHTTP(): Promise<void> {
   const httpServer = createHttpApp();
   const port = config.PORT;
+  // Final wave (B1): with no allowlist, Host-header validation is applied
+  // only to connections arriving on a loopback interface, so a
+  // non-loopback deployment is served without DNS-rebinding protection.
+  // That is the deliberate default (the alternative, applying it anyway,
+  // 403s every request to such a deployment), but it should never be a
+  // silent one.
+  if (configuredOriginHostnames().length === 0) {
+    log.warn(
+      {},
+      "ALEXANDRIA_ALLOWED_ORIGINS is not set: Host-header (DNS-rebinding) validation applies to loopback connections only. Set it to this deployment's hostname(s) to enforce it everywhere.",
+    );
+  }
   httpServer.listen(port, () =>
     log.info(
       { sources: listSources().length, url: `http://localhost:${port}/mcp` },

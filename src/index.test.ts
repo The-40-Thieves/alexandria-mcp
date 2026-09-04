@@ -271,11 +271,68 @@ test('a body over the 100kb JSON cap is rejected regardless of content-type casi
         error?: { code?: number };
         id?: unknown;
       };
+      assert.equal(res.status, 413);
       assert.equal(parsed.jsonrpc, '2.0');
-      assert.equal(parsed.error?.code, -32603);
+      assert.equal(parsed.error?.code, -32000);
       assert.equal(parsed.id, null);
     });
   }
+});
+
+/**
+ * Final wave (B3): the cap used to be gated on isJsonContentType(), so a
+ * POST declaring any other media type skipped it entirely and the SDK
+ * adapter buffered the whole request before answering 415 - a 200 KB
+ * text/plain body was accepted in validation against a 100 KiB cap. Every
+ * POST body is now read through the cap first, whatever its type, and the
+ * media type is checked only afterwards.
+ */
+test('POST /mcp: the body cap and media-type check apply to every content type', async (t) => {
+  const app = createHttpApp();
+  const server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  await t.test('a 200 KB text/plain body is rejected with 413, not buffered', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'x'.repeat(200 * 1024),
+    });
+    assert.equal(res.status, 413);
+    const parsed = (await res.json()) as { jsonrpc?: string; error?: { code?: number } };
+    assert.equal(parsed.jsonrpc, '2.0');
+    assert.equal(parsed.error?.code, -32000);
+  });
+
+  await t.test('a small text/plain body is rejected with 415', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'hello',
+    });
+    assert.equal(res.status, 415);
+    const parsed = (await res.json()) as { jsonrpc?: string; error?: { code?: number } };
+    assert.equal(parsed.jsonrpc, '2.0');
+    assert.equal(parsed.error?.code, -32000);
+  });
+
+  await t.test('an ordinary JSON tools/list call still works', async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    assert.equal(res.status, 200);
+    const parsed = parseMcpText(res.headers.get('content-type'), await res.text()) as {
+      result?: { tools?: unknown[] };
+    };
+    assert.equal(parsed.result?.tools?.length, TOOL_COUNT);
+  });
 });
 
 /**
@@ -428,7 +485,7 @@ test('HEAD /health and HEAD /metrics answer with headers and no body', async (t)
 });
 
 /**
- * Final wave, A10 (review round 2): readJsonBody() used to just throw on
+ * Final wave, A10 (review round 2): readCappedBody() used to just throw on
  * an oversized body, leaving the request stream (and its socket) open to
  * keep receiving whatever the client still had queued up to its declared
  * Content-Length. The first attempt at a fix (destroying `req` from
@@ -436,7 +493,7 @@ test('HEAD /health and HEAD /metrics answer with headers and no body', async (t)
  * test's request line declared `Connection: close`, so Node's own HTTP
  * server closes the socket after responding regardless of whether the
  * fix does anything at all, and the fix itself was a no-op: by the time
- * readJsonBody()'s `for await` throws, Node's async-iterator protocol has
+ * readCappedBody()'s `for await` throws, Node's async-iterator protocol has
  * already destroyed `req`'s readable side as part of unwinding the loop
  * (so `req.destroyed` is already true and `req.socket` already
  * detached), so `if (!req.destroyed) req.destroy()` never runs, and even
@@ -447,7 +504,7 @@ test('HEAD /health and HEAD /metrics answer with headers and no body', async (t)
  * no soft "closed: true" fallback on timeout - if the server does not
  * close the connection, this test fails instead of quietly passing.
  */
-test('an oversized POST body gets the 500 envelope and the server closes the connection', async (t) => {
+test('an oversized POST body gets the 413 envelope and the server closes the connection', async (t) => {
   const app = createHttpApp();
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -492,7 +549,8 @@ test('an oversized POST body gets the 500 envelope and the server closes the con
     ),
   ]);
 
-  assert.match(data, /"code":-32603/, data);
+  assert.match(data, /^HTTP\/1\.1 413 /, data);
+  assert.match(data, /"code":-32000/, data);
 
   // No further bytes accepted: the socket must already be torn down, not
   // merely half-closed and still willing to read more of the declared

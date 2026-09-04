@@ -172,6 +172,13 @@ actively resist automated access.
 (`ALEXANDRIA_HTTP_RATE_LIMIT`). Putting a Cloudflare Tunnel plus Access in
 front of it adds authentication Alexandria itself never implements:
 
+Set `ALEXANDRIA_ALLOWED_ORIGINS` to the tunnel hostname. Without it,
+Host-header validation applies only to loopback connections (see the README
+HTTP section: enforcing it with no allowlist would `403` every request that
+arrives with this deployment's real hostname in `Host`), so a tunnelled
+`/mcp` runs without DNS-rebinding protection until the variable is set. The
+server logs one warning at startup when it is missing.
+
 1. Run `cloudflared tunnel` pointing at this server's `TRANSPORT=http`
    listener (no public port opened on the box - the tunnel is outbound-only).
 2. Add an Access application over the tunnel's hostname, with a policy
