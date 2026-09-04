@@ -1,5 +1,10 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "environmentVariablesNote": "environmentVariables above is a curated subset: the optional, source-specific keys. The full list of environment variables this server reads (transport, provider, and caching settings included) is documented in .env.example in the repository."
+    }
+  },
   "name": "io.github.The-40-Thieves/alexandria-mcp",
   "title": "Alexandria",
   "description": "Search, read, and cite across 152 libraries: 11 tools, 3 prompts, and a full-text resource.",

@@ -139,10 +139,10 @@
 
 - Return-shape documentation from tool description strings (superseded by
   `outputSchema`). (Task 1)
-- HathiTrust (its Data API was retired 2024-07-17). SciELO, added then
-  dropped in the same task after both upstreams were verified unusable for
-  live search (a JS proof-of-work bot shield on search.scielo.org, no text
-  search in ArticleMeta). (Tasks 3, 5)
+- HathiTrust (its Data API was retired 2024-07-17). (Task 3)
+- SciELO, added then dropped in the same task after both upstreams were
+  verified unusable for live search (a JS proof-of-work bot shield on
+  search.scielo.org, no text search in ArticleMeta). (Task 5)
 - The dedicated GitHub Packages publish workflow (`npm.pkg.github.com`);
   releases now publish to npmjs.org with provenance instead. (Task 16)
 

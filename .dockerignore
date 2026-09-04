@@ -1,0 +1,12 @@
+# Bounds the build context for docker/mcp-registry's local build (and any
+# other builder, not just BuildKit's own context-aware transfer) to what the
+# Dockerfile actually COPYs. Mirrors the runtime-artifact and repo-hygiene
+# entries in .gitignore.
+node_modules/
+dist/
+data/
+eval/probe-latest.json
+.superpowers/
+.git/
+coverage/
+*.log
