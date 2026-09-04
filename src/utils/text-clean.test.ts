@@ -179,14 +179,88 @@ Post-text`;
     });
 
     // (b) The plausible-word-shape credit (Important 2, round 1) is
-    // PARTIAL (0.7), not a full hit - a chunk made entirely of unknown but
-    // plausibly-shaped tokens (no real words at all) still fails the 0.75
-    // threshold instead of passing outright.
-    test('a chunk of plausibly-shaped but unknown tokens scores 0.7 and fails', () => {
-      const raw = 'florbin wexatude glimberous plonitash fendrocal wistuvane brintolay quovendish';
+    // PARTIAL (0.7), not a full hit - an English chunk whose vocabulary is
+    // almost entirely unknown still fails the 0.75 threshold instead of
+    // passing outright. Final wave (A): the fixture now carries the two
+    // English function words ("the", "of") that put it over
+    // ENGLISH_FUNCTION_WORD_MIN_SHARE, because the partial-credit lexicon
+    // signal is exactly the part that is now English-only. Without them
+    // this chunk is indistinguishable from clean prose in a language the
+    // lexicon was never built for, which is the case A exists to fix.
+    test('an English chunk of plausibly-shaped but unknown tokens scores under 0.75', () => {
+      const raw =
+        'the florbin wexatude glimberous plonitash fendrocal wistuvane brintolay quovendish ' +
+        'frobular gantrivex mulverine trapsodine welquint braxinal dorvantle plexumeer ' +
+        'scattrovin quilmadge of';
       const score = ocrQualityScore(raw);
-      assert.ok(Math.abs(score - 0.7) < 1e-9, `expected ~0.7, got ${score}`);
+      assert.ok(Math.abs(score - 0.73) < 1e-9, `expected ~0.73, got ${score}`);
       assert.ok(score < 0.75, 'still fails the quality threshold');
+    });
+
+    // Final wave (A): ocrQualityScore() returned min(regexScore,
+    // lexiconScore) unconditionally, and the lexicon is 5,000 English
+    // words - so clean prose in any other Latin-script language scored
+    // 0.70 to 0.74 (measured on these exact fixtures at a066522: fr
+    // 0.7375, pt 0.7257, it 0.7167, es 0.7385, de 0.6972, no 0.7057, la
+    // 0.7000) against library_ingest's 0.75 threshold, silently dropping
+    // every chunk from perseus, gallica, hal, eurlex and nbnorway. The
+    // English lexicon veto now applies only to a chunk that is
+    // confidently English by function-word share.
+    const CLEAN_PROSE_BY_LANGUAGE: Array<[string, string]> = [
+      [
+        'French',
+        "La bibliotheque nationale conserve des manuscrits rares dont plusieurs remontent au douzieme siecle. Les chercheurs qui consultent ces documents doivent respecter des regles strictes de conservation, car le papier ancien se degrade rapidement lorsqu'il est expose a la lumiere.",
+      ],
+      [
+        'Portuguese',
+        'A biblioteca nacional guarda manuscritos raros, muitos dos quais remontam ao seculo doze. Os investigadores que consultam estes documentos devem respeitar regras rigorosas de conservacao, porque o papel antigo degrada-se rapidamente quando exposto a luz.',
+      ],
+      [
+        'Italian',
+        'La biblioteca nazionale conserva manoscritti rari, molti dei quali risalgono al dodicesimo secolo. I ricercatori che consultano questi documenti devono rispettare regole rigorose di conservazione, perche la carta antica si degrada rapidamente quando viene esposta alla luce.',
+      ],
+      [
+        'Spanish',
+        'La biblioteca nacional conserva manuscritos raros, muchos de los cuales datan del siglo doce. Los investigadores que consultan estos documentos deben respetar reglas estrictas de conservacion, porque el papel antiguo se degrada rapidamente cuando se expone a la luz.',
+      ],
+      [
+        'German',
+        'Die Nationalbibliothek bewahrt seltene Handschriften auf, von denen viele aus dem zwoelften Jahrhundert stammen. Forscher, die diese Dokumente einsehen, muessen strenge Regeln zur Erhaltung beachten, weil altes Papier schnell zerfaellt, wenn es dem Licht ausgesetzt wird.',
+      ],
+      [
+        'Norwegian',
+        'Nasjonalbiblioteket oppbevarer sjeldne handskrifter, og mange av dem stammer fra det tolvte arhundret. Forskere som leser disse dokumentene ma folge strenge regler for bevaring, fordi gammelt papir brytes raskt ned nar det utsettes for lys.',
+      ],
+      [
+        'Latin',
+        'Bibliotheca nationalis codices raros servat, quorum multi ad saeculum duodecimum pertinent. Viri docti qui haec documenta inspiciunt regulas severas conservationis observare debent, quia charta vetus celeriter corrumpitur cum luci exponitur.',
+      ],
+      [
+        'English',
+        'The national library keeps rare manuscripts, many of which date from the twelfth century. Researchers who consult these documents must follow strict rules of conservation, because old paper breaks down quickly when it is exposed to the light.',
+      ],
+    ];
+
+    for (const [language, prose] of CLEAN_PROSE_BY_LANGUAGE) {
+      test(`clean ${language} prose clears the 0.75 ingest threshold`, () => {
+        const score = ocrQualityScore(prose);
+        assert.ok(score >= 0.75, `expected a passing score for ${language}, got ${score}`);
+      });
+    }
+
+    // Deferred minor, folded into A's test set: "qty", "img" and "src"
+    // are vowel-less, so they are neither in the lexicon nor plausibly
+    // word-shaped and score 0 apiece. An otherwise ordinary English chunk
+    // carrying several of them must still clear the threshold rather than
+    // being dropped for using abbreviations.
+    test('English prose with vowel-less abbreviations (qty, img, src) still passes', () => {
+      const raw =
+        'The order table lists one row per item, with the qty column holding the number ' +
+        'ordered and the img column holding the src of the product photo. If the src is ' +
+        'empty the page shows a placeholder, and the qty falls back to one so the total ' +
+        'is never zero.';
+      const score = ocrQualityScore(raw);
+      assert.ok(score >= 0.75, `expected a passing score, got ${score}`);
     });
   });
 
