@@ -1,6 +1,6 @@
 // Ecosyste.ms Packages: cross-registry package metadata. Requires
 // CONTACT_EMAIL so requests carry a courteous User-Agent
-// (alexandria-mcp/10 (mailto:<email>)); defineRest()'s raw auth injection
+// (Alexandria/<version> (mailto:<email>)); defineRest()'s raw auth injection
 // sets the header value to the bare env value, not that wrapped format, so
 // this is a custom register() rather than defineRest(), per the plan.
 //
@@ -11,6 +11,7 @@
 // name match across every registry. Use that instead.
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { fetchJSON } from '../utils/http.ts';
+import { contactUserAgent } from '../utils/userAgent.ts';
 import { register } from './registry.ts';
 
 const BASE = 'https://packages.ecosyste.ms/api/v1';
@@ -31,7 +32,12 @@ function requireContactEmail(): string {
 }
 
 function headers(): Record<string, string> {
-  return { 'User-Agent': `alexandria-mcp/10 (mailto:${requireContactEmail()})` };
+  // requireContactEmail() first: this source is hidden without it and the
+  // upstream answers 402 for a UA with no mailto, so the throw must happen
+  // even though contactUserAgent() would otherwise fall back to the repo
+  // URL. Final wave (F1): the version comes from package.json now.
+  requireContactEmail();
+  return { 'User-Agent': contactUserAgent() };
 }
 
 export function normalizeEcosystems(pkg: EcosystemsPackage): LibraryResult {

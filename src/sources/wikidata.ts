@@ -4,15 +4,16 @@
 // stub pointing at the entity page, the same convention as digitalnz.ts.
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { fetchJSON } from '../utils/http.ts';
+import { contactUserAgent } from '../utils/userAgent.ts';
 import { register } from './registry.ts';
 
 const API = 'https://www.wikidata.org/w/api.php';
 
 function headers(): Record<string, string> {
-  const email = process.env.CONTACT_EMAIL;
-  return {
-    'User-Agent': `alexandria-mcp/10 (${email ? `mailto:${email}` : 'https://github.com/The-40-Thieves/alexandria-mcp'})`,
-  };
+  // Final wave (F1): the version comes from package.json via
+  // utils/userAgent.ts, not a hardcoded `alexandria-mcp/10` frozen at
+  // whatever major this repo was on when this line was written.
+  return { 'User-Agent': contactUserAgent() };
 }
 
 interface WikidataEntity {

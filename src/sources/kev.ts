@@ -4,10 +4,12 @@
 // attack.ts, peps.ts, tc39.ts and swiftevolution.ts.
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { fetchJSON } from '../utils/http.ts';
+import { contactUserAgent } from '../utils/userAgent.ts';
 import { register } from './registry.ts';
 
 const URL = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json';
-const UA = 'alexandria-mcp/10 (+https://github.com/The-40-Thieves/alexandria-mcp)';
+// Final wave (F1): built from package.json's version via
+// utils/userAgent.ts, not a literal frozen at `alexandria-mcp/10`.
 const TIMEOUT_MS = 30000;
 
 interface KevVulnerability {
@@ -27,7 +29,7 @@ let cached: Promise<KevCatalog> | undefined;
 
 function download(): Promise<KevCatalog> {
   if (!cached) {
-    cached = fetchJSON<KevCatalog>(URL, { headers: { 'User-Agent': UA } }, TIMEOUT_MS).catch(
+    cached = fetchJSON<KevCatalog>(URL, { headers: { 'User-Agent': contactUserAgent() } }, TIMEOUT_MS).catch(
       (err) => {
         cached = undefined; // let a later call retry after a failed download
         throw err;

@@ -73,6 +73,14 @@ The default UA sent by tier 1 changed from an impersonated
 versioned, and pointing back at the project, rather than pretending to be
 a browser. Overridable per deployment via `ALEXANDRIA_FETCH_UA`.
 
+Final wave (F1): that is now the UA for EVERY outbound call, not just tier
+1's. `src/utils/http.ts` - the path every REST adapter takes - used to send
+`library-mcp-server/1.0 (open source research tool)`, and four adapters
+(wikipedia, wikidata, kev, ecosystems) hardcoded `alexandria-mcp/10`, frozen
+at whatever major each was written on. All of them build from
+`src/utils/userAgent.ts` now; the four that upstream asks to carry a contact
+address use `contactUserAgent()`, which folds `CONTACT_EMAIL` in when set.
+
 `npm run probe` was run once against every source before this change and
 once after (see the task 13 report for the full before/after status
 table). No source's probe status regressed from the UA change alone; a
@@ -80,9 +88,9 @@ site that specifically depended on the browser UA would show up as a new
 `ERROR`/`EMPTY`/`TIMEOUT` in that diff, and none did in this run. If a
 future probe run does turn up a regression traceable to the UA, the fix is
 a per-adapter `headers` override restoring the old browser UA for that one
-call site (fetchTier.ts's `browserUA()` reads `ALEXANDRIA_FETCH_UA` first,
-so a global override is also available without patching source), not
-reverting the default for everyone.
+call site (`src/utils/userAgent.ts`'s `fetchUserAgent()` reads
+`ALEXANDRIA_FETCH_UA` first, so a global override is also available without
+patching source), not reverting the default for everyone.
 
 ## Residual limits of the SSRF guard (final wave)
 

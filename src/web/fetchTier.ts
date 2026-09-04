@@ -40,7 +40,7 @@
 import { config } from '../config.ts';
 import { type AddressPin, guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
-import { VERSION } from '../version.ts';
+import { fetchUserAgent } from '../utils/userAgent.ts';
 import { tryBrowserRun } from './browserRun.ts';
 import { extractHtml, extractPdfOffThread } from './extract.ts';
 import type { PdfPage } from './pdf.ts';
@@ -78,21 +78,6 @@ export interface FetchedPage {
 export const FETCH_TIMEOUT_MS = 15_000;
 const MIN_TEXT_CHARS = 500;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MB
-
-// Task 13: an honest, identifying UA instead of impersonating Chrome. A
-// site that blocks unknown bots on the old Chrome-131 string may now block
-// this one too - see docs/fetch-tier-runtime.md for the before/after probe
-// diff and any adapter that needed its old UA kept through a `headers`
-// override to avoid a real regression.
-// Overridable per deployment, not just per adapter: some operators may
-// prefer a fully custom string (their own contact UA, or a browser UA if
-// their traffic mix needs it) without patching source.
-function browserUA(): string {
-  return (
-    config.ALEXANDRIA_FETCH_UA ||
-    `Alexandria/${VERSION} (+https://github.com/The-40-Thieves/alexandria-mcp)`
-  );
-}
 
 // ─── Response size cap ──────────────────────────────────────────────────────
 
@@ -227,7 +212,7 @@ async function tryDefuddle(url: string, pin: AddressPin | undefined): Promise<Fe
     url,
     {
       headers: {
-        'User-Agent': browserUA(),
+        'User-Agent': fetchUserAgent(),
         // Task 13, Cloudflare's "Markdown for Agents": a zone that has this
         // enabled answers a q=1 (default) `Accept: text/markdown` with
         // `content-type: text/markdown` directly, skipping Defuddle

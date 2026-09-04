@@ -7,6 +7,7 @@ import {
   REDIRECT_STATUSES,
 } from '../web/urlGuard.ts';
 import { isSensitiveKey } from './secretWords.ts';
+import { fetchUserAgent } from './userAgent.ts';
 
 // The ambient global RequestInit (from @types/node) has no `dispatcher`
 // field under this project's tsconfig, so options that want one are typed
@@ -105,7 +106,12 @@ export async function fetchWithRetry(
         ...options,
         signal,
         headers: {
-          'User-Agent': 'library-mcp-server/1.0 (open source research tool)',
+          // Final wave (F1): one honest UA for every outbound call - see
+          // utils/userAgent.ts. This used to send
+          // `library-mcp-server/1.0 (open source research tool)`, a name
+          // this project has not used since it was renamed and a version
+          // that was never true, on the path every REST adapter takes.
+          'User-Agent': fetchUserAgent(),
           ...options.headers,
         },
       });
