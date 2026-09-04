@@ -142,6 +142,18 @@ const rawFields = {
     .describe(
       'Max /mcp requests per client IP per minute (a token bucket refilling continuously toward this cap). Exceeding it returns 429 with a JSON-RPC error body.',
     ),
+  // Task 15 (Controller amendment, carried from Task 13's review): behind a
+  // reverse proxy (Cloudflare Tunnel, a PaaS edge), req.socket.remoteAddress
+  // is the proxy's own address for every client, so the rate limiter above
+  // would key every caller into one shared bucket. Off by default - only
+  // set this behind a proxy trusted to set these headers honestly, since a
+  // direct caller could otherwise spoof its own key and dodge the limit.
+  ALEXANDRIA_TRUSTED_PROXY: z
+    .string()
+    .optional()
+    .describe(
+      'Set to "1" when /mcp sits behind a trusted reverse proxy (Cloudflare Tunnel, a PaaS edge): the rate limiter keys clients on the CF-Connecting-IP header, then the first X-Forwarded-For entry, instead of the socket address. Off by default - only set this behind a proxy you trust to set those headers honestly.',
+    ),
 
   // ── Shared LLM provider table ───────────────────────────────────────────
   ALEXANDRIA_BASE_URL: z
@@ -274,6 +286,19 @@ const rawFields = {
     .optional()
     .describe(
       'Set to 1 to use the jina reader fetch tier anonymously (20 RPM shared cap) when JINA_API_KEY is unset.',
+    ),
+  // Task 15: fetch tier 4, tried after crawl4ai. See docs/cloudflare.md.
+  CLOUDFLARE_ACCOUNT_ID: z
+    .string()
+    .optional()
+    .describe(
+      'Cloudflare account ID for the Browser Run fetch tier (tier 4, after crawl4ai): POSTs to https://api.cloudflare.com/client/v4/accounts/<id>/browser-rendering/markdown. Requires CLOUDFLARE_BROWSER_RUN_TOKEN too; hides the tier without both.',
+    ),
+  CLOUDFLARE_BROWSER_RUN_TOKEN: z
+    .string()
+    .optional()
+    .describe(
+      "Cloudflare API token (Browser Rendering 'Edit' permission) for CLOUDFLARE_ACCOUNT_ID's Browser Run fetch tier.",
     ),
 
   // ── knowledge_search delegation (src/tools/libraryAnswer.ts) ────────────

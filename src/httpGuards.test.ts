@@ -92,13 +92,16 @@ test('origin guard', async (t) => {
 // the limiter is wrong. Calling the guard function directly keeps 61
 // iterations at native JS speed (microseconds), well under the refill
 // window, so the boundary is exact.
-function fakeReqRes(remoteAddress: string): {
+function fakeReqRes(
+  remoteAddress: string,
+  headers: Record<string, string> = {},
+): {
   req: IncomingMessage;
   res: ServerResponse;
   written: { status?: number; body?: string };
 } {
   const written: { status?: number; body?: string } = {};
-  const req = { socket: { remoteAddress } } as unknown as IncomingMessage;
+  const req = { socket: { remoteAddress }, headers } as unknown as IncomingMessage;
   const res = {
     writeHead(status: number) {
       written.status = status;
@@ -180,4 +183,93 @@ test('rate limit wiring: an actual /mcp request over a small configured limit ge
   const body = (await third.json()) as { jsonrpc?: string; error?: { code?: number } };
   assert.equal(body.jsonrpc, '2.0');
   assert.equal(typeof body.error?.code, 'number');
+});
+
+// Task 15 (Controller amendment): ALEXANDRIA_TRUSTED_PROXY changes which
+// header checkRateLimit's clientKey() reads. Both branches (flag set,
+// flag unset) are exercised against the SAME socket address carrying
+// different proxy-set headers, so a pass here can only be explained by the
+// header actually driving the bucket key, not the socket address.
+test('checkRateLimit: ALEXANDRIA_TRUSTED_PROXY', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+
+  await t.test(
+    'keys on CF-Connecting-IP when the flag is set, not the shared proxy socket address',
+    () => {
+      process.env.ALEXANDRIA_TRUSTED_PROXY = '1';
+      resetRateLimitForTests();
+      const proxyAddress = '10.0.0.1'; // the same for every client behind the proxy
+
+      // Exhaust client A's bucket...
+      for (let i = 0; i < 60; i++) {
+        const { req, res } = fakeReqRes(proxyAddress, { 'cf-connecting-ip': '198.51.100.10' });
+        assert.equal(checkRateLimit(req, res), true);
+      }
+      const { req: aReq, res: aRes } = fakeReqRes(proxyAddress, {
+        'cf-connecting-ip': '198.51.100.10',
+      });
+      assert.equal(checkRateLimit(aReq, aRes), false, 'client A should now be rejected');
+
+      // ...client B, behind the same proxy socket address, is untouched.
+      const { req: bReq, res: bRes } = fakeReqRes(proxyAddress, {
+        'cf-connecting-ip': '198.51.100.11',
+      });
+      assert.equal(checkRateLimit(bReq, bRes), true, 'client B should have its own bucket');
+
+      delete process.env.ALEXANDRIA_TRUSTED_PROXY;
+    },
+  );
+
+  await t.test(
+    'falls back to the first X-Forwarded-For entry when CF-Connecting-IP is absent',
+    () => {
+      process.env.ALEXANDRIA_TRUSTED_PROXY = '1';
+      resetRateLimitForTests();
+      const proxyAddress = '10.0.0.1';
+
+      for (let i = 0; i < 60; i++) {
+        const { req, res } = fakeReqRes(proxyAddress, {
+          'x-forwarded-for': '198.51.100.20, 10.0.0.1',
+        });
+        assert.equal(checkRateLimit(req, res), true);
+      }
+      const { req: exhausted, res: exhaustedRes } = fakeReqRes(proxyAddress, {
+        'x-forwarded-for': '198.51.100.20, 10.0.0.1',
+      });
+      assert.equal(checkRateLimit(exhausted, exhaustedRes), false);
+
+      const { req: fresh, res: freshRes } = fakeReqRes(proxyAddress, {
+        'x-forwarded-for': '198.51.100.21, 10.0.0.1',
+      });
+      assert.equal(
+        checkRateLimit(fresh, freshRes),
+        true,
+        'a different first entry gets its own bucket',
+      );
+
+      delete process.env.ALEXANDRIA_TRUSTED_PROXY;
+    },
+  );
+
+  await t.test(
+    'ignores CF-Connecting-IP/X-Forwarded-For and keys on the socket address when unset',
+    () => {
+      delete process.env.ALEXANDRIA_TRUSTED_PROXY;
+      resetRateLimitForTests();
+      const socketAddress = '198.51.100.30';
+
+      // Two requests carrying different spoofed proxy headers, but the
+      // SAME socket address, must land in the SAME bucket when the flag
+      // is off - proving the headers are ignored, not merely unused.
+      for (let i = 0; i < 60; i++) {
+        const { req, res } = fakeReqRes(socketAddress, { 'cf-connecting-ip': `203.0.113.${i}` });
+        assert.equal(checkRateLimit(req, res), true);
+      }
+      const { req, res } = fakeReqRes(socketAddress, { 'cf-connecting-ip': '203.0.113.99' });
+      assert.equal(checkRateLimit(req, res), false, 'the shared socket-keyed bucket is exhausted');
+    },
+  );
 });

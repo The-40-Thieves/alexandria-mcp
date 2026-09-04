@@ -64,7 +64,28 @@ const buckets = new Map<string, Bucket>();
 // server's actual traffic shape.
 const MAX_TRACKED_CLIENTS = 50_000;
 
+// Task 15 (Controller amendment): behind a reverse proxy (Cloudflare
+// Tunnel, a PaaS edge), req.socket.remoteAddress is the proxy's own
+// address for every client, collapsing the whole rate limiter into one
+// shared bucket. ALEXANDRIA_TRUSTED_PROXY=1 opts into trusting the
+// proxy-set headers instead: CF-Connecting-IP first (Cloudflare's own,
+// unspoofable-by-the-client header once behind a Tunnel/proxy), then the
+// first X-Forwarded-For entry (the original client, per the header's
+// left-to-right append convention - later entries are added by
+// intermediate hops closer to this server). Unset, or neither header
+// present, falls back to the socket address exactly as before - the flag
+// must be an explicit, deliberate opt-in (see config.ts's description)
+// since trusting either header from an untrusted caller would let it pick
+// its own rate-limit bucket.
 function clientKey(req: IncomingMessage): string {
+  if (config.ALEXANDRIA_TRUSTED_PROXY === '1') {
+    const cfConnectingIp = req.headers['cf-connecting-ip'];
+    if (typeof cfConnectingIp === 'string' && cfConnectingIp) return cfConnectingIp;
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const rawFirst = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    const firstEntry = rawFirst?.split(',')[0]?.trim();
+    if (firstEntry) return firstEntry;
+  }
   return req.socket.remoteAddress ?? 'unknown';
 }
 

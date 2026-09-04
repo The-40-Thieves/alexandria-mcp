@@ -556,9 +556,60 @@ test('fetchAsText', async (t) => {
     delete process.env.CRAWL4AI_URL;
   });
 
+  await t.test(
+    'tier 4: falls through to browser-run when CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_BROWSER_RUN_TOKEN are set',
+    async () => {
+      delete process.env.JINA_API_KEY;
+      delete process.env.ALEXANDRIA_JINA_READER;
+      delete process.env.CRAWL4AI_URL;
+      process.env.CLOUDFLARE_ACCOUNT_ID = 'acct123';
+      process.env.CLOUDFLARE_BROWSER_RUN_TOKEN = 'test-cf-token';
+      const server = await startFixtureServer();
+      t.after(() => server.close());
+
+      const browserRunCalls: Array<{
+        url: string;
+        headers: Record<string, string>;
+        body: unknown;
+      }> = [];
+      globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
+        const url = String(input);
+        if (url.startsWith('https://api.cloudflare.com/client/v4/accounts/acct123/')) {
+          browserRunCalls.push({
+            url,
+            headers: (init.headers as Record<string, string>) ?? {},
+            body: init.body ? JSON.parse(init.body as string) : undefined,
+          });
+          return new Response(
+            JSON.stringify({ success: true, result: 'Rendered via Browser Run.' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return originalFetch(input as string, init);
+      }) as typeof fetch;
+
+      const target = `${server.url}/tiny`;
+      const page = await fetchAsText(target);
+      assert.equal(page.via, 'browser-run');
+      assert.equal(page.text, 'Rendered via Browser Run.');
+      assert.equal(browserRunCalls.length, 1);
+      assert.equal(
+        browserRunCalls[0].url,
+        'https://api.cloudflare.com/client/v4/accounts/acct123/browser-rendering/markdown',
+      );
+      assert.equal(browserRunCalls[0].headers.Authorization, 'Bearer test-cf-token');
+      assert.deepEqual(browserRunCalls[0].body, { url: target });
+
+      delete process.env.CLOUDFLARE_ACCOUNT_ID;
+      delete process.env.CLOUDFLARE_BROWSER_RUN_TOKEN;
+    },
+  );
+
   await t.test('throws the last tier error once every configured tier fails', async () => {
     delete process.env.JINA_API_KEY;
     delete process.env.ALEXANDRIA_JINA_READER;
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+    delete process.env.CLOUDFLARE_BROWSER_RUN_TOKEN;
     const server = await startFixtureServer({ results: [{ success: false }] });
     t.after(() => server.close());
     process.env.CRAWL4AI_URL = server.url;
@@ -568,10 +619,40 @@ test('fetchAsText', async (t) => {
     delete process.env.CRAWL4AI_URL;
   });
 
+  await t.test(
+    'browser-run is skipped (never called) when only one of the two env vars is set',
+    async () => {
+      delete process.env.JINA_API_KEY;
+      delete process.env.ALEXANDRIA_JINA_READER;
+      delete process.env.CRAWL4AI_URL;
+      delete process.env.CLOUDFLARE_BROWSER_RUN_TOKEN;
+      process.env.CLOUDFLARE_ACCOUNT_ID = 'acct123';
+      const server = await startFixtureServer();
+      t.after(() => server.close());
+
+      let browserRunCalled = false;
+      globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
+        const url = String(input);
+        if (url.startsWith('https://api.cloudflare.com/')) {
+          browserRunCalled = true;
+          throw new Error('browser-run should not have been called');
+        }
+        return originalFetch(input as string, init);
+      }) as typeof fetch;
+
+      await assert.rejects(() => fetchAsText(`${server.url}/broken`), /defuddle/);
+      assert.equal(browserRunCalled, false);
+
+      delete process.env.CLOUDFLARE_ACCOUNT_ID;
+    },
+  );
+
   await t.test('throws when no tier is configured and defuddle fails', async () => {
     delete process.env.JINA_API_KEY;
     delete process.env.ALEXANDRIA_JINA_READER;
     delete process.env.CRAWL4AI_URL;
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+    delete process.env.CLOUDFLARE_BROWSER_RUN_TOKEN;
     const server = await startFixtureServer();
     t.after(() => server.close());
 
