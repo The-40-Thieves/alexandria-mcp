@@ -14,3 +14,7 @@ dist/
 # (src/utils/catalogIndex.ts): the catalog embedding cache, created at
 # runtime by `npm run eval:routing` when an embeddings role is configured.
 /eval/catalog-embeddings*.json
+# scripts/probe.ts's per-run output (the weekly probe workflow uploads it
+# as an artifact and diffs it against eval/probe-baseline.json, which stays
+# checked in); a local `npm run probe` shouldn't dirty the tree.
+/eval/probe-latest.json

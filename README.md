@@ -225,16 +225,27 @@ index above. This file was written against the current pgvector/supabase-js
 docs but has not been run against a live database - verify it against your
 own project before relying on it.
 
+## Claude Code (npx)
+
+```bash
+claude mcp add --env OPENAI_API_KEY=sk-... alexandria -- npx -y @the-40-thieves/alexandria-mcp
+```
+
+Search and read work with no environment variables at all; the `--env` flag
+above is only needed to enable `library_ask`, `library_answer`,
+`library_research`, and `library_ingest`. See [Credentials](#credentials)
+for the full list of optional keys.
+
 ## Claude Desktop (stdio)
 
-Minimum config (search and read only):
+Minimum config (search and read only), using the published package via `npx`:
 
 ```json
 {
   "mcpServers": {
     "library": {
-      "command": "node",
-      "args": ["/path/to/alexandria-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"],
       "env": {
         "TRANSPORT": "stdio"
       }
@@ -249,8 +260,8 @@ With `library_ask` and `library_ingest` enabled:
 {
   "mcpServers": {
     "library": {
-      "command": "node",
-      "args": ["/path/to/alexandria-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"],
       "env": {
         "TRANSPORT": "stdio",
         "OPENAI_API_KEY": "sk-...",
@@ -261,6 +272,9 @@ With `library_ask` and `library_ingest` enabled:
   }
 }
 ```
+
+From a local checkout instead of the published package, replace `command`/
+`args` with `"command": "node", "args": ["/path/to/alexandria-mcp/dist/index.js"]`.
 
 ## Railway (HTTP)
 
@@ -328,7 +342,7 @@ Register in Claude Desktop:
 }
 ```
 
-Health check: `GET /health` returns `{ status: "ok", version: "10.0.0", sources: { total: 152, visible: 116, hidden: 36, calls: 0, errors: 0 }, byKind: { rest: 118, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }, cache: { entries: 0 }, tools: 11 }`.
+Health check: `GET /health` returns `{ status: "ok", version: "11.0.0", sources: { total: 152, visible: 116, hidden: 36, calls: 0, errors: 0 }, byKind: { rest: 118, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }, cache: { entries: 0 }, tools: 11 }`.
 
 Metrics: `GET /metrics` returns per-source counters (calls, errors, timeouts, cacheHits, quotaRejections, latencyMsTotal) and per-tool counters (invocations, llmCalls) as JSON, e.g. `{ "sources": { "arxiv": { "calls": 12, "errors": 0, "timeouts": 0, "cacheHits": 3, "quotaRejections": 0, "latencyMsTotal": 4210 } }, "tools": { "library_ask": { "invocations": 5, "llmCalls": 5 } } }`. Only sources/tools actually called since the process started appear.
 

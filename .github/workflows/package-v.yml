@@ -1,24 +1,109 @@
-# Publishes the package to GitHub Packages on manual dispatch.
-# For more information see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
+# Publishes @the-40-thieves/alexandria-mcp to registry.npmjs.org on a v* tag
+# using npm trusted publishing (GitHub Actions OIDC). Replaces the previous
+# GitHub Packages publish (npm.pkg.github.com); see the note at the bottom.
+#
+# Answers verified 2026-09-03 against the primary sources:
+#
+# 1. Can a FIRST-EVER publish of a brand-new package use trusted publishing?
+#    No, not as documented. npm's trusted-publisher configuration lives in the
+#    package's settings page on npmjs.com ("Navigate to your package settings"),
+#    so the package must already exist before a publisher can be attached:
+#    https://docs.npmjs.com/trusted-publishers/#step-1-add-a-trusted-publisher-on-npmjscom
+#    npm/cli issue #8544 "Allow publishing initial version with OIDC" is still
+#    OPEN (last activity 2026-08-05); an npm maintainer said first-publish was
+#    left out of the MVP: https://github.com/npm/cli/issues/8544
+#    The `npm trust github` CLI (npm >= 11.10.0) configures the same thing from
+#    the terminal but its docs do not claim to work for a package that does not
+#    exist yet: https://docs.npmjs.com/cli/v12/commands/npm-trust
+#    So the bootstrap is: one manual, token-or-login publish (a 0.0.0
+#    placeholder, or the real 11.0.0 without provenance) by the owner, then
+#    attach the trusted publisher, then every later tag goes through this
+#    workflow. Exact steps are in owner-checklist.md.
+#
+# 2. Which npm CLI does the runner need?
+#    npm >= 11.5.1 and Node >= 22.14.0 (https://docs.npmjs.com/trusted-publishers/).
+#    actions/setup-node `node-version: 24` resolves the newest 24.x; per
+#    https://nodejs.org/dist/index.json v24.20.0 (2026-08-26) bundles npm
+#    11.19.0, and every 24.x since v24.5.0 bundles >= 11.5.1. No manual
+#    `npm i -g npm` is needed. The Node 24 recommendation is also in
+#    https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md#publishing-to-npm-with-trusted-publisher-oidc
+#
+# 3. Is --provenance implied?
+#    Yes. "When you publish using trusted publishing from GitHub Actions ...
+#    npm automatically generates and publishes provenance attestations ...
+#    you don't need to add the --provenance flag", provided the repo and the
+#    package are both public (true here):
+#    https://docs.npmjs.com/trusted-publishers/#automatic-provenance-generation
+#    The explicit flag below is kept as belt-and-braces; it is harmless.
+#    `--access public` IS still required on a scoped package's first publish
+#    (scoped packages default to restricted):
+#    https://docs.npmjs.com/creating-and-publishing-scoped-public-packages
+#
+# Preconditions in the repo before the first tag (all in owner-checklist.md):
+#   - package.json: remove `publishConfig.registry` (it currently pins
+#     npm.pkg.github.com and would override registry-url below).
+#   - package.json: add `"mcpName": "io.github.The-40-Thieves/alexandria-mcp"`
+#     (the MCP registry reads it from the PUBLISHED package).
+#   - package.json: add a `bin` entry and a `#!/usr/bin/env node` shebang so
+#     `npx -y @the-40-thieves/alexandria-mcp` can start the server.
+#   - package.json `repository.url` must exactly match the GitHub repo
+#     (it does: https://github.com/The-40-Thieves/alexandria-mcp.git):
+#     https://docs.npmjs.com/trusted-publishers/#troubleshooting
+#   - On npmjs.com the trusted publisher must name THIS file: package-v.yml.
 
-name: Node.js Package
+name: Publish to npm
 
-on: workflow_dispatch
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    # Manual re-run against the checked-out ref. The trusted publisher matches
+    # the workflow filename, and for workflow_dispatch npm validates the
+    # calling workflow's name, which is this same file, so it still matches:
+    # https://docs.npmjs.com/trusted-publishers/#troubleshooting
+
+permissions:
+  contents: read
+  id-token: write # required for OIDC trusted publishing
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
 
 jobs:
-  publish-gpr:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+  publish-npm:
+    runs-on: ubuntu-latest # trusted publishing supports GitHub-hosted runners only
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
+          # setup-node's own OIDC guidance: never cache in a release build.
+          package-manager-cache: false
+
+      - name: Check the tag matches package.json
+        if: github.event_name == 'push'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag v$tag does not match package.json version $pkg" >&2
+            exit 1
+          fi
+
       - run: npm ci
+
       - run: npm run build
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # No NODE_AUTH_TOKEN: the npm CLI detects the OIDC environment and
+      # exchanges the GitHub token for a short-lived publish token itself.
+      - run: npm publish --provenance --access public
+
+# Dropped from the old workflow: the GitHub Packages publish (npm.pkg.github.com
+# with NODE_AUTH_TOKEN=GITHUB_TOKEN and `packages: write`). If a mirror on
+# GitHub Packages is still wanted, add a second job that runs
+# `npm publish --registry=https://npm.pkg.github.com` with that token; it
+# cannot share this job because publishConfig is being removed.
