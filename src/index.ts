@@ -24,7 +24,7 @@ import { indexText, ingestText } from './pipeline/index.ts';
 import { registerPrompts } from './prompts.ts';
 import { registerResources } from './resources.ts';
 import { assertIngestAllowed, ingestMetadata } from './sources/ingestPolicy.ts';
-import { getAdapter, healthSummary, listSources, truncateText } from './sources/registry.ts';
+import { getAdapter, healthSummary, listSources } from './sources/registry.ts';
 import { s2Recommend } from './sources/semanticscholar.ts';
 import { TOOL_COUNT } from './toolCount.ts';
 import { formatResult } from './tools/format.ts';
@@ -37,22 +37,13 @@ import { libraryAsk } from './tools/libraryAsk.ts';
 import { libraryCitations } from './tools/libraryCitations.ts';
 import { libraryHealth } from './tools/libraryHealth.ts';
 import { libraryResearch, type ProgressCallback } from './tools/libraryResearch.ts';
-import type { LibrarySource, ReadResult } from './types.ts';
+import type { LibrarySource } from './types.ts';
 import { closeDispatchers, installDispatcher } from './utils/dispatcher.ts';
 import { requestContext } from './utils/http.ts';
 import { metricsSnapshot, sourceCallTotals, toolMetrics } from './utils/metrics.ts';
 import { closeStateStore } from './utils/stateStore.ts';
 import { VERSION } from './version.ts';
-import { type FetchedPage, fetchAsText } from './web/fetchTier.ts';
-import {
-  extractDoiFromUrl,
-  fetchBiocFullText,
-  OPEN_ACCESS_HOP_ORDER,
-  OpenAccessBlockedError,
-  pmcidFromBiocUrl,
-  resolveOpenAccess,
-} from './web/openAccess.ts';
-import { PDF_PAGE_JOINER } from './web/pdf.ts';
+import { withOpenAccessFallback } from './web/openAccessFallback.ts';
 
 import './sources/all.ts';
 
@@ -129,6 +120,10 @@ const CitationSchema = z.object({
     })
     .optional(),
   resolves: z.boolean().optional(),
+  // Final wave (E4): detailed-only marker on a citation whose text came
+  // from the corpus cache; `source`/`id` above are the chunk's original
+  // (readable) pair either way.
+  via: z.literal('corpus').optional(),
 });
 
 const AuthSpecSchema = z.object({
@@ -190,9 +185,24 @@ const ChunkMetadataSchema = z.object({
   license: z.string().optional(),
   attribution: z.string().optional(),
   expiresAt: z.string().optional(),
+  // Final wave (E6): ChunkMetadata has carried these since review round 1
+  // (they are what keeps a corpus-as-cache citation's url and grading
+  // tier honest - see src/pipeline/corpusSearch.ts), and library_index's
+  // sampleChunks payload has always included them; only this schema had
+  // not caught up, so the declared output shape did not match what the
+  // tool actually returns.
+  url: z.string().optional(),
+  cluster: z.string().optional(),
 });
 
-const ChunkSchema = z.object({ text: z.string(), metadata: ChunkMetadataSchema });
+// embedText likewise: chunkSemantic() sets it whenever the embedded text
+// differs from the displayed text (ALEXANDRIA_CHUNK_PREFIX), and it is in
+// the payload.
+const ChunkSchema = z.object({
+  text: z.string(),
+  embedText: z.string().optional(),
+  metadata: ChunkMetadataSchema,
+});
 
 const ReadResultSchema = z.object({
   title: z.string(),
@@ -281,115 +291,6 @@ function withRequestContext<T>(tool: string, handler: () => Promise<T>): Promise
   return requestContext.run({ reqId: randomUUID(), tool }, handler);
 }
 
-// Task 6 (and review round 1's controller ruling): the open-access
-// fallback chain, used by library_read's handler below. Triggers whenever
-// an adapter's result has no full text - metadataOnly: true, OR less than
-// MIN_FULL_TEXT_CHARS of `text` (most scholarly adapters - crossref,
-// datacite, biorxiv, medrxiv, plos, doaj, europmc, zenodo, osf, openalex,
-// semanticscholar - never set metadataOnly at all; read() just returns an
-// abstract stub as `text`) - AND the item names a DOI, its own `doi`
-// field, or one embedded in `externalUrl`. resolveOpenAccess() (openalex,
-// pmc, core, fatcat, in that order) finds a candidate URL, then this
-// fetches it (fetchAsText for a PDF/HTML candidate, fetchBiocFullText
-// directly for a PMC one, since PMC's BioC endpoint is neither HTML nor a
-// PDF and fetchAsText's content-type gate would refuse it). On success the
-// adapter's own stub moves to `note` (dropped only when it's identical to
-// the new full text) rather than being discarded. Anything short of real
-// text keeps the adapter's original `text` untouched (never blanked) and
-// attaches `unavailable` with a reason and which OA sources were actually
-// tried.
-const MIN_FULL_TEXT_CHARS = 2000;
-
-type UnavailableReason = NonNullable<ReadResult['unavailable']>['reason'];
-
-function classifyOpenAccessFailure(err: unknown): UnavailableReason {
-  const message = err instanceof Error ? err.message : String(err);
-  // fetchTier.ts's guard errors ("fetchAsText: refusing to fetch ...",
-  // "fetchAsText: could not resolve ...", "fetchAsText: not a valid
-  // URL ...") all start this way - see assertFetchableUrl's callers.
-  if (/refusing to fetch|could not resolve|not a valid URL/.test(message)) return 'blocked';
-  if (/byte cap/.test(message)) return 'too_large'; // readCappedBytes/readCappedText
-  if (/HTTP 40[123]\b/.test(message)) return 'paywalled';
-  return 'no_full_text';
-}
-
-// Mirrors pdf.ts's extractPdf(): `text` is these pages' text joined by
-// PDF_PAGE_JOINER, so walking the same join recovers each page's char
-// range in that (untruncated) text.
-function pdfPagesToCharPages(
-  pages: NonNullable<FetchedPage['pages']>,
-): NonNullable<ReadResult['pages']> {
-  let offset = 0;
-  return pages.map(({ page, text }) => {
-    const charStart = offset;
-    const charEnd = charStart + text.length;
-    offset = charEnd + PDF_PAGE_JOINER.length;
-    return { page, charStart, charEnd };
-  });
-}
-
-function hasFullText(result: ReadResult): boolean {
-  return !result.metadataOnly && (result.text ?? '').length >= MIN_FULL_TEXT_CHARS;
-}
-
-async function withOpenAccessFallback(result: ReadResult): Promise<ReadResult> {
-  if (hasFullText(result)) return result;
-  const doi = result.doi ?? extractDoiFromUrl(result.externalUrl);
-  if (!doi) return result;
-
-  const allHops = [...OPEN_ACCESS_HOP_ORDER] as string[];
-  let oa: Awaited<ReturnType<typeof resolveOpenAccess>>;
-  try {
-    oa = await resolveOpenAccess(doi);
-  } catch (err) {
-    // A hop's own candidate URL was refused by assertFetchableUrl (see
-    // openAccess.ts's module comment) - a real refusal, not "nothing
-    // found", so it's reported rather than silently swallowed.
-    // OpenAccessBlockedError carries exactly the hops resolveOpenAccess
-    // attempted before the one that threw; anything else (a bug, an
-    // unexpected throw) falls back to reporting the full hop list.
-    const triedTiers = err instanceof OpenAccessBlockedError ? err.tried : allHops;
-    return { ...result, unavailable: { reason: classifyOpenAccessFailure(err), triedTiers } };
-  }
-  if (!oa) {
-    return { ...result, unavailable: { reason: 'not_found', triedTiers: allHops } };
-  }
-
-  const triedTiers = allHops.slice(0, allHops.indexOf(oa.via) + 1);
-  try {
-    let text: string;
-    let title = result.title;
-    let pages: NonNullable<ReadResult['pages']> | undefined;
-    if (oa.via === 'pmc') {
-      const pmcid = pmcidFromBiocUrl(oa.url);
-      const fetched = pmcid ? await fetchBiocFullText(pmcid) : undefined;
-      if (!fetched) throw new Error(`no BioC full text available at ${oa.url}`);
-      text = fetched;
-    } else {
-      const page = await fetchAsText(oa.url);
-      if (!page.text) throw new Error(`empty text fetching ${oa.url}`);
-      text = page.text;
-      title = result.title || page.title;
-      if (page.via === 'pdf' && page.pages) pages = pdfPagesToCharPages(page.pages);
-    }
-    const enriched: ReadResult = { ...result, metadataOnly: false, title, ...truncateText(text) };
-    if (pages) enriched.pages = pages;
-    // The adapter's own abstract/stub is kept under `note` rather than
-    // discarded - a short-text trigger means the adapter DID return
-    // something real, just not full text.
-    if (result.text && result.text !== text) {
-      enriched.note = result.note
-        ? `${result.note}\n\nAbstract: ${result.text}`
-        : `Abstract: ${result.text}`;
-    }
-    return enriched;
-  } catch (err) {
-    // Keep the adapter's own text untouched (never blanked); only attach
-    // `unavailable` (result is spread first, so its `text` survives).
-    return { ...result, unavailable: { reason: classifyOpenAccessFailure(err), triedTiers } };
-  }
-}
-
 /**
  * Build a fresh McpServer with the ten public tools registered.
  *
@@ -438,7 +339,7 @@ export function createServer(): McpServer {
     'library_health_check',
     {
       title: 'Check Source Health',
-      description: `Report per-source health: 'ok', 'degraded', 'down', 'key_missing', or 'unknown', merging this process's live error rate and latency with the last off-process probe run. Use before relying on a source that has been erroring, or to check whether a key is configured. Optionally filter by source or cluster. Set response_format: "detailed" for error rate, latency, and quota usage.`,
+      description: `Report per-source health: 'ok', 'degraded', 'down', 'key_missing', or 'unknown', merging this process's live error rate and latency with the last off-process probe run. The probe layer reads eval/probe-latest.json, which published installs do not ship, so on a published install a source's status stays 'unknown' until this process itself calls it. Use before relying on a source that has been erroring, or to check whether a key is configured. Optionally filter by source or cluster. Set response_format: "detailed" for error rate, latency, and quota usage.`,
       inputSchema: z.object({
         source: SourceSchema.optional(),
         cluster: z.string().optional().describe('Restrict to sources in this cluster'),
@@ -458,11 +359,26 @@ export function createServer(): McpServer {
     },
     async ({ source, cluster, response_format }) =>
       withRequestContext('library_health_check', async () => {
-        const result = libraryHealth({ source, cluster, response_format });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          structuredContent: toStructured(result),
-        };
+        // Final wave (E7): the only tool handler without a try/catch, so
+        // any throw from libraryHealth() (a probe file of the wrong shape
+        // made `results` undefined and threw on the first property read)
+        // escaped the handler instead of answering isError like every
+        // other tool. The shape guard in libraryHealth() closes that
+        // particular hole; this closes the class.
+        try {
+          const result = libraryHealth({ source, cluster, response_format });
+          return {
+            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            structuredContent: toStructured(result),
+          };
+        } catch (err) {
+          return {
+            content: [
+              { type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` },
+            ],
+            isError: true,
+          };
+        }
       }),
   );
 
@@ -576,7 +492,14 @@ export function createServer(): McpServer {
                   .filter((r) => r.hasFullText)
                   .map((r) => ({
                     type: 'resource_link' as const,
-                    uri: `library://doc/${r.source}/${r.id}`,
+                    // Final wave (E1): encoded, because plenty of real ids
+                    // contain '/' - every DOI (crossref, datacite,
+                    // opencitations), and codewiki/readthedocs' path-shaped
+                    // ids - and an unencoded one produced a URI with extra
+                    // path segments that resources.ts's {source}/{id}
+                    // template could never match back. resources.ts
+                    // decodeURIComponent()s it on the way in.
+                    uri: `library://doc/${encodeURIComponent(r.source)}/${encodeURIComponent(r.id)}`,
                     name: r.title,
                     title: r.title,
                   }))

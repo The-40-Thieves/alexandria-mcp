@@ -33,7 +33,7 @@
 import { fetchCrossrefBibtex } from '../sources/crossref.ts';
 import { authParam, normalizeOpenAlex } from '../sources/openalex.ts';
 import { opencitationsRead, opencitationsSearch } from '../sources/opencitations.ts';
-import { getAdapter } from '../sources/registry.ts';
+import { getAdapter, listSources } from '../sources/registry.ts';
 import type { LibraryResult } from '../types.ts';
 import { type BibliographyStyle, formatBibliography } from '../utils/bibliography.ts';
 import { fetchJSON } from '../utils/http.ts';
@@ -244,10 +244,25 @@ async function buildFormatted(results: LibraryResult[], style: BibliographyStyle
   return entries.join('\n\n');
 }
 
+// Final wave (E5): `source` is validated against the registry before
+// anything else. resolveSeed()'s DOI branch runs BEFORE its getAdapter()
+// call, so `{source: 'not-registered', id: '10.1000/example'}` reached
+// OpenAlex and came back with the invented source echoed in the result's
+// `seed` - a caller could name any string and get an authoritative-looking
+// answer attributed to it. Every other branch would have failed on
+// getAdapter() anyway; this makes the check uniform and up front.
+function assertRegisteredSource(source: string): void {
+  if (listSources().some((s) => s.name === source)) return;
+  throw new Error(
+    `Unknown source "${source}". Run library_list_sources for the current list of sources.`,
+  );
+}
+
 export async function libraryCitations(
   options: LibraryCitationsOptions,
 ): Promise<LibraryCitationsResult> {
   const { id, source, direction, limit = DEFAULT_LIMIT, format } = options;
+  assertRegisteredSource(source);
   const { work, doi } = await resolveSeed(id, source);
 
   let results: LibraryResult[];

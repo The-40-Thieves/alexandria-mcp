@@ -60,7 +60,10 @@ interface AnswerLike {
 // flagged, is safety-relevant information a concise caller still needs to
 // see, so it is carried through here (concise answer/research previously
 // dropped it entirely - a gap this task closes, not a new omission).
-export type ConciseCitation = Omit<Citation, 'grade' | 'resolves'>;
+// Final wave (E4): `via` joins grade/resolves as detailed-only - the
+// concise shape stays exactly the field set library_answer returned before
+// any of the three existed.
+export type ConciseCitation = Omit<Citation, 'grade' | 'resolves' | 'via'>;
 
 function toConciseCitation(c: Citation): ConciseCitation {
   const row: ConciseCitation = { n: c.n, source: c.source, id: c.id, title: c.title };

@@ -72,6 +72,24 @@ function registerStaticSource(
   });
 }
 
+// Final wave (E3): a source whose terms forbid storing its text (trove is
+// the live example: registered `daily` AND `ingestPolicy: 'forbidden'`),
+// and one whose text may only be kept for a retention window.
+function registerPolicySource(name: string, ingestPolicy: 'forbidden' | 'timeboxed'): void {
+  register(name, {
+    description: `test ${ingestPolicy} source ${name}`,
+    supportsIngest: true,
+    freshness: 'daily',
+    ingestPolicy,
+    async search() {
+      return [];
+    },
+    async read() {
+      return { title: name, authors: [] };
+    },
+  });
+}
+
 function registerRealtimeSource(name: string): void {
   register(name, {
     description: `test realtime source ${name}`,
@@ -281,4 +299,97 @@ test('corpusSearch', async (t) => {
       assert.equal(store.calls.length, 0, 'the store is never queried');
     },
   );
+});
+
+// Final wave (E3): cacheableSources() filtered on freshness alone, and
+// freshness has nothing to do with whether a source's terms allow storing
+// its text. A pre-policy or externally inserted chunk from a `forbidden`
+// source (trove is registered daily AND forbidden) was returned, embedded
+// into answers, and cited. And a `timeboxed` chunk with no expiresAt was
+// treated as never expiring, which is the opposite of a retention window.
+test('corpusSearch: ingest policy is enforced on the read path', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+  process.env.SUPABASE_URL = 'https://fake.supabase.test';
+
+  registerStaticSource('zzfcorpus_policy_ok');
+  registerPolicySource('zzfcorpus_policy_forbidden', 'forbidden');
+  registerPolicySource('zzfcorpus_policy_timeboxed', 'timeboxed');
+
+  const embed = async (texts: string[]) => texts.map(() => [0, 0, 0]);
+
+  await t.test('a forbidden source is excluded from the query filter', async () => {
+    const store = new FakeStore([]);
+    await corpusSearch('a query', { store, embed });
+    const sources = store.calls[0]?.filter?.sources ?? [];
+    assert.ok(sources.includes('zzfcorpus_policy_ok'));
+    assert.ok(
+      !sources.includes('zzfcorpus_policy_forbidden'),
+      'a forbidden source must never enter the query filter',
+    );
+  });
+
+  await t.test('a forbidden chunk the store returns anyway is dropped', async () => {
+    // A provider that ignores the filter (or a chunk written before the
+    // policy existed) must still not reach an answer.
+    const store = new FakeStore([
+      hit({
+        metadata: chunkMetadata({ source: 'zzfcorpus_policy_forbidden', sourceId: 'trove-doc' }),
+        source: 'zzfcorpus_policy_forbidden',
+      }),
+      hit({
+        metadata: chunkMetadata({ source: 'zzfcorpus_policy_ok', sourceId: 'ok-doc' }),
+        source: 'zzfcorpus_policy_ok',
+      }),
+    ]);
+    const results = await corpusSearch('a query', { store, embed });
+    assert.deepEqual(
+      results.map((r) => r.id),
+      ['zzfcorpus_policy_ok:ok-doc:0'],
+    );
+  });
+
+  await t.test('a timeboxed chunk with no expiresAt is dropped', async () => {
+    const store = new FakeStore([
+      hit({
+        metadata: chunkMetadata({ source: 'zzfcorpus_policy_timeboxed', sourceId: 'news-doc' }),
+        source: 'zzfcorpus_policy_timeboxed',
+      }),
+    ]);
+    assert.deepEqual(await corpusSearch('a query', { store, embed }), []);
+  });
+
+  await t.test('a timeboxed chunk with a malformed expiresAt is dropped', async () => {
+    const store = new FakeStore([
+      hit({
+        metadata: chunkMetadata({
+          source: 'zzfcorpus_policy_timeboxed',
+          sourceId: 'news-doc',
+          expiresAt: 'not-a-date',
+        }),
+        source: 'zzfcorpus_policy_timeboxed',
+      }),
+    ]);
+    assert.deepEqual(await corpusSearch('a query', { store, embed }), []);
+  });
+
+  await t.test('a timeboxed chunk with a valid future expiresAt is served', async () => {
+    const store = new FakeStore([
+      hit({
+        metadata: chunkMetadata({
+          source: 'zzfcorpus_policy_timeboxed',
+          sourceId: 'news-doc',
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        }),
+        source: 'zzfcorpus_policy_timeboxed',
+      }),
+    ]);
+    const results = await corpusSearch('a query', { store, embed });
+    assert.deepEqual(
+      results.map((r) => r.id),
+      ['zzfcorpus_policy_timeboxed:news-doc:0'],
+    );
+  });
 });

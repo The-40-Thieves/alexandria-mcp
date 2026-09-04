@@ -12,6 +12,7 @@
 // returns [] rather than throwing - the same "quietly absent" contract
 // fetchKnowledgeResults() uses for KNOWLEDGE_MCP_URL.
 import { config } from '../config.ts';
+import type { IngestPolicy } from '../sources/ingestPolicy.ts';
 import { listSources } from '../sources/registry.ts';
 import type { LibraryResult, VectorStoreProvider } from '../types.ts';
 import { embed, hasEmbeddingsConfigured } from '../utils/providers.ts';
@@ -38,6 +39,9 @@ async function defaultStore(): Promise<VectorStoreProvider> {
 interface CacheableSourceInfo {
   homepage?: string;
   cluster?: string;
+  // Final wave (E3): carried so every returned hit can be re-checked
+  // against the policy, not just filtered by the query.
+  ingestPolicy: IngestPolicy;
 }
 
 // A source is only ever served from the cache when its registry freshness
@@ -46,6 +50,14 @@ interface CacheableSourceInfo {
 // query runs. Read fresh on every call rather than cached at module load,
 // same reasoning src/sources/registry.ts's own listSources() callers use.
 //
+// Final wave (E3): a source whose ingestPolicy is 'forbidden' is excluded
+// here too, so it never even enters the query filter. This filtered on
+// freshness alone, and freshness has nothing to do with whether a source's
+// terms allow storing its text: trove is registered daily AND forbidden,
+// so a pre-policy or externally inserted trove chunk in the vector store
+// was returned, embedded into answers, and cited. library_ingest refuses
+// to WRITE such a chunk; the read path has to refuse to serve one.
+//
 // Carries homepage/cluster too: Review round 1 (Important 1)'s fallback
 // for a chunk ingested before ChunkMetadata.url/cluster existed uses the
 // *current* registry entry for the chunk's source, and this is already
@@ -53,8 +65,10 @@ interface CacheableSourceInfo {
 function cacheableSources(): Map<string, CacheableSourceInfo> {
   const sources = new Map<string, CacheableSourceInfo>();
   for (const s of listSources()) {
+    const policy = s.ingestPolicy ?? 'allowed';
+    if (policy === 'forbidden') continue;
     if (s.freshness === 'static' || s.freshness === 'daily') {
-      sources.set(s.name, { homepage: s.homepage, cluster: s.cluster });
+      sources.set(s.name, { homepage: s.homepage, cluster: s.cluster, ingestPolicy: policy });
     }
   }
   return sources;
@@ -64,10 +78,18 @@ function cacheableSources(): Map<string, CacheableSourceInfo> {
 // metadata.expiresAt on every chunk it writes (src/sources/ingestPolicy.ts's
 // ingestMetadata()); the read path must honor that retention deadline too,
 // or an expired chunk keeps answering queries after it was meant to expire.
-function isExpired(expiresAt: string | undefined): boolean {
-  if (!expiresAt) return false;
-  const t = Date.parse(expiresAt);
-  return Number.isFinite(t) && t <= Date.now();
+//
+// Final wave (E3): for a TIMEBOXED source the deadline is now required,
+// not merely honored when present. A missing or unparseable expiresAt used
+// to mean "never expires", which is the exact opposite of what a retention
+// window means - and it is the shape a chunk written before the policy
+// existed, or inserted by something other than library_ingest, actually
+// has. Fails closed: no valid future deadline, no serve.
+function isServable(policy: IngestPolicy, expiresAt: string | undefined): boolean {
+  const deadline = expiresAt === undefined ? Number.NaN : Date.parse(expiresAt);
+  if (policy === 'timeboxed') return Number.isFinite(deadline) && deadline > Date.now();
+  if (policy === 'forbidden') return false;
+  return !Number.isFinite(deadline) || deadline > Date.now();
 }
 
 // Composite id encodes the chunk's original source/sourceId/chunkIndex for
@@ -97,9 +119,17 @@ export async function corpusSearch(
 
   const minSim = config.ALEXANDRIA_CORPUS_MIN_SIM;
   return hits
-    .filter(
-      (h) => h.similarity >= minSim && allowed.has(h.source) && !isExpired(h.metadata.expiresAt),
-    )
+    .filter((h) => {
+      if (h.similarity < minSim) return false;
+      // Final wave (E3): the policy is re-checked on every returned hit,
+      // not trusted to the query filter. A provider that ignores or
+      // mis-applies the `sources` filter (or a future one that does its
+      // own thing) must not be the only thing standing between a
+      // forbidden chunk and an answer.
+      const info = allowed.get(h.source);
+      if (!info) return false;
+      return isServable(info.ingestPolicy, h.metadata.expiresAt);
+    })
     .map((h) => {
       const registryInfo = allowed.get(h.source);
       return {

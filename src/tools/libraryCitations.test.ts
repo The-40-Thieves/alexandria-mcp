@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+// Final wave (E5): libraryCitations now validates `source` against the
+// registry at entry, so the real registrations (arxiv, openalex, ...) that
+// several cases below name have to be loaded, not just the local fixtures.
+import '../sources/all.ts';
 import { register } from '../sources/registry.ts';
 import { libraryCitations } from './libraryCitations.ts';
 
@@ -542,4 +546,23 @@ test('libraryCitations: format bibtex caps Crossref-preferred lookups at 20; lat
     /crossref_hit/,
     'the 21st item is beyond the cap and must use the local formatter',
   );
+});
+
+// Final wave (E5): resolveSeed()'s DOI branch ran before its getAdapter()
+// call, so a DOI-shaped id with an unregistered `source` reached OpenAlex
+// and came back with the invented source echoed in the result's `seed`.
+test('libraryCitations: an unregistered source is refused before any fetch', async (t) => {
+  const { calls, restore } = stubFetchSequence([]);
+  t.after(restore);
+
+  await assert.rejects(
+    () =>
+      libraryCitations({
+        id: '10.1000/example',
+        source: 'not-registered',
+        direction: 'citations',
+      }),
+    /Unknown source "not-registered"/,
+  );
+  assert.equal(calls.length, 0, 'nothing may be fetched for an unregistered source');
 });

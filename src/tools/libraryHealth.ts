@@ -87,12 +87,27 @@ const probeCache = new Map<string, ProbeCacheEntry>();
 // separate, infrequent process) ever rewrites. Absent or corrupt is treated
 // exactly like "no probe has ever run" - caught here, never left to throw
 // into the tool handler.
+// Final wave (E7): valid JSON of the WRONG SHAPE was accepted. A file that
+// parses but has no `results` object - a truncated write, an older probe
+// format, a hand-edited file, `{}` - left `probeFile.results` undefined,
+// and `probeFile?.results[s.name]` below then threw TypeError out of the
+// one tool handler that had no try/catch. "Absent or corrupt is treated
+// exactly like no probe has ever run" was already the intent; this makes
+// the shape part of what corrupt means.
+function isProbeFile(value: unknown): value is ProbeFile {
+  if (typeof value !== 'object' || value === null) return false;
+  const { generatedAt, results } = value as Partial<ProbeFile>;
+  if (typeof generatedAt !== 'string') return false;
+  return typeof results === 'object' && results !== null && !Array.isArray(results);
+}
+
 function loadProbeFile(probePath: string, now: number): ProbeFile | undefined {
   const cached = probeCache.get(probePath);
   if (cached && now - cached.loadedAt < PROBE_CACHE_TTL_MS) return cached.data;
   let data: ProbeFile | undefined;
   try {
-    data = JSON.parse(fs.readFileSync(probePath, 'utf8')) as ProbeFile;
+    const parsed: unknown = JSON.parse(fs.readFileSync(probePath, 'utf8'));
+    data = isProbeFile(parsed) ? parsed : undefined;
   } catch {
     data = undefined;
   }

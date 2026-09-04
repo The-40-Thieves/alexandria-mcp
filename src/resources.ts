@@ -22,6 +22,21 @@ function firstValue(v: string | string[]): string {
   return Array.isArray(v) ? (v[0] ?? '') : v;
 }
 
+// Final wave (E1): the template variable arrives percent-encoded (the
+// resource_link URIs src/index.ts builds encode it, and a client
+// round-tripping a URI it was given sends it back the same way), and used
+// to be handed to adapter.read() still encoded - so `10.1234%2Fabc` was
+// looked up instead of `10.1234/abc`. A value that is not valid
+// percent-encoding at all is passed through unchanged rather than throwing
+// out of the resource handler.
+function decodeSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Registers `library://doc/{source}/{id}`, reading the same text
  * `library_read` returns (including Task 6's open-access fallback) for the
@@ -41,8 +56,8 @@ export function registerResources(
       mimeType: 'text/plain',
     },
     async (uri, { source, id }) => {
-      const sourceName = firstValue(source);
-      const itemId = firstValue(id);
+      const sourceName = decodeSegment(firstValue(source));
+      const itemId = decodeSegment(firstValue(id));
       if (!sourceName || !itemId) {
         throw new ProtocolError(
           ProtocolErrorCode.InvalidParams,
