@@ -26,15 +26,15 @@
 // that no single value can crowd out the instructions around it. Callers
 // with a genuinely larger unit (a retrieved chunk, a draft report) pass
 // their own cap.
-export const MAX_DATA_BLOCK_CHARS = 4000;
+const MAX_DATA_BLOCK_CHARS = 4000;
 
-export function truncateForPrompt(value: string, maxChars = MAX_DATA_BLOCK_CHARS): string {
+function truncateForPrompt(value: string, maxChars = MAX_DATA_BLOCK_CHARS): string {
   if (value.length <= maxChars) return value;
   const dropped = value.length - maxChars;
   return `${value.slice(0, maxChars)}\n[truncated, ${dropped} more character${dropped === 1 ? '' : 's'} omitted]`;
 }
 
-export function escapeTagChars(value: string): string {
+function escapeTagChars(value: string): string {
   return value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 

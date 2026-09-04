@@ -39,7 +39,7 @@ import { PDF_PAGE_JOINER } from './pdf.ts';
 // text keeps the adapter's original `text` untouched (never blanked) and
 // attaches `unavailable` with a reason and which OA sources were actually
 // tried.
-export const MIN_FULL_TEXT_CHARS = 2000;
+const MIN_FULL_TEXT_CHARS = 2000;
 
 type UnavailableReason = NonNullable<ReadResult['unavailable']>['reason'];
 

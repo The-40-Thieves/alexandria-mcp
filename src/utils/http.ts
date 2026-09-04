@@ -140,7 +140,7 @@ export async function fetchWithRetry(
 // an unbounded chunked body was buffered whole after fetchWithRetry had
 // already cleared its timeout on the response headers.
 /** Default streamed body cap. Override per call with `{ maxBytes }`. */
-export const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MB
+const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export type BodyLimitedOptions = FetchOptions & { maxBytes?: number };
 
