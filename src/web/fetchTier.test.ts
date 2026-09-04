@@ -7,13 +7,8 @@ import { guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
 import { VERSION } from '../version.ts';
 import { resetExtractWorkerForTests } from './extract.ts';
-import {
-  assertConfiguredServiceUrl,
-  assertFetchableUrl,
-  type DnsLookupAll,
-  dnsResolver,
-  fetchAsText,
-} from './fetchTier.ts';
+import { assertFetchableUrl, type DnsLookupAll, dnsResolver, fetchAsText } from './fetchTier.ts';
+import { assertConfiguredServiceUrl } from './urlGuard.ts';
 
 function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/web', name), 'utf8');
@@ -562,7 +557,7 @@ test('fetchAsText', async (t) => {
       delete process.env.JINA_API_KEY;
       delete process.env.ALEXANDRIA_JINA_READER;
       delete process.env.CRAWL4AI_URL;
-      process.env.CLOUDFLARE_ACCOUNT_ID = 'acct123';
+      process.env.CLOUDFLARE_ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
       process.env.CLOUDFLARE_BROWSER_RUN_TOKEN = 'test-cf-token';
       const server = await startFixtureServer();
       t.after(() => server.close());
@@ -574,7 +569,11 @@ test('fetchAsText', async (t) => {
       }> = [];
       globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
         const url = String(input);
-        if (url.startsWith('https://api.cloudflare.com/client/v4/accounts/acct123/')) {
+        if (
+          url.startsWith(
+            'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/',
+          )
+        ) {
           browserRunCalls.push({
             url,
             headers: (init.headers as Record<string, string>) ?? {},
@@ -595,7 +594,7 @@ test('fetchAsText', async (t) => {
       assert.equal(browserRunCalls.length, 1);
       assert.equal(
         browserRunCalls[0].url,
-        'https://api.cloudflare.com/client/v4/accounts/acct123/browser-rendering/markdown',
+        'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/browser-rendering/markdown',
       );
       assert.equal(browserRunCalls[0].headers.Authorization, 'Bearer test-cf-token');
       assert.deepEqual(browserRunCalls[0].body, { url: target });
@@ -626,7 +625,7 @@ test('fetchAsText', async (t) => {
       delete process.env.ALEXANDRIA_JINA_READER;
       delete process.env.CRAWL4AI_URL;
       delete process.env.CLOUDFLARE_BROWSER_RUN_TOKEN;
-      process.env.CLOUDFLARE_ACCOUNT_ID = 'acct123';
+      process.env.CLOUDFLARE_ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
       const server = await startFixtureServer();
       t.after(() => server.close());
 

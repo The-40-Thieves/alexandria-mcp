@@ -1,5 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Dispatcher } from 'undici';
+import {
+  assertFetchableUrl,
+  configuredServiceOrigins,
+  MAX_REDIRECTS,
+  REDIRECT_STATUSES,
+} from '../web/urlGuard.ts';
 import { isSensitiveKey } from './secretWords.ts';
 
 // The ambient global RequestInit (from @types/node) has no `dispatcher`
@@ -117,6 +123,130 @@ export async function fetchWithRetry(
   throw lastError;
 }
 
+// ─── Guarded redirects and a body cap for fetchJSON/fetchText ───────────────
+//
+// Final wave (C2): both used to hand `fetch` its follow-redirects default
+// and then read the whole body with response.json()/response.text(). Every
+// REST adapter, the open-access hops, the citation walk, PMC, and doi.org's
+// content negotiation go through here, and a redirect destination is
+// upstream-controlled - doi.org's especially - so an upstream that answers
+// `Location: http://169.254.169.254/...` was followed without a check, and
+// an unbounded chunked body was buffered whole after fetchWithRetry had
+// already cleared its timeout on the response headers.
+/** Default streamed body cap. Override per call with `{ maxBytes }`. */
+export const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export type BodyLimitedOptions = FetchOptions & { maxBytes?: number };
+
+// The SSRF guard is applied to every REDIRECT hop, not to the caller's own
+// starting URL. Two reasons, both load-bearing:
+//   - The starting URL of a fetchJSON/fetchText call is always an adapter's
+//     own registered endpoint (a module-level constant, sometimes with a
+//     caller-supplied path segment or query appended) or an operator's
+//     configured service URL. A `Location` header is the only part of this
+//     path an upstream controls, and it is exactly the part that was
+//     unchecked.
+//   - Some configured endpoints are deliberately private: SEARXNG_URL and
+//     CRAWL4AI_URL name hosts on an operator's own tailnet, which the
+//     private-range rules refuse by design (fetchTier.ts checks those
+//     against configuredServiceOrigins() instead). Guarding hop 0 here
+//     would break them, and would put a live DNS lookup in front of every
+//     REST adapter call, including in unit tests that mock fetch.
+// A redirect that stays inside a configured service origin is allowed for
+// the same reason: it is an endpoint this server already calls directly.
+async function assertRedirectTargetAllowed(nextUrl: string): Promise<void> {
+  try {
+    if (configuredServiceOrigins().has(new URL(nextUrl).origin.toLowerCase())) return;
+  } catch {
+    // Not a parseable URL; assertFetchableUrl below rejects it by shape.
+  }
+  await assertFetchableUrl(nextUrl);
+}
+
+async function fetchGuardedRedirects(
+  url: string,
+  options: FetchOptions,
+  timeoutMs: number,
+  retries: number,
+): Promise<{ response: Response; finalUrl: string }> {
+  let currentUrl = url;
+  for (let hop = 0; ; hop++) {
+    const response = await fetchWithRetry(
+      currentUrl,
+      { ...options, redirect: 'manual' },
+      timeoutMs,
+      retries,
+    );
+    if (!REDIRECT_STATUSES.has(response.status)) return { response, finalUrl: currentUrl };
+    // A redirect hop's body is never read; cancel it so the connection goes
+    // back to the pool instead of sitting open until GC.
+    await response.body?.cancel().catch(() => {});
+    if (hop >= MAX_REDIRECTS) {
+      throw new Error(`more than ${MAX_REDIRECTS} redirects, url: ${redactUrl(url)}`);
+    }
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new Error(`redirect with no Location header, url: ${redactUrl(currentUrl)}`);
+    }
+    const nextUrl = new URL(location, currentUrl).toString();
+    await assertRedirectTargetAllowed(nextUrl);
+    currentUrl = nextUrl;
+  }
+}
+
+// Streams the body counting bytes and aborts once the running total passes
+// the cap, so a server that lies about (or omits) Content-Length cannot
+// force this process to buffer an unbounded response after fetchWithRetry's
+// per-attempt timer has already been cleared. An honest, oversized
+// Content-Length is rejected before a byte is read.
+async function readCappedText(response: Response, url: string, maxBytes: number): Promise<string> {
+  const declared = response.headers.get('content-length');
+  if (declared && Number(declared) > maxBytes) {
+    throw new Error(
+      `response declares ${declared} bytes, over the ${maxBytes}-byte cap, url: ${redactUrl(url)}`,
+    );
+  }
+  const body = response.body;
+  if (!body) return '';
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let out = '';
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new Error(
+          `response exceeded the ${maxBytes}-byte cap while streaming, url: ${redactUrl(url)}`,
+        );
+      }
+      out += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return out + decoder.decode();
+}
+
+async function fetchGuardedBody(
+  url: string,
+  options: BodyLimitedOptions,
+  timeoutMs: number,
+  retries: number,
+): Promise<string> {
+  const { maxBytes = DEFAULT_MAX_RESPONSE_BYTES, ...init } = options;
+  const { response, finalUrl } = await fetchGuardedRedirects(url, init, timeoutMs, retries);
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
+  }
+  return readCappedText(response, finalUrl, maxBytes);
+}
+
 // timeoutMs/retries let a source with a known-slow upstream (e.g. loc.gov's
 // collections search, which can take 15-30s to answer) ask for a longer
 // per-attempt budget than DEFAULT_TIMEOUT_MS without touching the shared
@@ -124,40 +254,26 @@ export async function fetchWithRetry(
 // is a separate outer guard and should be set at least as large as this.
 export async function fetchJSON<T>(
   url: string,
-  options: RequestInit = {},
+  options: BodyLimitedOptions = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retries = DEFAULT_RETRIES,
 ): Promise<T> {
-  const response = await fetchWithRetry(
+  const raw = await fetchGuardedBody(
     url,
-    {
-      ...options,
-      headers: { Accept: 'application/json', ...options.headers },
-    },
+    { ...options, headers: { Accept: 'application/json', ...options.headers } },
     timeoutMs,
     retries,
   );
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
-  }
-
-  return response.json() as Promise<T>;
+  return JSON.parse(raw) as T;
 }
 
 export async function fetchText(
   url: string,
-  options: RequestInit = {},
+  options: BodyLimitedOptions = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retries = DEFAULT_RETRIES,
 ): Promise<string> {
-  const response = await fetchWithRetry(url, options, timeoutMs, retries);
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
-  }
-
-  return response.text();
+  return fetchGuardedBody(url, options, timeoutMs, retries);
 }
 
 // Parses a Retry-After header (delta-seconds or an HTTP-date, RFC 9110

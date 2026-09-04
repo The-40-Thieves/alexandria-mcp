@@ -10,6 +10,10 @@ import { stripHtml } from '../utils/text-clean.ts';
 import { register } from './registry.ts';
 
 const URL = 'https://api.w3.org/specifications?items=1000&embed=true';
+// Final wave (C2): fetchJSON caps response bodies at 10 MB by default;
+// this catalog measured 1,715,078 bytes on 2026-09-03. Explicit anyway: it
+// is a whole-catalog download, and the default is not sized for those.
+const CATALOG_MAX_BYTES = 16 * 1024 * 1024;
 const TIMEOUT_MS = 30000;
 
 interface W3cSpec {
@@ -29,7 +33,7 @@ let cached: Promise<W3cSpec[]> | undefined;
 
 function download(): Promise<W3cSpec[]> {
   if (!cached) {
-    cached = fetchJSON<W3cSpecificationsResponse>(URL, {}, TIMEOUT_MS)
+    cached = fetchJSON<W3cSpecificationsResponse>(URL, { maxBytes: CATALOG_MAX_BYTES }, TIMEOUT_MS)
       .then((data) => data._embedded.specifications)
       .catch((err) => {
         cached = undefined;

@@ -10,6 +10,10 @@ import { fetchAsText } from '../web/fetchTier.ts';
 import { register, truncateText } from './registry.ts';
 
 const URL = 'https://peps.python.org/api/peps.json';
+// Final wave (C2): fetchJSON caps response bodies at 10 MB by default;
+// this catalog measured 424,419 bytes on 2026-09-03. Explicit anyway: it
+// is a whole-catalog download, and the default is not sized for those.
+const CATALOG_MAX_BYTES = 16 * 1024 * 1024;
 const TIMEOUT_MS = 20000;
 
 interface PepEntry {
@@ -28,7 +32,7 @@ let cached: Promise<PepEntry[]> | undefined;
 
 function download(): Promise<PepEntry[]> {
   if (!cached) {
-    cached = fetchJSON<PepsResponse>(URL, {}, TIMEOUT_MS)
+    cached = fetchJSON<PepsResponse>(URL, { maxBytes: CATALOG_MAX_BYTES }, TIMEOUT_MS)
       .then((data) => Object.values(data))
       .catch((err) => {
         cached = undefined;

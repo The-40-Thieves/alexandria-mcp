@@ -84,6 +84,34 @@ call site (fetchTier.ts's `browserUA()` reads `ALEXANDRIA_FETCH_UA` first,
 so a global override is also available without patching source), not
 reverting the default for everyone.
 
+## Residual limits of the SSRF guard (final wave)
+
+**Delegated renderers cannot be pinned.** Tiers 2, 3 and 4 (jina,
+crawl4ai, Browser Run) do not fetch the target themselves; they hand the
+URL to a third party that resolves the hostname on its own machine.
+`assertFetchableUrl` still runs before each of them, so a target whose name
+or whose one DNS answer is private is refused - but that check validates
+*Alexandria's* DNS answer, and nothing about it constrains the connection
+the delegate then makes. A hostname that resolves publicly for Alexandria
+and privately for the delegate reaches whatever the delegate can reach.
+This is unfixable from here for jina and Browser Run (hosted, no way to
+pass a validated address with the Host/SNI preserved). It matters most for
+crawl4ai, because crawl4ai runs on the operator's own tailnet: a
+successful validation here does not stop it fetching a Cave-internal
+service. Tier 1 (defuddle, the tier that fetches directly) has no such gap
+- it pins every hop to the address `resolveFetchTarget` just validated.
+
+**Without `worker_threads`, extraction has no timeout.** `extractHtml` and
+`extractPdfOffThread` fall back to running the same extraction in-thread
+when a `Worker` cannot be constructed at all. The 30 second per-job
+timeout goes with the worker: it works by terminating that worker, and
+there is nothing to terminate on the main thread. `parseHTML` + Defuddle
+and unpdf's PDF.js are both synchronous, so an in-thread timer could not
+interrupt them even if one were set. On this fallback path a pathological
+page or PDF blocks the event loop for as long as it takes. Every supported
+runtime (Node 24, the `engines` floor) has `worker_threads`, so this is the
+fallback's documented cost, not the normal path.
+
 ## HTTP guards (`src/httpGuards.ts`, TRANSPORT=http only)
 
 Applied to `/mcp` only - `/health` and `/metrics` carry no session state
@@ -95,9 +123,20 @@ worth protecting the same way:
   hostnames, no scheme or port). Loopback (`localhost`, `127.0.0.1`,
   `[::1]`) is always allowed, regardless of that setting. A request that
   fails either check gets a `403` (the guard itself writes that response,
-  per `@modelcontextprotocol/node`'s own contract).
+  per `@modelcontextprotocol/node`'s own contract). The **Host** check
+  applies only when `ALEXANDRIA_ALLOWED_ORIGINS` is set, or when the
+  request arrived on a loopback interface: applied unconditionally it
+  `403`s every request to a non-loopback deployment that has not set the
+  variable, whose own hostname is in no allowlist because there is no
+  allowlist. One warning is logged at startup when it is unset. The
+  **Origin** check is unconditional (the SDK's `originValidation` passes a
+  request carrying no `Origin` header at all, which is every non-browser
+  MCP client).
 - **Per-client-IP rate limit** (`checkRateLimit`): a token bucket keyed on
-  `req.socket.remoteAddress`, capacity `ALEXANDRIA_HTTP_RATE_LIMIT`
+  `req.socket.remoteAddress` (or, with `ALEXANDRIA_TRUSTED_PROXY=1`,
+  `CF-Connecting-IP` then the *rightmost* `X-Forwarded-For` entry - the one
+  the last hop appended; the leftmost is whatever the original caller
+  sent), capacity `ALEXANDRIA_HTTP_RATE_LIMIT`
   (default 60), refilling continuously back toward that cap over a
   one-minute window. Starts full, so a client's first burst up to the cap
   is never rejected - only sustained traffic above the configured
