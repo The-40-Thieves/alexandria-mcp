@@ -132,14 +132,18 @@ worth protecting the same way:
   `[::1]`) is always allowed, regardless of that setting. A request that
   fails either check gets a `403` (the guard itself writes that response,
   per `@modelcontextprotocol/node`'s own contract). The **Host** check
-  applies only when `ALEXANDRIA_ALLOWED_ORIGINS` is set, or when the
-  request arrived on a loopback interface: applied unconditionally it
-  `403`s every request to a non-loopback deployment that has not set the
-  variable, whose own hostname is in no allowlist because there is no
-  allowlist. One warning is logged at startup when it is unset. The
-  **Origin** check is unconditional (the SDK's `originValidation` passes a
-  request carrying no `Origin` header at all, which is every non-browser
-  MCP client).
+  applies only when `ALEXANDRIA_ALLOWED_ORIGINS` is set: applied
+  unconditionally it `403`s every request to any deployment that has not
+  set the variable, whose own hostname is in no allowlist because there is
+  no allowlist. Setting the variable is what turns DNS-rebinding
+  protection on, and one warning is logged at startup while it is unset.
+  The check is deliberately NOT keyed on which interface the connection
+  arrived on: a Cloudflare Tunnel terminates at `localhost:PORT` and
+  forwards the public hostname in `Host`, so keying on loopback `403`ed
+  the tunnelled request while letting the identical `Host` through on a
+  LAN address. The **Origin** check is unconditional (the SDK's
+  `originValidation` passes a request carrying no `Origin` header at all,
+  which is every non-browser MCP client).
 - **Per-client-IP rate limit** (`checkRateLimit`): a token bucket keyed on
   `req.socket.remoteAddress` (or, with `ALEXANDRIA_TRUSTED_PROXY=1`,
   `CF-Connecting-IP` then the *rightmost* `X-Forwarded-For` entry - the one

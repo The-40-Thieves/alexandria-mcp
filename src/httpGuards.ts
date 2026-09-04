@@ -33,30 +33,27 @@ function allowedHostnames(): string[] {
   return [...new Set([...LOOPBACK_HOSTNAMES, ...configuredOriginHostnames()])];
 }
 
-// The LOCAL end of this connection (which interface it arrived on), not the
-// client's address: '127.0.0.1' / '::1' means the listener that answered is
-// reachable only from this machine. '::ffff:127.0.0.1' is the IPv4-mapped
-// form Node reports for an IPv4 client on a dual-stack listener.
-function isLoopbackAddress(address: string | undefined): boolean {
-  if (!address) return false;
-  const bare = address.replace(/^::ffff:/i, '');
-  return bare === '::1' || bare.startsWith('127.');
-}
-
 /**
  * Validates the request's Host and Origin headers against
  * ALEXANDRIA_ALLOWED_ORIGINS (plus loopback, always). Returns false when the
  * request was already rejected (403) - the caller must not handle it
  * further in that case.
  *
- * Final wave (B1): the Host check is conditional. Applied unconditionally
- * it 403s every request to a non-loopback deployment whose operator never
- * set ALEXANDRIA_ALLOWED_ORIGINS (verified live) - the Host header of a
- * real deployment is its own public hostname, which is in no allowlist
- * because there is no allowlist. Host validation exists for DNS-rebinding
- * protection, which is a browser-against-localhost attack, so it applies
- * when there is an allowlist to check against, or when this connection
- * arrived on a loopback interface (the case rebinding actually targets).
+ * Final wave (B1): the Host check applies ONLY when
+ * ALEXANDRIA_ALLOWED_ORIGINS is set. Applied unconditionally it 403s every
+ * request to any deployment whose operator never set the variable (verified
+ * live) - such a deployment's Host header is its own hostname, which cannot
+ * be in an allowlist that does not exist.
+ *
+ * Re-review round 2: an earlier version of this fix also applied the check
+ * when the connection arrived on a loopback interface. That was wrong for
+ * the deployment topology this repo's own docs recommend. A Cloudflare
+ * Tunnel terminates at `localhost:PORT` and forwards the public hostname in
+ * `Host`, so with no allowlist set, the tunnelled request (loopback
+ * interface, foreign Host) got 403 while a direct request to the same
+ * server on its LAN address, carrying the identical Host, got 200 -
+ * strictly backwards. The interface a connection arrives on says nothing
+ * about whether its Host is legitimate; only the allowlist does.
  *
  * The Origin check is unconditional: the SDK's originValidation passes any
  * request with no Origin header (non-browser MCP clients send none), so a
@@ -64,9 +61,9 @@ function isLoopbackAddress(address: string | undefined): boolean {
  */
 export function checkOrigin(req: IncomingMessage, res: ServerResponse): boolean {
   const hostnames = allowedHostnames();
-  const hostCheckApplies =
-    configuredOriginHostnames().length > 0 || isLoopbackAddress(req.socket.localAddress);
-  if (hostCheckApplies && !hostHeaderValidation(hostnames)(req, res)) return false;
+  if (configuredOriginHostnames().length > 0 && !hostHeaderValidation(hostnames)(req, res)) {
+    return false;
+  }
   if (!originValidation(hostnames)(req, res)) return false;
   return true;
 }

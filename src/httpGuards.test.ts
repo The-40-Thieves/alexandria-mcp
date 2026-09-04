@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { connect as netConnect } from 'node:net';
 import test from 'node:test';
 import {
   trackedClientCountForTests as buckets,
@@ -334,11 +335,26 @@ test('checkOrigin: Host-header validation is conditional', async (t) => {
     delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
   });
 
-  await t.test('a loopback connection still rejects a foreign Host with no allowlist', () => {
+  // Re-review round 2: the interface a connection arrives on must NOT
+  // decide this. A Cloudflare Tunnel terminates at localhost:PORT and
+  // forwards the public hostname in Host, so keying on loopback rejected
+  // the tunnelled request while letting the identical Host through on a
+  // LAN address - strictly backwards, and the exact topology this repo's
+  // own docs recommend. See the end-to-end test below for the socket-level
+  // version of this case.
+  await t.test('a loopback connection with a foreign Host passes with no allowlist', () => {
     delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
     const { req, res, written } = fakeReqRes('127.0.0.1', publicHost, '127.0.0.1');
-    assert.equal(checkOrigin(req, res), false, 'DNS-rebinding protection still applies locally');
+    assert.equal(checkOrigin(req, res), true, 'the tunnel topology must not be rejected');
+    assert.equal(written.status, undefined);
+  });
+
+  await t.test('a loopback connection with a foreign Host is 403 once the allowlist is set', () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'other.example.org';
+    const { req, res, written } = fakeReqRes('127.0.0.1', publicHost, '127.0.0.1');
+    assert.equal(checkOrigin(req, res), false);
     assert.equal(written.status, 403);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
   });
 
   await t.test('an Origin outside the allowlist is 403 even on a non-loopback connection', () => {
@@ -421,4 +437,74 @@ test('checkRateLimit: the ceiling evicts the oldest bucket, not every bucket', (
   const { req: still, res: stillRes } = fakeReqRes(secondSeen);
   assert.equal(checkRateLimit(still, stillRes), false);
   resetRateLimitForTests();
+});
+
+// Re-review round 2, the reproduction that opened B1: a real server bound
+// to 0.0.0.0 with NO allowlist, reached over loopback with a foreign Host
+// header - the Cloudflare Tunnel topology docs/cloudflare.md recommends,
+// where cloudflared connects to localhost:PORT and forwards the public
+// hostname in Host. Driven over a raw socket rather than fetch(), because
+// Host is a forbidden header name for fetch and cannot be set from it.
+test('an unallowlisted server bound to 0.0.0.0 accepts a loopback request with a foreign Host', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+  delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  resetRateLimitForTests();
+  t.after(() => resetRateLimitForTests());
+
+  const app = createHttpApp();
+  const server = app.listen(0, '0.0.0.0');
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const statusLine = (host: string, extraHeaders = ''): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const socket = netConnect(port, '127.0.0.1');
+      let data = '';
+      socket.on('data', (chunk) => {
+        data += chunk.toString();
+        if (data.includes('\r\n\r\n')) {
+          socket.destroy();
+          resolve(data.split('\r\n')[0] ?? '');
+        }
+      });
+      socket.on('error', reject);
+      socket.once('connect', () => {
+        socket.write(
+          `POST /mcp HTTP/1.1\r\nHost: ${host}\r\n` +
+            'Content-Type: application/json\r\n' +
+            'Accept: application/json, text/event-stream\r\n' +
+            `${extraHeaders}` +
+            `Content-Length: ${Buffer.byteLength(mcpBody)}\r\nConnection: close\r\n\r\n${mcpBody}`,
+        );
+      });
+      setTimeout(() => {
+        socket.destroy();
+        reject(new Error('no response within 5000ms'));
+      }, 5000).unref?.();
+    });
+
+  await t.test('a foreign Host over loopback is served, not 403ed', async () => {
+    assert.match(await statusLine('alexandria.example.com'), /^HTTP\/1\.1 200 /);
+  });
+
+  await t.test('the same request is 403ed once the allowlist names other hosts', async () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'other.example.org';
+    resetRateLimitForTests();
+    assert.match(await statusLine('alexandria.example.com'), /^HTTP\/1\.1 403 /);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
+
+  await t.test('an Origin outside the allowlist is still 403ed', async () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'alexandria.example.com';
+    resetRateLimitForTests();
+    assert.match(
+      await statusLine('alexandria.example.com', 'Origin: https://evil.example.net\r\n'),
+      /^HTTP\/1\.1 403 /,
+    );
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
 });

@@ -298,12 +298,12 @@ details and `src/httpGuards.ts` for the implementation.
 
 **Set `ALEXANDRIA_ALLOWED_ORIGINS` on any deployment reachable by a
 hostname other than loopback.** With it unset, `Host`-header validation is
-applied only to requests arriving on a loopback interface, and the server
-logs one warning at startup saying so: a public deployment's `Host` header
-is its own hostname, which cannot be in an allowlist that does not exist,
-so enforcing the check without one would `403` every request. The `Origin`
-check is unconditional either way, so a browser request carrying an
-`Origin` outside the list is always rejected.
+**off** and the server logs one warning at startup saying so: a deployment's
+`Host` header is its own hostname, which cannot be in an allowlist that does
+not exist, so enforcing the check without one would `403` every request.
+Setting it is what turns DNS-rebinding protection on. The `Origin` check is
+unconditional either way, so a browser request carrying an `Origin` outside
+the list is always rejected.
 
 `POST /mcp` requires `content-type: application/json` (anything else is
 `415`) and a body no larger than 100 KiB (`413`, connection closed).

@@ -43,6 +43,13 @@ export const PDF_PAGE_JOINER = '\n\n';
 // handle and this module runs inside the extraction worker thread (see
 // extractWorker.ts). pdf.test.ts asserts the two stay equal.
 //
+// Parked by ruling: both bounds cap the OUTPUT, not the work.
+// extractText() below has already walked every page of the document by the
+// time this loop runs, so a pathological PDF still costs what it costs -
+// what these prevent is that cost turning into an unbounded string and an
+// unbounded downstream payload. Bounding the work itself would mean
+// rendering page by page rather than in one extractText() call.
+//
 // The page that CROSSES the char bound is kept whole, so `text` ends up
 // just over the limit whenever anything was dropped. That is deliberate:
 // the library_read handler's truncateText() then sees charCount >

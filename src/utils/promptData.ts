@@ -39,6 +39,23 @@ function escapeTagChars(value: string): string {
 }
 
 /**
+ * The inverse of escapeTagChars, for the one case that needs it: a caller
+ * that has to match a model's verbatim quotation of block content back
+ * against the ORIGINAL, unescaped value it fenced (see
+ * libraryResearch.ts's checkCitations).
+ *
+ * Deliberately applied only to the model's returned fragment, never to a
+ * whole document: a value that literally contained the four characters
+ * `&lt;` passes through escapeTagChars unchanged, so unescaping it is
+ * lossy. On a short fragment that is a failed match, which the caller
+ * already degrades safely (it keeps the sentence and warns); run over a
+ * whole report it would silently corrupt the returned text.
+ */
+export function unescapeTagChars(value: string): string {
+  return value.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+/**
  * One labelled, length-capped, tag-escaped data block. The instructions
  * around it refer back to it ("the topic above") rather than
  * re-interpolating the raw value.

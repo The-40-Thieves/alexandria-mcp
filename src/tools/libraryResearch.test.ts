@@ -527,6 +527,30 @@ test('checkCitations', async (t) => {
     assert.deepEqual(out.warnings, []);
   });
 
+  // Re-review round 2: the model sees the report through dataBlock(),
+  // which entity-escapes '<' and '>', so it quotes a flagged sentence back
+  // in that escaped form ("p &lt; 0.05") while the report itself holds the
+  // raw '<'. Splitting one against the other matched zero times, so any
+  // claim containing an angle bracket was silently kept with a spurious
+  // "matched 0 times" warning - and statistical prose is full of them.
+  await t.test('removes a claim containing an angle bracket the model saw escaped', async () => {
+    const report =
+      'The API added rate limiting in 2025 [1]. The effect was significant (p < 0.05) [1].';
+    // Exactly what a model quoting from the fenced block returns.
+    const out = await runWith(report, ['The effect was significant (p &lt; 0.05) [1].']);
+    assert.equal(out.report, 'The API added rate limiting in 2025 [1].');
+    assert.deepEqual(out.warnings, []);
+  });
+
+  await t.test('handles a claim carrying both escaped bracket forms', async () => {
+    const report = 'Prose first [1]. Values outside <lo> and >hi< were dropped from analysis [1].';
+    const out = await runWith(report, [
+      'Values outside &lt;lo&gt; and &gt;hi&lt; were dropped from analysis [1].',
+    ]);
+    assert.equal(out.report, 'Prose first [1].');
+    assert.deepEqual(out.warnings, []);
+  });
+
   await t.test('keeps a one-word claim instead of shredding the report', async () => {
     const report = 'Yes. The API added rate limiting in 2025 [1]. Yes, latency fell [1].';
     const out = await runWith(report, ['Yes.']);

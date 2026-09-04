@@ -173,11 +173,16 @@ actively resist automated access.
 front of it adds authentication Alexandria itself never implements:
 
 Set `ALEXANDRIA_ALLOWED_ORIGINS` to the tunnel hostname. Without it,
-Host-header validation applies only to loopback connections (see the README
-HTTP section: enforcing it with no allowlist would `403` every request that
-arrives with this deployment's real hostname in `Host`), so a tunnelled
-`/mcp` runs without DNS-rebinding protection until the variable is set. The
-server logs one warning at startup when it is missing.
+Host-header validation is off entirely (see the README HTTP section:
+enforcing it with no allowlist would `403` every request that arrives with
+this deployment's real hostname in `Host`), so a tunnelled `/mcp` runs
+without DNS-rebinding protection until the variable is set. The server logs
+one warning at startup when it is missing.
+
+This matters more for a tunnel than for a direct listener: `cloudflared`
+connects to `localhost:PORT` and forwards the PUBLIC hostname in `Host`, so
+the tunnel hostname - not `localhost` - is what the guard sees, and it is
+the value the allowlist has to name.
 
 1. Run `cloudflared tunnel` pointing at this server's `TRANSPORT=http`
    listener (no public port opened on the box - the tunnel is outbound-only).

@@ -9,7 +9,12 @@ import pLimit from 'p-limit';
 import { z } from 'zod';
 import { requestLogger } from '../log.ts';
 import { gradeCitation, retractedWarning } from '../utils/citationGrade.ts';
-import { dataBlock, escapeSourceText, UNTRUSTED_DATA_SENTENCE } from '../utils/promptData.ts';
+import {
+  dataBlock,
+  escapeSourceText,
+  UNTRUSTED_DATA_SENTENCE,
+  unescapeTagChars,
+} from '../utils/promptData.ts';
 import { chatJSON, requireRoleForTool } from '../utils/providers.ts';
 import {
   type Citation,
@@ -98,6 +103,11 @@ function sourcesList(citations: Citation[]): string {
 // A whole answer, a learnings set, or a draft report is legitimately much
 // longer than one query or title, so those blocks get a larger cap than
 // promptData's default rather than being cut to a fraction of themselves.
+//
+// Parked by ruling: this bounds the prompt, not the work - a report past
+// the cap is still written in full and still fact-checked, the model just
+// never sees its tail, so any unsupported claim after character 24,000 goes
+// unflagged rather than being flagged and kept.
 const MAX_LONG_BLOCK_CHARS = 24_000;
 
 const QueriesSchema = z.object({ queries: z.array(z.string().min(1)) });
@@ -268,7 +278,15 @@ ${UNTRUSTED_DATA_SENTENCE}`;
   const warnings: string[] = [];
   let cleaned = report;
   for (const raw of result.unsupported) {
-    const sentence = raw?.trim();
+    // Re-review round 2: the model is shown the report through
+    // dataBlock(), which entity-escapes '<' and '>', so a flagged sentence
+    // it quotes back verbatim ("the effect was significant (p &lt; 0.05)")
+    // is in the ESCAPED representation while `cleaned` below is the raw
+    // report. Splitting one against the other matched zero times, so the
+    // sentence was kept with a spurious "matched 0 times" warning - the
+    // fact-check silently stopped removing any claim containing '<' or
+    // '>'. Matching happens in the report's own representation now.
+    const sentence = unescapeTagChars(raw ?? '').trim();
     if (!sentence) continue;
     const shown = JSON.stringify(sentence.length > 80 ? `${sentence.slice(0, 77)}...` : sentence);
     if (sentence.length < MIN_REMOVABLE_CLAIM_CHARS) {

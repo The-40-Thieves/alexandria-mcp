@@ -291,3 +291,141 @@ test('fetchJSON/fetchText: guarded redirects and a streamed body cap', async (t)
     assert.equal(data.ok, true);
   });
 });
+
+// Re-review round 2: two gaps in the C2 redirect loop.
+//
+// (a) Every hop was VALIDATED but none was PINNED, so a hostname that
+// resolved publicly for assertFetchableUrl and privately a moment later at
+// connect time went unnoticed - the exact TOCTOU gap the guard exists to
+// close, and the one fetchTier.ts's own redirect loop has always closed by
+// pinning each hop to the addresses resolveFetchTarget just validated.
+//
+// (b) The original method and body were replayed on every hop, so a
+// redirected POST was re-POSTed to the new location: a body, and for the
+// adapters that POST a key-bearing payload a credential with it, sent
+// somewhere the caller never addressed. Per the fetch spec, 303 always
+// becomes a GET and 301/302 become a GET when the request was a POST.
+test('fetchJSON/fetchText: redirect hops are pinned and re-methoded', async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalLookup = dnsResolver.lookup;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    dnsResolver.lookup = originalLookup;
+  });
+
+  await t.test('a redirect hop connects through the guarded, pinned dispatcher', async () => {
+    const lookedUp: string[] = [];
+    dnsResolver.lookup = (async (hostname: string) => {
+      lookedUp.push(hostname);
+      return [{ address: '93.184.216.34', family: 4 }];
+    }) as typeof dnsResolver.lookup;
+
+    const dispatchers: Array<unknown> = [];
+    globalThis.fetch = (async (url: string, init: RequestInit & { dispatcher?: unknown } = {}) => {
+      dispatchers.push(init.dispatcher);
+      if (url === 'https://start.example.org/a') {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://hop.example.org/b' },
+        });
+      }
+      return new Response('{"ok":true}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    await fetchJSON('https://start.example.org/a', {}, 1000, 0);
+
+    assert.equal(dispatchers.length, 2);
+    assert.equal(dispatchers[0], undefined, 'hop 0 keeps the plain dispatcher, per the ruling');
+    assert.ok(dispatchers[1], 'the redirect hop must carry the guarded dispatcher');
+    // The pin comes from the SAME lookup that validated the hop: exactly
+    // one resolution of the redirect target, not one to check and another
+    // to connect (which would reopen the race).
+    assert.deepEqual(lookedUp, ['hop.example.org']);
+  });
+
+  await t.test('a 302 on a POST becomes a GET with no body', async () => {
+    dnsResolver.lookup = (async () => [
+      { address: '93.184.216.34', family: 4 },
+    ]) as typeof dnsResolver.lookup;
+
+    const seen: Array<{ url: string; method?: string; body: unknown; headers: unknown }> = [];
+    globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+      seen.push({ url, method: init.method, body: init.body, headers: init.headers });
+      if (url === 'https://api.example.org/search') {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://api.example.org/results/1' },
+        });
+      }
+      return new Response('{"ok":true}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    await fetchJSON(
+      'https://api.example.org/search',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer secret-token' },
+        body: JSON.stringify({ q: 'physics', api_key: 'secret' }),
+      },
+      1000,
+      0,
+    );
+
+    assert.equal(seen[0].method, 'POST', 'the first hop is the request the caller made');
+    assert.equal(seen[1].method, 'GET');
+    assert.equal(seen[1].body, undefined, 'the body must not be replayed to the new location');
+    const headers = seen[1].headers as Record<string, string>;
+    assert.equal(headers['Content-Type'], undefined, 'the dropped body drops its content-type');
+    assert.equal(
+      headers.Authorization,
+      'Bearer secret-token',
+      'other headers are preserved, matching fetch semantics',
+    );
+  });
+
+  await t.test('a 303 becomes a GET even from a non-POST method', async () => {
+    dnsResolver.lookup = (async () => [
+      { address: '93.184.216.34', family: 4 },
+    ]) as typeof dnsResolver.lookup;
+
+    const methods: Array<string | undefined> = [];
+    globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+      methods.push(init.method);
+      if (url.endsWith('/put')) {
+        return new Response(null, { status: 303, headers: { location: 'https://x.example/done' } });
+      }
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+
+    await fetchText('https://x.example/put', { method: 'PUT', body: 'payload' }, 1000, 0);
+    assert.deepEqual(methods, ['PUT', 'GET']);
+  });
+
+  await t.test('a 307 preserves the method and body', async () => {
+    dnsResolver.lookup = (async () => [
+      { address: '93.184.216.34', family: 4 },
+    ]) as typeof dnsResolver.lookup;
+
+    const seen: Array<{ method?: string; body: unknown }> = [];
+    globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+      seen.push({ method: init.method, body: init.body });
+      if (url.endsWith('/a')) {
+        return new Response(null, { status: 307, headers: { location: 'https://x.example/b' } });
+      }
+      return new Response('ok', { status: 200 });
+    }) as typeof fetch;
+
+    await fetchText('https://x.example/a', { method: 'POST', body: 'payload' }, 1000, 0);
+    assert.deepEqual(
+      seen.map((s) => s.method),
+      ['POST', 'POST'],
+    );
+    assert.equal(seen[1].body, 'payload', '307 is the status that exists to preserve the body');
+  });
+});

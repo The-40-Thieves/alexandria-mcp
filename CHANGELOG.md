@@ -117,15 +117,14 @@
 ### Changed (BREAKING)
 
 - `/mcp` Host-header validation now applies only when
-  `ALEXANDRIA_ALLOWED_ORIGINS` is set, or when the request arrived on a
-  loopback interface. Applied unconditionally it returned `403` for every
-  request to any non-loopback deployment that had not set the variable,
+  `ALEXANDRIA_ALLOWED_ORIGINS` is set. Applied unconditionally it returned
+  `403` for every request to any deployment that had not set the variable,
   because such a deployment's own `Host` header is in no allowlist when
   there is no allowlist. Remedy: set `ALEXANDRIA_ALLOWED_ORIGINS` to the
-  hostname(s) this deployment is reached by, which restores Host validation
-  everywhere and is what the startup warning now asks for. The `Origin`
-  check is unchanged and still rejects any request whose `Origin` header
-  names a hostname outside the list.
+  hostname(s) this deployment is reached by, which turns Host validation
+  back on and is what the startup warning asks for. The `Origin` check is
+  unchanged and still rejects any request whose `Origin` header names a
+  hostname outside the list.
 - `POST /mcp` with a media type other than `application/json` is now
   answered `415` by this server, and any POST body over the 100 KiB cap is
   answered `413` (it was `500`) with the connection closed. Previously a

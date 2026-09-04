@@ -148,7 +148,7 @@ const rawFields = {
     .string()
     .optional()
     .describe(
-      'Comma-separated hostnames (no scheme/port) allowed to reach /mcp: checked against both the Host and Origin headers for DNS-rebinding protection. Loopback (localhost, 127.0.0.1, [::1]) is always allowed regardless of this setting. Unset, the Host check applies only to connections arriving on a loopback interface (the Origin check always applies), so set this on any deployment reached by another hostname.',
+      'Comma-separated hostnames (no scheme/port) allowed to reach /mcp: checked against both the Host and Origin headers for DNS-rebinding protection. Loopback (localhost, 127.0.0.1, [::1]) is always allowed regardless of this setting. Unset, the Host check is off entirely (the Origin check always applies), so set this on any deployment reached by a hostname other than loopback.',
     ),
   ALEXANDRIA_HTTP_RATE_LIMIT: z.coerce
     .number()

@@ -1215,16 +1215,15 @@ export function createHttpApp(): Server {
 async function runHTTP(): Promise<void> {
   const httpServer = createHttpApp();
   const port = config.PORT;
-  // Final wave (B1): with no allowlist, Host-header validation is applied
-  // only to connections arriving on a loopback interface, so a
-  // non-loopback deployment is served without DNS-rebinding protection.
-  // That is the deliberate default (the alternative, applying it anyway,
-  // 403s every request to such a deployment), but it should never be a
-  // silent one.
+  // Final wave (B1): with no allowlist there is nothing to validate the
+  // Host header against, so that guard is off entirely and this deployment
+  // has no DNS-rebinding protection. That is the deliberate default (the
+  // alternative, applying it anyway, 403s every request to any deployment
+  // that has not set the variable), but it must never be a silent one.
   if (configuredOriginHostnames().length === 0) {
     log.warn(
       {},
-      "ALEXANDRIA_ALLOWED_ORIGINS is not set: Host-header (DNS-rebinding) validation applies to loopback connections only. Set it to this deployment's hostname(s) to enforce it everywhere.",
+      "ALEXANDRIA_ALLOWED_ORIGINS is not set: Host-header (DNS-rebinding) validation is OFF for /mcp. Set it to this deployment's hostname(s) to turn it on. The Origin check still applies to any request carrying an Origin header.",
     );
   }
   httpServer.listen(port, () =>

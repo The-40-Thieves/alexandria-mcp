@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Dispatcher } from 'undici';
 import {
-  assertFetchableUrl,
   configuredServiceOrigins,
   MAX_REDIRECTS,
   REDIRECT_STATUSES,
+  resolveFetchTarget,
 } from '../web/urlGuard.ts';
+import { type AddressPin, guardedDispatcher, withPinnedAddress } from './dispatcher.ts';
 import { isSensitiveKey } from './secretWords.ts';
 import { fetchUserAgent } from './userAgent.ts';
 
@@ -160,13 +161,53 @@ export type BodyLimitedOptions = FetchOptions & { maxBytes?: number };
 //     REST adapter call, including in unit tests that mock fetch.
 // A redirect that stays inside a configured service origin is allowed for
 // the same reason: it is an endpoint this server already calls directly.
-async function assertRedirectTargetAllowed(nextUrl: string): Promise<void> {
+//
+// Re-review round 2: this now also returns the PIN. Validating a hop and
+// then connecting without pinning leaves the TOCTOU gap the guard exists
+// to close - a second DNS answer between the check and the connect is not
+// caught by validation alone - and fetchTier.ts's own redirect loop has
+// always pinned every hop. Reusing the addresses resolveFetchTarget just
+// validated (rather than resolving again to build a pin) is what actually
+// closes it; see that function's comment in src/web/urlGuard.ts.
+interface RedirectHop {
+  pin?: AddressPin;
+  // False only for a configured service origin, which is deliberately
+  // exempt from the private-range rules and therefore has no validated
+  // address set to pin to. Passing guardedDispatcher with no pin in scope
+  // would fail closed on its connect.lookup hook (see dispatcher.ts).
+  guarded: boolean;
+}
+
+async function resolveRedirectTarget(nextUrl: string): Promise<RedirectHop> {
   try {
-    if (configuredServiceOrigins().has(new URL(nextUrl).origin.toLowerCase())) return;
+    if (configuredServiceOrigins().has(new URL(nextUrl).origin.toLowerCase())) {
+      return { guarded: false };
+    }
   } catch {
-    // Not a parseable URL; assertFetchableUrl below rejects it by shape.
+    // Not a parseable URL; resolveFetchTarget below rejects it by shape.
   }
-  await assertFetchableUrl(nextUrl);
+  const { pin } = await resolveFetchTarget(nextUrl);
+  return { pin, guarded: true };
+}
+
+// Per the fetch spec's redirect handling: 303 always becomes a GET, and
+// 301/302 become a GET when the original request was a POST. Re-review
+// round 2: this loop replayed the original method and body on every hop, so
+// a redirected POST was re-POSTed to the new location - a body sent
+// somewhere the caller never addressed, and (for the adapters that POST a
+// key-bearing JSON body) a credential with it. Content-Type/Content-Length
+// go with the dropped body.
+function afterRedirect(init: FetchOptions, status: number): FetchOptions {
+  const method = (init.method ?? 'GET').toUpperCase();
+  const becomesGet = status === 303 || ((status === 301 || status === 302) && method === 'POST');
+  if (!becomesGet) return init;
+  const { body: _body, headers, ...rest } = init;
+  const kept = Object.fromEntries(
+    Object.entries((headers as Record<string, string> | undefined) ?? {}).filter(
+      ([name]) => !['content-type', 'content-length'].includes(name.toLowerCase()),
+    ),
+  );
+  return { ...rest, method: 'GET', headers: kept };
 }
 
 async function fetchGuardedRedirects(
@@ -176,13 +217,20 @@ async function fetchGuardedRedirects(
   retries: number,
 ): Promise<{ response: Response; finalUrl: string }> {
   let currentUrl = url;
+  let init: FetchOptions = options;
+  let hopPin: AddressPin | undefined;
+  let hopGuarded = false;
   for (let hop = 0; ; hop++) {
-    const response = await fetchWithRetry(
-      currentUrl,
-      { ...options, redirect: 'manual' },
-      timeoutMs,
-      retries,
-    );
+    // Hop 0 keeps the plain dispatcher and no pin, per the standing ruling
+    // above: its URL is the adapter's own endpoint, and some of those are
+    // deliberately private.
+    const hopInit: FetchOptions = {
+      ...init,
+      redirect: 'manual',
+      ...(hopGuarded ? { dispatcher: guardedDispatcher } : {}),
+    };
+    const attempt = () => fetchWithRetry(currentUrl, hopInit, timeoutMs, retries);
+    const response = hopPin ? await withPinnedAddress(hopPin, attempt) : await attempt();
     if (!REDIRECT_STATUSES.has(response.status)) return { response, finalUrl: currentUrl };
     // A redirect hop's body is never read; cancel it so the connection goes
     // back to the pool instead of sitting open until GC.
@@ -195,7 +243,8 @@ async function fetchGuardedRedirects(
       throw new Error(`redirect with no Location header, url: ${redactUrl(currentUrl)}`);
     }
     const nextUrl = new URL(location, currentUrl).toString();
-    await assertRedirectTargetAllowed(nextUrl);
+    ({ pin: hopPin, guarded: hopGuarded } = await resolveRedirectTarget(nextUrl));
+    init = afterRedirect(init, response.status);
     currentUrl = nextUrl;
   }
 }
