@@ -4,12 +4,19 @@
 // (see README's "Pointing roles at a gateway" section).
 //
 // Env precedence per role (router | synth | research | embeddings | rerank):
-//   1. ALEXANDRIA_<ROLE>_BASE_URL / _API_KEY / _MODEL
-//   2. ALEXANDRIA_BASE_URL / ALEXANDRIA_API_KEY (shared across every role)
+//   1. ALEXANDRIA_<ROLE>_BASE_URL / _API_KEY / _MODEL / _GATEWAY_ID
+//   2. ALEXANDRIA_BASE_URL / ALEXANDRIA_API_KEY / ALEXANDRIA_GATEWAY_ID
+//      (shared across every role)
 //   3. OPENAI_API_KEY, with baseURL defaulted to https://api.openai.com/v1
 // With only OPENAI_API_KEY set, every role resolves to (1) and (2) empty,
 // so this collapses to exactly today's behavior: gpt-4o-mini against
 // api.openai.com for router/synth, text-embedding-3-small for embeddings.
+// _GATEWAY_ID (task 15 review) is unlike the other three: it never falls
+// through to OPENAI_API_KEY's direct-OpenAI target (api.openai.com is
+// never behind an AI Gateway) and it's optional even when a gateway IS
+// configured - only the unified api.cloudflare.com/.../ai/v1 endpoint
+// needs it, to name a non-default gateway via the cf-aig-gateway-id
+// header; see docs/cloudflare.md.
 import OpenAI from 'openai';
 import type { z } from 'zod';
 import { config } from '../config.ts';
@@ -27,6 +34,14 @@ export interface RoleConfig {
   baseURL: string;
   apiKey: string;
   model: string;
+  // Task 15 review (Important 2): Cloudflare AI Gateway id for the
+  // unified api.cloudflare.com/.../ai/v1 endpoint's cf-aig-gateway-id
+  // header (routes to a NAMED gateway - the legacy
+  // gateway.ai.cloudflare.com/v1/<account>/<gateway>/... URL form
+  // already encodes the gateway id in `baseURL` and needs no header).
+  // Never set on the direct-OpenAI `fallback` below - api.openai.com
+  // is never behind an AI Gateway.
+  gatewayId?: string;
   fallback?: RoleConfig;
 }
 
@@ -57,7 +72,10 @@ function defaultModel(role: Role): string {
   }
 }
 
-function envKey(role: Role, suffix: 'BASE_URL' | 'API_KEY' | 'MODEL' | 'JSON_MODE'): string {
+function envKey(
+  role: Role,
+  suffix: 'BASE_URL' | 'API_KEY' | 'MODEL' | 'JSON_MODE' | 'GATEWAY_ID',
+): string {
   return `ALEXANDRIA_${role.toUpperCase()}_${suffix}`;
 }
 
@@ -102,8 +120,10 @@ export function roleConfig(role: Role): RoleConfig {
   const roleBaseURL = configValue(envKey(role, 'BASE_URL'));
   const roleApiKey = configValue(envKey(role, 'API_KEY'));
   const roleModel = configValue(envKey(role, 'MODEL'));
+  const roleGatewayId = configValue(envKey(role, 'GATEWAY_ID'));
   const sharedBaseURL = config.ALEXANDRIA_BASE_URL;
   const sharedApiKey = config.ALEXANDRIA_API_KEY;
+  const sharedGatewayId = config.ALEXANDRIA_GATEWAY_ID;
   const openaiApiKey = config.OPENAI_API_KEY;
 
   const directBaseURL = openaiBaseUrlOverride.value;
@@ -111,8 +131,11 @@ export function roleConfig(role: Role): RoleConfig {
   const baseURL = roleBaseURL || sharedBaseURL || directBaseURL;
   const apiKey = roleApiKey || sharedApiKey || openaiApiKey || '';
   const model = roleModel || defaultModel(role);
+  // Same precedence as baseURL/apiKey above (per-role, then shared) - see
+  // roleFields()'s ALEXANDRIA_<ROLE>_GATEWAY_ID in config.ts.
+  const gatewayId = roleGatewayId || sharedGatewayId || undefined;
 
-  const resolved: RoleConfig = { baseURL, apiKey, model };
+  const resolved: RoleConfig = { baseURL, apiKey, model, ...(gatewayId ? { gatewayId } : {}) };
 
   // When the primary points at a gateway rather than OpenAI directly, and a
   // direct OpenAI key is also available, wire it up as a one-shot fallback
@@ -157,14 +180,30 @@ export function requireRoleForTool(tool: string, role: Role): void {
 const clientCache = new Map<string, OpenAI>();
 
 function clientFor(config: RoleConfig): OpenAI {
-  const key = `${config.baseURL}::${config.apiKey}`;
+  // gatewayId is part of the cache key too: two RoleConfigs sharing a
+  // baseURL+apiKey but naming different Cloudflare gateways must never
+  // share a client (each needs its own cf-aig-gateway-id default header).
+  const key = `${config.baseURL}::${config.apiKey}::${config.gatewayId ?? ''}`;
   let client = clientCache.get(key);
   if (!client) {
     // maxRetries: 0 - retry/fallback policy is owned by chatJSON/chatText
     // above (one same-config retry on invalid JSON, one fallback-config
     // attempt on a network error or 5xx), not by the SDK's own hidden
     // exponential-backoff retries stacking on top of that.
-    client = new OpenAI({ baseURL: config.baseURL, apiKey: config.apiKey, maxRetries: 0 });
+    client = new OpenAI({
+      baseURL: config.baseURL,
+      apiKey: config.apiKey,
+      maxRetries: 0,
+      // Task 15 review (Important 2): Cloudflare AI Gateway's unified
+      // api.cloudflare.com/.../ai/v1 endpoint routes to a named gateway
+      // via this request header (verified against the installed `openai`
+      // package's own type declarations - node_modules/openai/client.d.ts
+      // - which take `defaultHeaders?: HeadersLike`, HeadersLike including
+      // a plain Record<string, string>). Omitted entirely when gatewayId
+      // is unset, matching every call this server made before this field
+      // existed.
+      ...(config.gatewayId ? { defaultHeaders: { 'cf-aig-gateway-id': config.gatewayId } } : {}),
+    });
     clientCache.set(key, client);
   }
   return client;

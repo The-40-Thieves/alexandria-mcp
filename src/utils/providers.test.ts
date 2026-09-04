@@ -96,13 +96,14 @@ function chatCompletion(content: string) {
   };
 }
 
-const ROLE_ENV_SUFFIXES = ['BASE_URL', 'API_KEY', 'MODEL', 'JSON_MODE'] as const;
+const ROLE_ENV_SUFFIXES = ['BASE_URL', 'API_KEY', 'MODEL', 'JSON_MODE', 'GATEWAY_ID'] as const;
 const ROLES = ['ROUTER', 'SYNTH', 'RESEARCH', 'EMBEDDINGS', 'RERANK', 'VERIFY'] as const;
 
 function clearAlexandriaEnv() {
   delete process.env.OPENAI_API_KEY;
   delete process.env.ALEXANDRIA_BASE_URL;
   delete process.env.ALEXANDRIA_API_KEY;
+  delete process.env.ALEXANDRIA_GATEWAY_ID;
   for (const role of ROLES) {
     for (const suffix of ROLE_ENV_SUFFIXES) {
       delete process.env[`ALEXANDRIA_${role}_${suffix}`];
@@ -167,6 +168,33 @@ test('roleConfig', async (t) => {
     assert.equal(roleConfig('synth').apiKey, 'shared-key');
   });
 
+  await t.test('gatewayId is unset by default, even with a gateway configured', () => {
+    clearAlexandriaEnv();
+    process.env.ALEXANDRIA_BASE_URL = 'http://gateway.example/v1';
+    process.env.ALEXANDRIA_API_KEY = 'shared-key';
+    assert.equal(roleConfig('router').gatewayId, undefined);
+  });
+
+  await t.test('ALEXANDRIA_GATEWAY_ID applies as a shared default for every role', () => {
+    clearAlexandriaEnv();
+    process.env.ALEXANDRIA_GATEWAY_ID = 'shared-gateway';
+    assert.equal(roleConfig('router').gatewayId, 'shared-gateway');
+    assert.equal(roleConfig('embeddings').gatewayId, 'shared-gateway');
+  });
+
+  await t.test(
+    'ALEXANDRIA_<ROLE>_GATEWAY_ID takes precedence over the shared ALEXANDRIA_GATEWAY_ID',
+    () => {
+      clearAlexandriaEnv();
+      process.env.ALEXANDRIA_GATEWAY_ID = 'shared-gateway';
+      process.env.ALEXANDRIA_ROUTER_GATEWAY_ID = 'router-only-gateway';
+
+      assert.equal(roleConfig('router').gatewayId, 'router-only-gateway');
+      // A sibling role only sees the shared gateway id.
+      assert.equal(roleConfig('synth').gatewayId, 'shared-gateway');
+    },
+  );
+
   await t.test(
     'a gateway base URL plus a real OPENAI_API_KEY attaches a direct-OpenAI fallback',
     () => {
@@ -183,6 +211,21 @@ test('roleConfig', async (t) => {
       assert.equal(router.fallback?.model, 'gpt-4o-mini');
     },
   );
+
+  await t.test('gatewayId never carries over onto the direct-OpenAI fallback', () => {
+    // api.openai.com is never behind an AI Gateway - sending
+    // cf-aig-gateway-id there would be inert at best.
+    clearAlexandriaEnv();
+    process.env.ALEXANDRIA_BASE_URL = 'http://gateway.example/v1';
+    process.env.ALEXANDRIA_API_KEY = 'gateway-key';
+    process.env.ALEXANDRIA_GATEWAY_ID = 'shared-gateway';
+    process.env.OPENAI_API_KEY = 'sk-direct';
+
+    const router = roleConfig('router');
+    assert.equal(router.gatewayId, 'shared-gateway');
+    assert.ok(router.fallback);
+    assert.equal(router.fallback?.gatewayId, undefined);
+  });
 
   await t.test(
     'the fallback does not inherit a gateway-local model name across a different base URL',
@@ -346,6 +389,41 @@ test('chatJSON', async (t) => {
       messages: Array<{ role: string; content: string }>;
     };
     assert.match(retryMessages.messages[1].content, /previous response was invalid/);
+  });
+
+  await t.test(
+    'ALEXANDRIA_<ROLE>_GATEWAY_ID reaches the request as the cf-aig-gateway-id header',
+    async () => {
+      const server = await startFakeServer(() => ({
+        status: 200,
+        body: chatCompletion(JSON.stringify({ intent: 'x', n: 1 })),
+      }));
+      t.after(() => server.close());
+
+      clearAlexandriaEnv();
+      process.env.ALEXANDRIA_ROUTER_BASE_URL = server.url;
+      process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+      process.env.ALEXANDRIA_ROUTER_GATEWAY_ID = 'my-named-gateway';
+
+      await chatJSON('router', 'sys', 'user', Schema);
+      assert.equal(server.chatRequests.length, 1);
+      assert.equal(server.chatRequests[0].headers['cf-aig-gateway-id'], 'my-named-gateway');
+    },
+  );
+
+  await t.test('no cf-aig-gateway-id header is sent when no gateway id is configured', async () => {
+    const server = await startFakeServer(() => ({
+      status: 200,
+      body: chatCompletion(JSON.stringify({ intent: 'x', n: 1 })),
+    }));
+    t.after(() => server.close());
+
+    clearAlexandriaEnv();
+    process.env.ALEXANDRIA_ROUTER_BASE_URL = server.url;
+    process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+
+    await chatJSON('router', 'sys', 'user', Schema);
+    assert.equal(server.chatRequests[0].headers['cf-aig-gateway-id'], undefined);
   });
 
   await t.test('fails after two invalid responses', async () => {

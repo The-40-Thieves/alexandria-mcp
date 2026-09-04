@@ -1,40 +1,48 @@
 // fetchAsText(): the shared web-fetch chain behind the `webfetch` source and
-// full-text reads for RSS-kind sources (rss.ts, googlenews.ts). Three tiers,
+// full-text reads for RSS-kind sources (rss.ts, googlenews.ts). Four tiers,
 // tried in order, first one over the success threshold wins:
 //
-//   1. defuddle  - GET the page directly with a browser UA and run Defuddle
-//                  (via linkedom's DOM) locally. No third-party dependency,
-//                  works for any page this process can reach. Follows
-//                  redirects itself (redirect: 'manual' + a capped loop, see
-//                  fetchFollowingRedirects) so every hop gets the SSRF guard,
-//                  not just the URL the caller supplied. When the response
-//                  is a PDF (by content-type or a .pdf URL path) this tier
-//                  extracts it with unpdf (see pdf.ts) instead of running
-//                  Defuddle, returning via: 'pdf' with per-page text.
-//   2. jina      - GET https://r.jina.ai/{url}, a hosted reader that renders
-//                  JS and strips boilerplate server-side. Only tried when
-//                  JINA_API_KEY or ALEXANDRIA_JINA_READER=1 is set, so an
-//                  anonymous caller never eats into Jina's 20 RPM shared cap.
-//   3. crawl4ai  - POST {CRAWL4AI_URL}/crawl, a self-hosted headless-browser
-//                  render (see cave-infra). Only tried when CRAWL4AI_URL is
-//                  configured.
+//   1. defuddle    - GET the page directly with a browser UA and run
+//                    Defuddle (via linkedom's DOM) locally. No third-party
+//                    dependency, works for any page this process can
+//                    reach. Follows redirects itself (redirect: 'manual' +
+//                    a capped loop, see fetchFollowingRedirects) so every
+//                    hop gets the SSRF guard, not just the URL the caller
+//                    supplied. When the response is a PDF (by content-type
+//                    or a .pdf URL path) this tier extracts it with unpdf
+//                    (see pdf.ts) instead of running Defuddle, returning
+//                    via: 'pdf' with per-page text.
+//   2. jina        - GET https://r.jina.ai/{url}, a hosted reader that
+//                    renders JS and strips boilerplate server-side. Only
+//                    tried when JINA_API_KEY or ALEXANDRIA_JINA_READER=1 is
+//                    set, so an anonymous caller never eats into Jina's 20
+//                    RPM shared cap.
+//   3. crawl4ai    - POST {CRAWL4AI_URL}/crawl, a self-hosted
+//                    headless-browser render (see cave-infra). Only tried
+//                    when CRAWL4AI_URL is configured.
+//   4. browser-run - POST Cloudflare Browser Run's REST /markdown Quick
+//                    Action (src/web/browserRun.ts), a hosted headless
+//                    Chrome render. Only tried when CLOUDFLARE_ACCOUNT_ID
+//                    and CLOUDFLARE_BROWSER_RUN_TOKEN are both set - see
+//                    docs/cloudflare.md.
 //
-// Tier 1 falls through to tier 2/3 when the page isn't HTML, when Defuddle
-// can't extract at least MIN_TEXT_CHARS of text (a paywall stub, a JS-only
-// shell, a login wall), or when the fetch itself fails. Tiers 2 and 3 are
-// tried in order for as long as they're configured; fetchAsText throws the
-// last tier's error once every configured tier has failed.
+// Tier 1 falls through to tier 2/3/4 when the page isn't HTML, when
+// Defuddle can't extract at least MIN_TEXT_CHARS of text (a paywall stub, a
+// JS-only shell, a login wall), or when the fetch itself fails. Tiers 2, 3,
+// and 4 are tried in order for as long as they're configured; fetchAsText
+// throws the last tier's error once every configured tier has failed.
 //
-// SECURITY: every tier is fetching (or asking a service to fetch, tiers 2/3)
-// a URL the caller supplied — this whole module is an SSRF surface. See
-// assertFetchableUrl() below for the guard, and its module comment for the
-// one documented residual gap (TOCTOU on tiers 2/3).
+// SECURITY: every tier is fetching (or asking a service to fetch, tiers
+// 2/3/4) a URL the caller supplied - this whole module is an SSRF surface.
+// See assertFetchableUrl() below for the guard, and its module comment for
+// the one documented residual gap (TOCTOU on tiers 2/3/4).
 
 import { lookup as nodeDnsLookup } from 'node:dns/promises';
 import { config } from '../config.ts';
 import { type AddressPin, guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
 import { VERSION } from '../version.ts';
+import { tryBrowserRun } from './browserRun.ts';
 import { extractHtml } from './extract.ts';
 import { extractPdf, type PdfPage } from './pdf.ts';
 
@@ -42,7 +50,7 @@ export interface FetchedPage {
   url: string;
   title: string;
   text: string;
-  via: 'defuddle' | 'jina' | 'crawl4ai' | 'pdf' | 'markdown';
+  via: 'defuddle' | 'jina' | 'crawl4ai' | 'browser-run' | 'pdf' | 'markdown';
   // Set only when via === 'pdf': one entry per PDF page, in order. `text`
   // above is these pages' text joined by pdf.ts's PDF_PAGE_JOINER - the
   // library_read handler (src/index.ts) walks that same join to turn this
@@ -50,7 +58,10 @@ export interface FetchedPage {
   pages?: PdfPage[];
 }
 
-const FETCH_TIMEOUT_MS = 15_000;
+// Exported for browserRun.ts (tier 4): a fixed timeout/label shared with
+// every other tier rather than a second constant that could drift from
+// this one.
+export const FETCH_TIMEOUT_MS = 15_000;
 const MIN_TEXT_CHARS = 500;
 const MAX_REDIRECTS = 5;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -269,7 +280,7 @@ function stripBrackets(hostname: string): string {
 
 // SSRF guard: every tier is fetching (or delegating the fetch of) a
 // caller-supplied URL, so this runs before any of them touch the target.
-// Called once up front in fetchAsText() (covering all three tiers, since
+// Called once up front in fetchAsText() (covering all four tiers, since
 // they all share the same starting URL) and again, defensively, at the top
 // of tryJinaReader()/tryCrawl4ai() and on every redirect hop
 // (fetchFollowingRedirects) — a private target must never reach a tier's
@@ -405,11 +416,12 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
 // Rejects fast on an honest, oversized Content-Length; otherwise streams the
 // body counting bytes and aborts once the running total passes the cap, so a
 // server that lies about (or omits) Content-Length can't force this process
-// to buffer an unbounded response. Shared by all three tiers (defuddle
-// fetches directly; jina and crawl4ai delegate the fetch but the response
-// still flows through this process), each tagging its own error messages
-// with `label` so a cap failure reads the same way callers already expect
-// (`/defuddle:/`, `/jina:/`, `/crawl4ai:/` in fetchAsText's error).
+// to buffer an unbounded response. Shared by all four tiers (defuddle
+// fetches directly; jina, crawl4ai, and browser-run delegate the fetch but
+// the response still flows through this process), each tagging its own
+// error messages with `label` so a cap failure reads the same way callers
+// already expect (`/defuddle:/`, `/jina:/`, `/crawl4ai:/`, `/browser-run:/`
+// in fetchAsText's error).
 // Byte-level core shared by readCappedText (every existing tier) and the
 // PDF branch below (task 6, which needs the raw bytes, not a UTF-8
 // decode): same fast-reject-on-declared-size-then-stream-counting shape,
@@ -458,7 +470,14 @@ async function readCappedBytes(
   return combined;
 }
 
-async function readCappedText(response: Response, url: string, label: string): Promise<string> {
+// Exported for browserRun.ts (tier 4): the same streaming-cap-then-decode
+// path every other tier reads its response through, rather than a second
+// implementation of the same size guard.
+export async function readCappedText(
+  response: Response,
+  url: string,
+  label: string,
+): Promise<string> {
   const bytes = await readCappedBytes(response, url, label);
   return new TextDecoder('utf-8').decode(bytes);
 }
@@ -678,7 +697,7 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
 // --- Chain -------------------------------------------------------------------
 
 export async function fetchAsText(url: string): Promise<FetchedPage> {
-  // One resolveFetchTarget() call up front, shared by all three tiers (they
+  // One resolveFetchTarget() call up front, shared by all four tiers (they
   // all start from the same URL): it validates AND, for tier 1, hands
   // tryDefuddle the pin for the connection it is about to make - a second,
   // separate call here just to re-derive that pin would reopen the TOCTOU
@@ -706,6 +725,14 @@ export async function fetchAsText(url: string): Promise<FetchedPage> {
   if (config.CRAWL4AI_URL) {
     try {
       return await tryCrawl4ai(url);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  if (config.CLOUDFLARE_ACCOUNT_ID && config.CLOUDFLARE_BROWSER_RUN_TOKEN) {
+    try {
+      return await tryBrowserRun(url);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
     }

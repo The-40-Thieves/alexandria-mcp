@@ -105,6 +105,8 @@ ALEXANDRIA_API_KEY=<your OpenAI key, forwarded through the gateway>
 
 Or point just one role at a gateway while the rest stay on OpenAI directly, e.g. `ALEXANDRIA_ROUTER_BASE_URL` + `ALEXANDRIA_ROUTER_API_KEY` for routing only.
 
+See [docs/cloudflare.md](docs/cloudflare.md) for the fuller Cloudflare integration guide: AI Gateway's newer unified endpoint, Workers AI for the `embeddings`/`rerank` roles, Tunnel + Access for a private `/mcp`, WAF rate limiting for a public one, R2 as an optional cache store, the Browser Run fetch tier below, and why Alexandria stays a hybrid (Node core, Cloudflare services) rather than a full Workers port.
+
 When `ALEXANDRIA_<ROLE>_BASE_URL`/`ALEXANDRIA_BASE_URL` is set *and* `OPENAI_API_KEY` is also present, `OPENAI_API_KEY` is wired up as a one-shot fallback: a network error or 5xx from the gateway falls through to a direct OpenAI call once before the request fails. `chatJSON` (used by routing) always validates the model's response against a zod schema and retries once, on the same backend, with the validation error appended to the prompt, which helps when a gateway is proxying a smaller or local model that doesn't reliably follow the JSON contract on the first try. It requests `response_format: json_object` only against `api.openai.com`, or when `ALEXANDRIA_<ROLE>_JSON_MODE=1` confirms the gateway/model supports it; otherwise it asks for JSON in the prompt instead.
 
 ### Supabase — optional ([supabase.com](https://supabase.com/dashboard))
@@ -279,6 +281,14 @@ is always allowed regardless) and a per-client-IP rate limit
 (`ALEXANDRIA_HTTP_RATE_LIMIT`, default 60/minute, `429` with a JSON-RPC
 error body once exceeded). See `docs/fetch-tier-runtime.md` for the
 details and `src/httpGuards.ts` for the implementation.
+
+Behind a reverse proxy or PaaS edge (Cloudflare Tunnel, Railway's own edge,
+...) the rate limiter's per-client key defaults to `req.socket.remoteAddress`,
+which is the proxy's address for every caller, not the caller's - set
+`ALEXANDRIA_TRUSTED_PROXY=1` to key on `CF-Connecting-IP` (falling back to
+the first `X-Forwarded-For` entry) instead. Only set this once `/mcp` is
+reachable exclusively through a proxy you trust to set those headers
+honestly - see `docs/cloudflare.md`'s Tunnel and Access section.
 
 Serves both eras of the MCP protocol on the same `/mcp` endpoint:
 `createMcpHandler(factory, { legacy: 'stateless' })` (`@modelcontextprotocol/server`,

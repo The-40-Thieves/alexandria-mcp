@@ -41,12 +41,12 @@ export async function mdnSearch(query: string, limit: number): Promise<LibraryRe
 }
 
 // Retrieves and extracts the article body at the doc URL via the fetch tier
-// (defuddle, then jina, then crawl4ai, whichever is configured). The id is
-// arbitrary third-party web content that fetchAsText can fail on for all
-// sorts of reasons (paywall, robots block, the whole chain unconfigured)
-// that aren't a bug in this source, so a failure falls back to
-// metadata-only with the error in `note`, the same convention as
-// kinds/rss.ts.
+// (defuddle, then jina, then crawl4ai, then Browser Run, whichever is
+// configured). The id is arbitrary third-party web content that
+// fetchAsText can fail on for all sorts of reasons (paywall, robots block,
+// the whole chain unconfigured) that aren't a bug in this source, so a
+// failure falls back to metadata-only with the error in `note`, the same
+// convention as kinds/rss.ts.
 export async function mdnRead(id: string): Promise<ReadResult> {
   const url = `${ORIGIN}${id}`;
   try {
