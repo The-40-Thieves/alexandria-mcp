@@ -29,12 +29,14 @@ let cached: Promise<KevCatalog> | undefined;
 
 function download(): Promise<KevCatalog> {
   if (!cached) {
-    cached = fetchJSON<KevCatalog>(URL, { headers: { 'User-Agent': contactUserAgent() } }, TIMEOUT_MS).catch(
-      (err) => {
-        cached = undefined; // let a later call retry after a failed download
-        throw err;
-      },
-    );
+    cached = fetchJSON<KevCatalog>(
+      URL,
+      { headers: { 'User-Agent': contactUserAgent() } },
+      TIMEOUT_MS,
+    ).catch((err) => {
+      cached = undefined; // let a later call retry after a failed download
+      throw err;
+    });
   }
   return cached;
 }

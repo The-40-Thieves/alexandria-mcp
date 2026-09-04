@@ -117,7 +117,7 @@ test('bls: the daily cap is key-aware', async (t) => {
     console.log(JSON.stringify({ dailyCap: bls?.pacing?.dailyCap }));
   `;
   const run = (key: string | undefined): { dailyCap?: number } => {
-    const env = { ...process.env, ALEXANDRIA_STATE_DB: ':memory:' };
+    const env: NodeJS.ProcessEnv = { ...process.env, ALEXANDRIA_STATE_DB: ':memory:' };
     if (key === undefined) delete env.BLS_API_KEY;
     else env.BLS_API_KEY = key;
     const out = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {

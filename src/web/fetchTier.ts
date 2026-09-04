@@ -254,6 +254,14 @@ async function tryDefuddle(url: string, pin: AddressPin | undefined): Promise<Fe
   // skipping extraction (and its worker hop) entirely.
   if (contentType.includes('text/markdown')) {
     const text = (await readCappedText(response, finalUrl, 'defuddle')).trim();
+    // Final wave (G4): the same MIN_TEXT_CHARS floor the Defuddle branch
+    // below applies. A markdown response can be a paywall stub, a login
+    // wall or a near-empty shell just as an HTML one can, and returning a
+    // 40-character stub here short-circuited the whole tier chain: the
+    // jina/crawl4ai/browser-run tiers that exist precisely to render such
+    // a page were never reached, because the caller had a "successful"
+    // answer.
+    if (text.length < MIN_TEXT_CHARS) return null;
     return { url: finalUrl, title: finalUrl, text, via: 'markdown' };
   }
   if (!contentType.includes('html')) {

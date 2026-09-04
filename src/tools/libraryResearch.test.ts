@@ -384,8 +384,19 @@ test('libraryResearch', async (t) => {
 
   await t.test('stops when the time budget is exhausted', async () => {
     // 30ms per LLM call: one round's generateQueries + several sequential
-    // extractLearnings calls already exceeds a 60ms (0.001 min) budget, so
-    // the loop should stop after round 1 despite a depth of 10.
+    // extractLearnings calls comfortably exceeds a 600ms (0.01 min)
+    // budget, so the loop stops within a round or two despite a depth
+    // of 10.
+    //
+    // Final wave: this used to set a 60ms budget, which is a flake, not a
+    // tighter test. generateObjectives() runs BEFORE the first round and
+    // costs one 30ms call plus HTTP setup, so under parallel test load the
+    // deadline could already be spent at runRound()'s own deadline check -
+    // zero rounds ran and the `rounds.length >= 1` assertion below failed.
+    // Observed intermittently on this box under `--test-concurrency=4`;
+    // the budget is now large enough that round 1 always starts and small
+    // enough that the loop still stops far short of depth 10, which is the
+    // property being tested.
     const research = await startFakeChatServer(decideResearch, 30);
     t.after(() => research.close());
     const synth = await startFakeChatServer(decideSynthNoop);
@@ -404,7 +415,7 @@ test('libraryResearch', async (t) => {
 
     const result = await libraryResearch(
       'a topic with a tight time budget',
-      { depth: 10, breadth: 4, maxMinutes: 0.001 },
+      { depth: 10, breadth: 4, maxMinutes: 0.01 },
       undefined,
       { answerFn },
     );

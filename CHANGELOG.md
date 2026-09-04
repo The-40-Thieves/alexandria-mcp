@@ -1,6 +1,6 @@
 # Changelog
 
-## 11.0.0 - 2026-MM-DD
+## 11.0.0 - 2026-09-03
 
 ### Added
 
@@ -85,6 +85,10 @@
   ratio over a bundled 5,000-word list. (Task 11)
 - `VectorStoreProvider.query()` and a `match_knowledge_chunks` SQL function
   with an HNSW index (`docs/sql/match_chunks.sql`; replaces ivfflat).
+  **`docs/sql/match_chunks.sql` has not been verified against a live
+  database.** Run it on a staging project first: it drops and recreates the
+  index, and an HNSW build over an existing corpus is neither instant nor
+  free.
   `corpusSearch()` embeds the query and returns already-ingested chunks
   above `ALEXANDRIA_CORPUS_MIN_SIM` (default 0.92) for static and daily
   sources only, folded into `library_answer` as one more fused list;
