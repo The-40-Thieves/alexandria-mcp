@@ -190,16 +190,20 @@ async function resolveRedirectTarget(nextUrl: string): Promise<RedirectHop> {
   return { pin, guarded: true };
 }
 
-// Per the fetch spec's redirect handling: 303 always becomes a GET, and
-// 301/302 become a GET when the original request was a POST. Re-review
-// round 2: this loop replayed the original method and body on every hop, so
-// a redirected POST was re-POSTed to the new location - a body sent
-// somewhere the caller never addressed, and (for the adapters that POST a
-// key-bearing JSON body) a credential with it. Content-Type/Content-Length
-// go with the dropped body.
+// Per the fetch spec's redirect handling: 303 becomes a GET unless the
+// original request was already HEAD (a HEAD redirected with 303 stays
+// HEAD - there is no body either way, so nothing is gained by widening it
+// to GET), and 301/302 become a GET when the original request was a POST.
+// Re-review round 2: this loop replayed the original method and body on
+// every hop, so a redirected POST was re-POSTed to the new location - a
+// body sent somewhere the caller never addressed, and (for the adapters
+// that POST a key-bearing JSON body) a credential with it.
+// Content-Type/Content-Length go with the dropped body.
 function afterRedirect(init: FetchOptions, status: number): FetchOptions {
   const method = (init.method ?? 'GET').toUpperCase();
-  const becomesGet = status === 303 || ((status === 301 || status === 302) && method === 'POST');
+  const becomesGet =
+    (status === 303 && method !== 'HEAD') ||
+    ((status === 301 || status === 302) && method === 'POST');
   if (!becomesGet) return init;
   const { body: _body, headers, ...rest } = init;
   const kept = Object.fromEntries(
