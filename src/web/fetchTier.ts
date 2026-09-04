@@ -280,7 +280,7 @@ function stripBrackets(hostname: string): string {
 
 // SSRF guard: every tier is fetching (or delegating the fetch of) a
 // caller-supplied URL, so this runs before any of them touch the target.
-// Called once up front in fetchAsText() (covering all three tiers, since
+// Called once up front in fetchAsText() (covering all four tiers, since
 // they all share the same starting URL) and again, defensively, at the top
 // of tryJinaReader()/tryCrawl4ai() and on every redirect hop
 // (fetchFollowingRedirects) — a private target must never reach a tier's
@@ -416,11 +416,12 @@ export async function assertFetchableUrl(rawUrl: string): Promise<void> {
 // Rejects fast on an honest, oversized Content-Length; otherwise streams the
 // body counting bytes and aborts once the running total passes the cap, so a
 // server that lies about (or omits) Content-Length can't force this process
-// to buffer an unbounded response. Shared by all three tiers (defuddle
-// fetches directly; jina and crawl4ai delegate the fetch but the response
-// still flows through this process), each tagging its own error messages
-// with `label` so a cap failure reads the same way callers already expect
-// (`/defuddle:/`, `/jina:/`, `/crawl4ai:/` in fetchAsText's error).
+// to buffer an unbounded response. Shared by all four tiers (defuddle
+// fetches directly; jina, crawl4ai, and browser-run delegate the fetch but
+// the response still flows through this process), each tagging its own
+// error messages with `label` so a cap failure reads the same way callers
+// already expect (`/defuddle:/`, `/jina:/`, `/crawl4ai:/`, `/browser-run:/`
+// in fetchAsText's error).
 // Byte-level core shared by readCappedText (every existing tier) and the
 // PDF branch below (task 6, which needs the raw bytes, not a UTF-8
 // decode): same fast-reject-on-declared-size-then-stream-counting shape,
@@ -696,7 +697,7 @@ async function tryCrawl4ai(url: string): Promise<FetchedPage> {
 // --- Chain -------------------------------------------------------------------
 
 export async function fetchAsText(url: string): Promise<FetchedPage> {
-  // One resolveFetchTarget() call up front, shared by all three tiers (they
+  // One resolveFetchTarget() call up front, shared by all four tiers (they
   // all start from the same URL): it validates AND, for tier 1, hands
   // tryDefuddle the pin for the connection it is about to make - a second,
   // separate call here just to re-derive that pin would reopen the TOCTOU

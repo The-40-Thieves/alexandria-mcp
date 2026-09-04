@@ -64,13 +64,25 @@ ALEXANDRIA_ROUTER_MODEL=openai/gpt-4o-mini
 
 The provider's own key (OpenAI, Anthropic, ...) is configured once in the
 AI Gateway dashboard's BYOK settings, not passed per request - only the
-Cloudflare API token travels as `ALEXANDRIA_API_KEY`. One caveat worth
-knowing before relying on this for anything beyond a single default
-gateway: Cloudflare's REST docs show a `cf-aig-gateway-id` request header
-for targeting a *non-default* named gateway, which this server's plain
-`baseURL`/`apiKey` client has no way to set - fine for the account's
-default gateway, a real limitation if you run several gateways and need a
-specific one.
+Cloudflare API token travels as `ALEXANDRIA_API_KEY`.
+
+Targeting a *named*, non-default gateway on this endpoint needs one more
+thing: Cloudflare's REST API routes to a named gateway via the
+`cf-aig-gateway-id` request header, not the URL path. `ALEXANDRIA_GATEWAY_ID`
+(shared) / `ALEXANDRIA_<ROLE>_GATEWAY_ID` (per-role override, same
+precedence as `ALEXANDRIA_BASE_URL`/`_API_KEY`) set that header on every
+request `src/utils/providers.ts`'s `clientFor()` makes, via the `openai`
+SDK's `defaultHeaders` client option:
+
+```env
+ALEXANDRIA_BASE_URL=https://api.cloudflare.com/client/v4/accounts/<account_id>/ai/v1
+ALEXANDRIA_API_KEY=<Cloudflare API token>
+ALEXANDRIA_GATEWAY_ID=<your gateway's name>
+ALEXANDRIA_ROUTER_MODEL=openai/gpt-4o-mini
+```
+
+Leave `ALEXANDRIA_GATEWAY_ID` unset for the account's default gateway -
+the header is only added when it (or a per-role override) is configured.
 
 **Legacy endpoint** (`gateway.ai.cloudflare.com`, still supported, the one
 already documented in the README's ["Pointing roles at a
@@ -123,6 +135,35 @@ allowance for either plan. Caveat: `bge-reranker-base` is a 2023 278M
 cross-encoder, weaker than newer hosted rerank models; there's no
 OpenAI-shaped `/rerank` route, which is why this backend needed its own
 ~30-line adapter rather than reusing the `cohere` backend's request shape.
+
+## Browser Run: fetch tier 4
+
+`src/web/browserRun.ts` adds Browser Run's REST `/markdown` Quick Action
+as a fourth fetch tier, tried after crawl4ai and only when both
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_BROWSER_RUN_TOKEN` are set:
+
+```env
+CLOUDFLARE_ACCOUNT_ID=<account_id>
+CLOUDFLARE_BROWSER_RUN_TOKEN=<Cloudflare API token with Browser Rendering Edit permission>
+```
+
+Paid plan pricing: 10 browser-hours/month included, then $0.09/hour; REST
+calls aren't charged for concurrency, with a 10 rps / 120-concurrent-browser
+/ 1-new-browser-per-second ceiling. At the stated scenario (10k pages x 5s
+each = 13.9 browser-hours) that's about $0.35/month past the included
+hours.
+
+**Bot posture - read this before relying on it for a hostile site.** Per
+Cloudflare's own docs, Browser Run "does not bypass CAPTCHAs, Turnstile
+challenges, or any other bot protection." There's no IP rotation - every
+request originates from a Cloudflare IP range, carries Web Bot Auth
+signatures, and is tagged with bot-detection IDs `119853733`/`128292352`,
+so a site that fingerprints or blocks known bot traffic can and does block
+it. `/crawl` honours `robots.txt` with a 0.5s default per-request delay.
+This is the opposite of a stealth spider: it's a cheap, legitimate,
+self-identifying JS-render tier for *cooperative* sites - the same
+Jina-reader-class tradeoff tier 2 already makes, not a way past sites that
+actively resist automated access.
 
 ## Tunnel + Access: a private `/mcp`
 

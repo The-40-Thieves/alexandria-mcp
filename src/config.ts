@@ -35,17 +35,20 @@
 import { z } from 'zod';
 
 // Per-role override quartet (see src/utils/providers.ts's Role/envKey):
-// ALEXANDRIA_<ROLE>_BASE_URL / _API_KEY / _MODEL / _JSON_MODE, for each of
-// router/synth/research/embeddings/rerank. A template-literal computed key
-// inside a plain object literal keeps its precise literal type (verified
-// under tsc); a helper function returning the same shape does not - its
-// return type widens to `Record<string, ...>` and every per-role field
-// then fails to typecheck as a known key of Config. Typed out per role
-// instead of via a loop for that reason.
+// ALEXANDRIA_<ROLE>_BASE_URL / _API_KEY / _MODEL / _JSON_MODE / _GATEWAY_ID,
+// for each of router/synth/research/embeddings/rerank/verify. A
+// template-literal computed key inside a plain object literal keeps its
+// precise literal type (verified under tsc); a helper function returning
+// the same shape does not - its return type widens to `Record<string,
+// ...>` and every per-role field then fails to typecheck as a known key of
+// Config. Typed out per role instead of via a loop for that reason.
 type RoleFields<Role extends string> = {
   [K in `ALEXANDRIA_${Role}_BASE_URL` | `ALEXANDRIA_${Role}_API_KEY`]: z.ZodOptional<z.ZodString>;
 } & {
-  [K in `ALEXANDRIA_${Role}_MODEL` | `ALEXANDRIA_${Role}_JSON_MODE`]: z.ZodOptional<z.ZodString>;
+  [K in
+    | `ALEXANDRIA_${Role}_MODEL`
+    | `ALEXANDRIA_${Role}_JSON_MODE`
+    | `ALEXANDRIA_${Role}_GATEWAY_ID`]: z.ZodOptional<z.ZodString>;
 };
 
 function roleFields<const Role extends string>(role: Role, lower: string): RoleFields<Role> {
@@ -71,6 +74,19 @@ function roleFields<const Role extends string>(role: Role, lower: string): RoleF
       .optional()
       .describe(
         `Set to "1" to confirm the ${lower} role's gateway/model honors OpenAI's response_format: json_object; otherwise a JSON instruction is appended to the prompt instead.`,
+      ),
+    // Task 15 review (Important 2): Cloudflare AI Gateway's unified REST
+    // endpoint (api.cloudflare.com/.../ai/v1) routes to a NAMED gateway via
+    // the cf-aig-gateway-id request header, not the URL path (unlike the
+    // legacy gateway.ai.cloudflare.com/v1/<account>/<gateway>/... form,
+    // where the gateway id is already part of ALEXANDRIA_BASE_URL). Set
+    // this to send that header on every request for the ${lower} role; see
+    // docs/cloudflare.md's AI Gateway section.
+    [`ALEXANDRIA_${role}_GATEWAY_ID`]: z
+      .string()
+      .optional()
+      .describe(
+        `Per-role override: Cloudflare AI Gateway id sent as the cf-aig-gateway-id header for the ${lower} role, for routing through a NAMED gateway on the unified api.cloudflare.com/.../ai/v1 endpoint. Falls back to ALEXANDRIA_GATEWAY_ID. Not needed with the legacy gateway.ai.cloudflare.com/v1/<account>/<gateway>/... URL form, which already encodes the gateway id in ALEXANDRIA_BASE_URL.`,
       ),
   } as RoleFields<Role>;
 }
@@ -166,6 +182,15 @@ const rawFields = {
     .string()
     .optional()
     .describe('Shared API key paired with ALEXANDRIA_BASE_URL.'),
+  // Task 15 review (Important 2): shared default for every role's
+  // ALEXANDRIA_<ROLE>_GATEWAY_ID (see roleFields() above) - same
+  // precedence pattern as ALEXANDRIA_BASE_URL/ALEXANDRIA_API_KEY.
+  ALEXANDRIA_GATEWAY_ID: z
+    .string()
+    .optional()
+    .describe(
+      'Shared Cloudflare AI Gateway id, sent as the cf-aig-gateway-id header on every role that has no ALEXANDRIA_<ROLE>_GATEWAY_ID override. Only needed for the unified api.cloudflare.com/.../ai/v1 endpoint routing through a NAMED gateway; see docs/cloudflare.md.',
+    ),
   OPENAI_API_KEY: z
     .string()
     .optional()

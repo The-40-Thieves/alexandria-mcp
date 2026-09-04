@@ -154,12 +154,12 @@ export function defineRssSource(cfg: FeedConfig): void {
   }
 
   // Retrieves and extracts the article body at the item's link via the
-  // fetch tier (defuddle, then jina, then crawl4ai, whichever is
-  // configured). A feed item's link is arbitrary third-party web content
-  // that fetchAsText can fail on for all sorts of reasons (paywall, robots
-  // block, the whole chain unconfigured) that aren't a bug in this source,
-  // so a failure here falls back to metadata-only with the error recorded
-  // in `note` rather than throwing.
+  // fetch tier (defuddle, then jina, then crawl4ai, then Browser Run,
+  // whichever is configured). A feed item's link is arbitrary third-party
+  // web content that fetchAsText can fail on for all sorts of reasons
+  // (paywall, robots block, the whole chain unconfigured) that aren't a bug
+  // in this source, so a failure here falls back to metadata-only with the
+  // error recorded in `note` rather than throwing.
   async function read(id: string): Promise<ReadResult> {
     try {
       const page = await fetchAsText(id);

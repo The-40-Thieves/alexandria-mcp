@@ -19,7 +19,7 @@ export async function webfetchRead(id: string): Promise<ReadResult> {
 
 register('webfetch', {
   description:
-    'Direct web fetch: search() always returns []; read(id=<url>) fetches and extracts the text of any http(s) page via the fetch tier (defuddle, then jina, then crawl4ai, whichever is configured). Use this to read a URL surfaced by another source, or any URL the caller already has.',
+    'Direct web fetch: search() always returns []; read(id=<url>) fetches and extracts the text of any http(s) page via the fetch tier (defuddle, then jina, then crawl4ai, then Browser Run, whichever is configured). Use this to read a URL surfaced by another source, or any URL the caller already has.',
   supportsIngest: true,
   kind: 'rest',
   cluster: 'web',
