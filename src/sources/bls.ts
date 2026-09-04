@@ -142,11 +142,17 @@ register('bls', {
   optionalEnv: ['BLS_API_KEY'],
   // Keyless BLS access is documented at 25 requests/day (the v1 rate,
   // which the keyless v2 request in blsRead's comment above matches in
-  // practice); a BLS_API_KEY raises this to 500/day, but pacing isn't
-  // env-conditional anywhere in this registry today (see task-4's
-  // datacite/crossref/pubmed precedent), so this stays at the
-  // conservative keyless figure.
-  pacing: { dailyCap: 25 },
+  // practice); a registered BLS_API_KEY raises it to 500/day.
+  //
+  // Final wave (F2): this used to be a flat 25 while the description above
+  // promised the 500/day tier with a key - so an operator who set the key
+  // got a quarter-of-a-percent of the throughput they were told they had,
+  // silently, with the cap doing the throttling. Computed from the env at
+  // module load, which is when the registry reads `pacing` (see
+  // registry.ts's register()), the same way every other adapter reads its
+  // key: setting BLS_API_KEY after the process starts has never taken
+  // effect for anything and does not here either.
+  pacing: { dailyCap: registrationKey() ? 500 : 25 },
   search: blsSearch,
   read: blsRead,
 });

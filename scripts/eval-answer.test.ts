@@ -9,6 +9,7 @@ import {
   fraction,
   loadAnswerGolden,
   type QueryJudgments,
+  resolvabilityTarget,
   scoreAnswerQuery,
 } from './eval-answer.ts';
 
@@ -136,5 +137,54 @@ test('checkResolvable', async (t) => {
   await t.test('resolves false for a guard-rejected private address', async () => {
     const resolvable = await checkResolvable('http://10.1.2.3/');
     assert.equal(resolvable, false);
+  });
+});
+
+// Final wave (E4): a corpus-cache citation's `url` falls back to its
+// source's HOMEPAGE when the chunk predates ChunkMetadata.url (see
+// corpusSearch.ts), and "the homepage resolved" measures nothing. Such a
+// citation is scored on its own DOI when it has one, and otherwise left
+// out of the resolvability sample rather than counted as a free pass.
+test('resolvabilityTarget', async (t) => {
+  const base = { n: 1, title: 'A Title' };
+
+  await t.test('an ordinary citation is scored on its url', () => {
+    assert.equal(
+      resolvabilityTarget({ ...base, source: 'arxiv', id: '2401.00001', url: 'https://a.test/x' }),
+      'https://a.test/x',
+    );
+  });
+
+  await t.test('an ordinary citation with no url falls back to its DOI', () => {
+    assert.equal(
+      resolvabilityTarget({ ...base, source: 'crossref', id: '10.1234/abc' }),
+      'https://doi.org/10.1234/abc',
+    );
+  });
+
+  await t.test('a corpus citation is scored on its DOI, never its homepage url', () => {
+    assert.equal(
+      resolvabilityTarget({
+        ...base,
+        source: 'crossref',
+        id: '10.1234/abc',
+        url: 'https://www.crossref.org/',
+        via: 'corpus',
+      }),
+      'https://doi.org/10.1234/abc',
+    );
+  });
+
+  await t.test('a corpus citation with no DOI is left out of the sample', () => {
+    assert.equal(
+      resolvabilityTarget({
+        ...base,
+        source: 'gutenberg',
+        id: '1342',
+        url: 'https://www.gutenberg.org/',
+        via: 'corpus',
+      }),
+      undefined,
+    );
   });
 });

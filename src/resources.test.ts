@@ -101,3 +101,31 @@ test('no text and no note falls back to a "no full text available" message', asy
     /No full text available for t_resources_unit_metadata_only:x9/,
   );
 });
+
+// Final wave (E1): plenty of real ids contain '/' - every DOI (crossref,
+// datacite, opencitations) and codewiki/readthedocs' path-shaped ids. The
+// resource_link URIs library_search emits encode the id, and this handler
+// decodes it, so the id the adapter is asked for is the id the caller was
+// given back.
+test('a DOI-shaped id survives the resource URI round trip', async () => {
+  const DOI = '10.1234/abc.def/2026';
+  let readWith: string | undefined;
+  register('t_resources_doi_fixture', {
+    description: 'fixture source for the E1 encoded-id test',
+    supportsIngest: false,
+    async search() {
+      return [];
+    },
+    async read(id: string) {
+      readWith = id;
+      return { title: 'x', authors: [], text: `text for ${id}` };
+    },
+  });
+
+  const client = await connectedClient(async (result) => result);
+  const uri = `library://doc/t_resources_doi_fixture/${encodeURIComponent(DOI)}`;
+  const result = await client.readResource({ uri });
+
+  assert.equal(readWith, DOI, 'the adapter must be asked for the decoded id');
+  assert.equal((result.contents[0] as { text?: string }).text, `text for ${DOI}`);
+});

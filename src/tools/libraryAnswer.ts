@@ -19,8 +19,11 @@ import { type ClaimVerdict, checkClaims } from '../utils/claimCheck.ts';
 import { rrf } from '../utils/fuse.ts';
 import { checkLiveness } from '../utils/liveness.ts';
 import { pool, type RemoteServerConfig } from '../utils/mcpClientPool.ts';
+import { CITATION_BRACKET_RE, escapeSourceText } from '../utils/promptData.ts';
 import { chatText, requireRoleForTool } from '../utils/providers.ts';
 import { rerank } from '../utils/rerank.ts';
+import { extractDoiFromUrl } from '../web/openAccess.ts';
+import { hasFullText, withOpenAccessFallback } from '../web/openAccessFallback.ts';
 import { type RouteItem, runAsk } from './libraryAsk.ts';
 
 const READ_CHAR_LIMIT = 6000;
@@ -45,6 +48,14 @@ export interface Citation {
   // URL to check) is still a valid Citation.
   grade?: CitationGrade;
   resolves?: boolean;
+  // Final wave (E4): set only on a citation that was served from the
+  // corpus cache (src/pipeline/corpusSearch.ts). `source`/`id` above are
+  // the ORIGINAL source and id the chunk was ingested from, so the pair
+  // library_read and library_citations accept is the pair the instructions
+  // tell an agent to pass back; this marker records where the text
+  // actually came from. Detailed output only - format.ts's concise
+  // citation keeps the pre-existing field set.
+  via?: 'corpus';
 }
 
 export interface LibraryAnswerOptions {
@@ -142,17 +153,38 @@ interface ReadSource {
   doi?: string;
 }
 
-// Reads the first `readTop` ranked results that claim hasFullText, skipping
-// any whose read() turns out metadataOnly or empty (a source can say
-// hasFullText: true at search time and still fail to produce text for a
-// specific item, e.g. paywalled). Does not backfill past the initial
-// readTop candidates.
+// Final wave (E2): a row is a read candidate when it claims hasFullText,
+// OR when it names a DOI. Task 6's open-access chain exists precisely for
+// the DOI-bearing scholarly rows that answer `hasFullText: false` (crossref,
+// datacite, openalex, semanticscholar and the preprint servers return an
+// abstract stub and a DOI, and the full text is one OA hop away), and this
+// pre-filter used to drop every one of them before the chain could run.
+function doiForResult(item: LibraryResult): string | undefined {
+  return extractDoiFromUrl(item.url) ?? extractDoiFromUrl(item.previewUrl);
+}
+
+function isReadCandidate(item: LibraryResult): boolean {
+  return item.hasFullText || Boolean(item.fullText) || Boolean(doiForResult(item));
+}
+
+// Reads the first `readTop` ranked results that are read candidates,
+// skipping any whose read() turns out metadataOnly or empty even after the
+// open-access fallback (a source can say hasFullText: true at search time
+// and still fail to produce text for a specific item, e.g. paywalled).
+// Does not backfill past the initial readTop candidates.
 //
 // Task 12: a corpus-as-cache hit (src/pipeline/corpusSearch.ts) already
 // carries its chunk text in `fullText` - it short-circuits straight to a
 // ReadSource with no adapter call, since there is nothing left to fetch.
+//
+// Final wave (E2): a result that comes back metadata-only, or shorter than
+// MIN_FULL_TEXT_CHARS, goes through withOpenAccessFallback() - the same
+// chain library_read and the document resource have used since task 6.
+// Until now that chain applied to library_read and resources only, so
+// library_answer synthesized from abstract stubs where library_read on the
+// same id returned the full text.
 async function readTopSources(ranked: LibraryResult[], readTop: number): Promise<ReadSource[]> {
-  const candidates = ranked.filter((r) => r.hasFullText).slice(0, readTop);
+  const candidates = ranked.filter(isReadCandidate).slice(0, readTop);
   const sources: ReadSource[] = [];
   for (const item of candidates) {
     if (item.fullText) {
@@ -160,7 +192,13 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
       continue;
     }
     try {
-      const result = await getAdapter(item.source).read(item.id);
+      const raw = await getAdapter(item.source).read(item.id);
+      // The chain itself is a no-op for a result that already has full
+      // text, and needs a DOI to do anything at all - so a row whose
+      // adapter answered properly costs nothing here.
+      const result = hasFullText(raw)
+        ? raw
+        : await withOpenAccessFallback(raw.doi ? raw : { ...raw, doi: doiForResult(item) });
       if (result.metadataOnly || !result.text) continue;
       sources.push({ item, text: result.text.slice(0, READ_CHAR_LIMIT), doi: result.doi });
     } catch (err) {
@@ -173,28 +211,13 @@ async function readTopSources(ranked: LibraryResult[], readTop: number): Promise
   return sources;
 }
 
-// Fetched page text is third-party content and can contain anything,
-// including text shaped like the delimiters around it. Neutralize any
-// <source ...> or </source> sequence so a page cannot close its own block
-// early and have the rest of its bytes read as prompt instructions, or
-// forge an extra numbered source. Entity-escaping the angle bracket keeps
-// the text readable while making the tag inert. Whitespace and zero-width
-// characters between the bracket, the slash, and the tag name are ignored
-// by lenient readers (a model included), so the match ignores them too;
-// otherwise "< source" or "<\u200B/source" would slip through.
-//
-// The same pass rewrites citation-shaped markers in the page text ("[3]",
-// "[1, 2]") to "[ref 3]". Citations are only ever extracted from the
-// model's answer, never from source text, but a model that echoes a page
-// sentence verbatim would carry its "[3]" along and mint a citation to
-// source 3 that the page, not the model, chose. "[ref 3]" reads the same
-// and does not match CITATION_BRACKET_RE.
-const SOURCE_TAG_BRACKET_RE = /<(?=[\s\u200B-\u200D\uFEFF]*\/?[\s\u200B-\u200D\uFEFF]*source)/gi;
-export function escapeSourceText(text: string): string {
-  // Escapes only the angle bracket, so the rest of the sequence (including
-  // its original casing and spacing) is preserved as readable text.
-  return text.replace(SOURCE_TAG_BRACKET_RE, '&lt;').replace(CITATION_BRACKET_RE, '[ref $1]');
-}
+// Final wave (D): the source fencing this module introduced (task 8) now
+// lives in src/utils/promptData.ts, so the research, ask, rerank and
+// claim-verification prompts fence the same way instead of each
+// interpolating retrieved text raw. Re-exported here because
+// src/utils/claimCheck.ts and scripts/eval-answer.ts already reach for
+// escapeSourceText at this path.
+export { escapeSourceText };
 
 // Same reasoning for the title, which lands inside a quoted attribute:
 // a quote or an angle bracket there would let a crafted title break out.
@@ -236,14 +259,15 @@ export function splitSentences(text: string): string[] {
 }
 
 // A citation marker is a bracketed, comma-separated list of up to
-// 3-digit numbers, e.g. "[1]", "[1,2]", "[1, 2]". A 4+ digit number never
-// matches (so "[2024]" isn't a marker at all), and a matched 3-digit
-// number >= 100 is still treated as ordinary prose (a page number, a
-// year written with only 3 digits is unlikely but harmless either way)
-// rather than a citation, since no source list realistically runs that
-// high. Only numbers in [1, PROSE_NUMBER_MAX] are citation candidates;
-// among those, anything beyond the actual source count is dangling.
-const CITATION_BRACKET_RE = /\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\]/g;
+// 3-digit numbers, e.g. "[1]", "[1,2]", "[1, 2]" (CITATION_BRACKET_RE, in
+// src/utils/promptData.ts alongside the escaping that rewrites the same
+// shape out of source text). A 4+ digit number never matches (so "[2024]"
+// isn't a marker at all), and a matched 3-digit number >= 100 is still
+// treated as ordinary prose (a page number; a year written with only 3
+// digits is unlikely but harmless either way) rather than a citation,
+// since no source list realistically runs that high. Only numbers in
+// [1, PROSE_NUMBER_MAX] are citation candidates; among those, anything
+// beyond the actual source count is dangling.
 const PROSE_NUMBER_MAX = 99;
 
 // Only ever called on the model's own answer (rawAnswer, then the filtered
@@ -303,12 +327,38 @@ function buildFallbackAnswer(sources: ReadSource[]): string {
 // through the same "best available link" order library_search's own
 // concise row (src/tools/format.ts) doesn't need to make, since library_
 // search still returns the full LibraryResult with all three fields intact.
+// Final wave (E4): a corpus-cache hit carries `source: 'corpus'` and a
+// composite id (`<source>:<sourceId>:<chunkIndex>`, see
+// corpusSearch.ts's buildId). Citing it as-is handed the agent a pair
+// library_read rejects outright - 'corpus' is deliberately not a
+// registered adapter - while the server instructions tell it to pass
+// `source:id` back. The citation is projected onto the chunk's original
+// source and id instead, with `via: 'corpus'` recording where the text
+// came from.
+//
+// The composite id is split from BOTH ends because a sourceId may itself
+// contain ':' (a DOI-shaped id does not, but an OAI or URN-shaped one
+// does): the first segment is the source, the last is the chunk index,
+// and everything between is the sourceId.
+function projectCorpusCitation(item: LibraryResult): {
+  source: string;
+  id: string;
+  via?: 'corpus';
+} {
+  if (item.source !== 'corpus') return { source: item.source, id: item.id };
+  const parts = item.id.split(':');
+  if (parts.length < 3) return { source: item.source, id: item.id };
+  const source = parts[0];
+  const id = parts.slice(1, -1).join(':');
+  if (!source || !id) return { source: item.source, id: item.id };
+  return { source, id, via: 'corpus' };
+}
+
 function buildCitations(sources: ReadSource[], usedNumbers: Set<number>): Citation[] {
   return sources
     .map((s, i) => ({
       n: i + 1,
-      source: s.item.source,
-      id: s.item.id,
+      ...projectCorpusCitation(s.item),
       title: s.item.title,
       url: s.item.url ?? s.item.previewUrl ?? s.item.downloadUrl,
     }))

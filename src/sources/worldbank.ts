@@ -15,6 +15,10 @@ import { register, truncateText } from './registry.ts';
 
 const INDICATOR_LIST_URL = 'https://api.worldbank.org/v2/indicator?format=json&per_page=30000';
 const LIST_TIMEOUT_MS = 30000; // the full catalog response is ~15 MB
+// Final wave (C2): fetchJSON caps response bodies at 10 MB by default;
+// this catalog measured 14,933,331 bytes on 2026-09-03, so it needs an
+// explicit larger cap with headroom for the catalog's own growth.
+const CATALOG_MAX_BYTES = 48 * 1024 * 1024;
 
 interface WBIndicator {
   id: string;
@@ -42,7 +46,11 @@ let cachedIndicators: Promise<WBIndicator[]> | undefined;
 
 function downloadIndicators(): Promise<WBIndicator[]> {
   if (!cachedIndicators) {
-    cachedIndicators = fetchJSON<WBIndicatorListResponse>(INDICATOR_LIST_URL, {}, LIST_TIMEOUT_MS)
+    cachedIndicators = fetchJSON<WBIndicatorListResponse>(
+      INDICATOR_LIST_URL,
+      { maxBytes: CATALOG_MAX_BYTES },
+      LIST_TIMEOUT_MS,
+    )
       .then((data) => data[1] ?? [])
       .catch((err) => {
         cachedIndicators = undefined;

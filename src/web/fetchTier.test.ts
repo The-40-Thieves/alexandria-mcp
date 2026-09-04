@@ -7,13 +7,8 @@ import { guardedDispatcher, withPinnedAddress } from '../utils/dispatcher.ts';
 import { fetchWithRetry } from '../utils/http.ts';
 import { VERSION } from '../version.ts';
 import { resetExtractWorkerForTests } from './extract.ts';
-import {
-  assertConfiguredServiceUrl,
-  assertFetchableUrl,
-  type DnsLookupAll,
-  dnsResolver,
-  fetchAsText,
-} from './fetchTier.ts';
+import { assertFetchableUrl, type DnsLookupAll, dnsResolver, fetchAsText } from './fetchTier.ts';
+import { assertConfiguredServiceUrl } from './urlGuard.ts';
 
 function fixture(name: string): string {
   return readFileSync(path.resolve(process.cwd(), 'eval/fixtures/web', name), 'utf8');
@@ -51,6 +46,11 @@ interface FixtureServer {
 // hop bypassing extraction). `hugeCrawl` makes /crawl itself stream an
 // oversized chunked body instead of its normal JSON, to exercise the same
 // streaming size cap on tier 3.
+// Comfortably over the tier's MIN_TEXT_CHARS floor, so this fixture
+// exercises the markdown hop itself rather than the short-body
+// fall-through the /markdown-tiny route below covers.
+const MARKDOWN_BODY = `# Agent-Ready Markdown\n\n${'This body is used as-is, no extraction involved. '.repeat(20)}`;
+
 function startFixtureServer(crawlResponse?: unknown, hugeCrawl = false): Promise<FixtureServer> {
   const crawlRequests: unknown[] = [];
   const articleRequestHeaders: IncomingMessage['headers'][] = [];
@@ -64,7 +64,15 @@ function startFixtureServer(crawlResponse?: unknown, hugeCrawl = false): Promise
       }
       if (req.method === 'GET' && req.url === '/markdown') {
         res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
-        res.end('# Agent-Ready Markdown\n\nThis body is used as-is, no extraction involved.');
+        res.end(MARKDOWN_BODY);
+        return;
+      }
+      // Final wave (G4): a markdown response UNDER the tier's own
+      // MIN_TEXT_CHARS floor - a paywall stub or login wall served as
+      // markdown, which used to short-circuit the whole tier chain.
+      if (req.method === 'GET' && req.url === '/markdown-tiny') {
+        res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
+        res.end('# Members only\n\nSubscribe to read this article.');
         return;
       }
       if (req.method === 'GET' && req.url === '/tiny') {
@@ -459,12 +467,28 @@ test('fetchAsText', async (t) => {
 
       const page = await fetchAsText(`${server.url}/markdown`);
       assert.equal(page.via, 'markdown');
-      assert.equal(
-        page.text,
-        '# Agent-Ready Markdown\n\nThis body is used as-is, no extraction involved.',
-      );
+      assert.equal(page.text, MARKDOWN_BODY.trim());
     },
   );
+
+  // Final wave (G4): a short markdown response used to be returned as a
+  // successful page, short-circuiting the tier chain - so the jina /
+  // crawl4ai / browser-run tiers that exist precisely to render a paywall
+  // stub or login wall were never reached. It falls through like a short
+  // HTML page now; with no later tier configured, that surfaces as the
+  // same "extracted under N chars" error a short HTML page produces.
+  await t.test('tier 1: a text/markdown response under the floor falls through', async () => {
+    delete process.env.JINA_API_KEY;
+    delete process.env.ALEXANDRIA_JINA_READER;
+    delete process.env.CRAWL4AI_URL;
+    const server = await startFixtureServer();
+    t.after(() => server.close());
+
+    await assert.rejects(
+      () => fetchAsText(`${server.url}/markdown-tiny`),
+      /extracted under 500 chars/,
+    );
+  });
 
   await t.test(
     'tier 1: a PDF response (by content-type) is extracted via unpdf, per page',
@@ -562,7 +586,7 @@ test('fetchAsText', async (t) => {
       delete process.env.JINA_API_KEY;
       delete process.env.ALEXANDRIA_JINA_READER;
       delete process.env.CRAWL4AI_URL;
-      process.env.CLOUDFLARE_ACCOUNT_ID = 'acct123';
+      process.env.CLOUDFLARE_ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
       process.env.CLOUDFLARE_BROWSER_RUN_TOKEN = 'test-cf-token';
       const server = await startFixtureServer();
       t.after(() => server.close());
@@ -574,7 +598,11 @@ test('fetchAsText', async (t) => {
       }> = [];
       globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
         const url = String(input);
-        if (url.startsWith('https://api.cloudflare.com/client/v4/accounts/acct123/')) {
+        if (
+          url.startsWith(
+            'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/',
+          )
+        ) {
           browserRunCalls.push({
             url,
             headers: (init.headers as Record<string, string>) ?? {},
@@ -595,7 +623,7 @@ test('fetchAsText', async (t) => {
       assert.equal(browserRunCalls.length, 1);
       assert.equal(
         browserRunCalls[0].url,
-        'https://api.cloudflare.com/client/v4/accounts/acct123/browser-rendering/markdown',
+        'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/browser-rendering/markdown',
       );
       assert.equal(browserRunCalls[0].headers.Authorization, 'Bearer test-cf-token');
       assert.deepEqual(browserRunCalls[0].body, { url: target });
@@ -626,7 +654,7 @@ test('fetchAsText', async (t) => {
       delete process.env.ALEXANDRIA_JINA_READER;
       delete process.env.CRAWL4AI_URL;
       delete process.env.CLOUDFLARE_BROWSER_RUN_TOKEN;
-      process.env.CLOUDFLARE_ACCOUNT_ID = 'acct123';
+      process.env.CLOUDFLARE_ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
       const server = await startFixtureServer();
       t.after(() => server.close());
 

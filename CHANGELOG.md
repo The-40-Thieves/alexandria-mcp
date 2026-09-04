@@ -1,6 +1,6 @@
 # Changelog
 
-## 11.0.0 - 2026-MM-DD
+## 11.0.0 - 2026-09-03
 
 ### Added
 
@@ -85,6 +85,10 @@
   ratio over a bundled 5,000-word list. (Task 11)
 - `VectorStoreProvider.query()` and a `match_knowledge_chunks` SQL function
   with an HNSW index (`docs/sql/match_chunks.sql`; replaces ivfflat).
+  **`docs/sql/match_chunks.sql` has not been verified against a live
+  database.** Run it on a staging project first: it drops and recreates the
+  index, and an HNSW build over an existing corpus is neither instant nor
+  free.
   `corpusSearch()` embeds the query and returns already-ingested chunks
   above `ALEXANDRIA_CORPUS_MIN_SIM` (default 0.92) for static and daily
   sources only, folded into `library_answer` as one more fused list;
@@ -107,8 +111,25 @@
   `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_BROWSER_RUN_TOKEN` are set; the
   target passes the SSRF guard first and the response is capped.
   `ALEXANDRIA_TRUSTED_PROXY=1`: the `/mcp` rate limiter keys on
-  `CF-Connecting-IP`, then the first `X-Forwarded-For` entry, else the
+  `CF-Connecting-IP`, then the rightmost `X-Forwarded-For` entry, else the
   socket address; off by default. (Task 15)
+
+### Changed (BREAKING)
+
+- `/mcp` Host-header validation now applies only when
+  `ALEXANDRIA_ALLOWED_ORIGINS` is set. Applied unconditionally it returned
+  `403` for every request to any deployment that had not set the variable,
+  because such a deployment's own `Host` header is in no allowlist when
+  there is no allowlist. Remedy: set `ALEXANDRIA_ALLOWED_ORIGINS` to the
+  hostname(s) this deployment is reached by, which turns Host validation
+  back on and is what the startup warning asks for. The `Origin` check is
+  unchanged and still rejects any request whose `Origin` header names a
+  hostname outside the list.
+- `POST /mcp` with a media type other than `application/json` is now
+  answered `415` by this server, and any POST body over the 100 KiB cap is
+  answered `413` (it was `500`) with the connection closed. Previously a
+  non-JSON POST skipped the cap entirely and the SDK buffered the whole
+  request before answering.
 
 ### Changed
 

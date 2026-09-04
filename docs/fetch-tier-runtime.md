@@ -73,6 +73,14 @@ The default UA sent by tier 1 changed from an impersonated
 versioned, and pointing back at the project, rather than pretending to be
 a browser. Overridable per deployment via `ALEXANDRIA_FETCH_UA`.
 
+Final wave (F1): that is now the UA for EVERY outbound call, not just tier
+1's. `src/utils/http.ts` - the path every REST adapter takes - used to send
+`library-mcp-server/1.0 (open source research tool)`, and four adapters
+(wikipedia, wikidata, kev, ecosystems) hardcoded `alexandria-mcp/10`, frozen
+at whatever major each was written on. All of them build from
+`src/utils/userAgent.ts` now; the four that upstream asks to carry a contact
+address use `contactUserAgent()`, which folds `CONTACT_EMAIL` in when set.
+
 `npm run probe` was run once against every source before this change and
 once after (see the task 13 report for the full before/after status
 table). No source's probe status regressed from the UA change alone; a
@@ -80,9 +88,37 @@ site that specifically depended on the browser UA would show up as a new
 `ERROR`/`EMPTY`/`TIMEOUT` in that diff, and none did in this run. If a
 future probe run does turn up a regression traceable to the UA, the fix is
 a per-adapter `headers` override restoring the old browser UA for that one
-call site (fetchTier.ts's `browserUA()` reads `ALEXANDRIA_FETCH_UA` first,
-so a global override is also available without patching source), not
-reverting the default for everyone.
+call site (`src/utils/userAgent.ts`'s `fetchUserAgent()` reads
+`ALEXANDRIA_FETCH_UA` first, so a global override is also available without
+patching source), not reverting the default for everyone.
+
+## Residual limits of the SSRF guard (final wave)
+
+**Delegated renderers cannot be pinned.** Tiers 2, 3 and 4 (jina,
+crawl4ai, Browser Run) do not fetch the target themselves; they hand the
+URL to a third party that resolves the hostname on its own machine.
+`assertFetchableUrl` still runs before each of them, so a target whose name
+or whose one DNS answer is private is refused - but that check validates
+*Alexandria's* DNS answer, and nothing about it constrains the connection
+the delegate then makes. A hostname that resolves publicly for Alexandria
+and privately for the delegate reaches whatever the delegate can reach.
+This is unfixable from here for jina and Browser Run (hosted, no way to
+pass a validated address with the Host/SNI preserved). It matters most for
+crawl4ai, because crawl4ai runs on the operator's own tailnet: a
+successful validation here does not stop it fetching a Cave-internal
+service. Tier 1 (defuddle, the tier that fetches directly) has no such gap
+- it pins every hop to the address `resolveFetchTarget` just validated.
+
+**Without `worker_threads`, extraction has no timeout.** `extractHtml` and
+`extractPdfOffThread` fall back to running the same extraction in-thread
+when a `Worker` cannot be constructed at all. The 30 second per-job
+timeout goes with the worker: it works by terminating that worker, and
+there is nothing to terminate on the main thread. `parseHTML` + Defuddle
+and unpdf's PDF.js are both synchronous, so an in-thread timer could not
+interrupt them even if one were set. On this fallback path a pathological
+page or PDF blocks the event loop for as long as it takes. Every supported
+runtime (Node 24, the `engines` floor) has `worker_threads`, so this is the
+fallback's documented cost, not the normal path.
 
 ## HTTP guards (`src/httpGuards.ts`, TRANSPORT=http only)
 
@@ -95,9 +131,24 @@ worth protecting the same way:
   hostnames, no scheme or port). Loopback (`localhost`, `127.0.0.1`,
   `[::1]`) is always allowed, regardless of that setting. A request that
   fails either check gets a `403` (the guard itself writes that response,
-  per `@modelcontextprotocol/node`'s own contract).
+  per `@modelcontextprotocol/node`'s own contract). The **Host** check
+  applies only when `ALEXANDRIA_ALLOWED_ORIGINS` is set: applied
+  unconditionally it `403`s every request to any deployment that has not
+  set the variable, whose own hostname is in no allowlist because there is
+  no allowlist. Setting the variable is what turns DNS-rebinding
+  protection on, and one warning is logged at startup while it is unset.
+  The check is deliberately NOT keyed on which interface the connection
+  arrived on: a Cloudflare Tunnel terminates at `localhost:PORT` and
+  forwards the public hostname in `Host`, so keying on loopback `403`ed
+  the tunnelled request while letting the identical `Host` through on a
+  LAN address. The **Origin** check is unconditional (the SDK's
+  `originValidation` passes a request carrying no `Origin` header at all,
+  which is every non-browser MCP client).
 - **Per-client-IP rate limit** (`checkRateLimit`): a token bucket keyed on
-  `req.socket.remoteAddress`, capacity `ALEXANDRIA_HTTP_RATE_LIMIT`
+  `req.socket.remoteAddress` (or, with `ALEXANDRIA_TRUSTED_PROXY=1`,
+  `CF-Connecting-IP` then the *rightmost* `X-Forwarded-For` entry - the one
+  the last hop appended; the leftmost is whatever the original caller
+  sent), capacity `ALEXANDRIA_HTTP_RATE_LIMIT`
   (default 60), refilling continuously back toward that cap over a
   one-minute window. Starts full, so a client's first burst up to the cap
   is never rejected - only sustained traffic above the configured

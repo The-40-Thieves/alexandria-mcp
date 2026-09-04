@@ -148,7 +148,7 @@ const rawFields = {
     .string()
     .optional()
     .describe(
-      'Comma-separated hostnames (no scheme/port) allowed to reach /mcp: checked against both the Host and Origin headers for DNS-rebinding protection. Loopback (localhost, 127.0.0.1, [::1]) is always allowed regardless of this setting.',
+      'Comma-separated hostnames (no scheme/port) allowed to reach /mcp: checked against both the Host and Origin headers for DNS-rebinding protection. Loopback (localhost, 127.0.0.1, [::1]) is always allowed regardless of this setting. Unset, the Host check is off entirely (the Origin check always applies), so set this on any deployment reached by a hostname other than loopback.',
     ),
   ALEXANDRIA_HTTP_RATE_LIMIT: z.coerce
     .number()
@@ -313,11 +313,18 @@ const rawFields = {
       'Set to 1 to use the jina reader fetch tier anonymously (20 RPM shared cap) when JINA_API_KEY is unset.',
     ),
   // Task 15: fetch tier 4, tried after crawl4ai. See docs/cloudflare.md.
+  // Final wave (C6): the value is interpolated into the Browser Run
+  // endpoint's PATH, so it is validated to Cloudflare's own account-id
+  // shape (32 lowercase hex characters) here, at config parse time, rather
+  // than being trusted to be path-safe. browserRun.ts encodes it on the
+  // way in anyway - a value matching this pattern needs no encoding, which
+  // is exactly why the encoding is cheap to keep as the second line.
   CLOUDFLARE_ACCOUNT_ID: z
     .string()
+    .regex(/^[0-9a-f]{32}$/, 'must be a 32-character lowercase hex Cloudflare account id')
     .optional()
     .describe(
-      'Cloudflare account ID for the Browser Run fetch tier (tier 4, after crawl4ai): POSTs to https://api.cloudflare.com/client/v4/accounts/<id>/browser-rendering/markdown. Requires CLOUDFLARE_BROWSER_RUN_TOKEN too; hides the tier without both.',
+      'Cloudflare account ID (32 lowercase hex characters) for the Browser Run fetch tier (tier 4, after crawl4ai): POSTs to https://api.cloudflare.com/client/v4/accounts/<id>/browser-rendering/markdown. Requires CLOUDFLARE_BROWSER_RUN_TOKEN too; hides the tier without both.',
     ),
   CLOUDFLARE_BROWSER_RUN_TOKEN: z
     .string()

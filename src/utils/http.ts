@@ -1,6 +1,14 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Dispatcher } from 'undici';
+import {
+  configuredServiceOrigins,
+  MAX_REDIRECTS,
+  REDIRECT_STATUSES,
+  resolveFetchTarget,
+} from '../web/urlGuard.ts';
+import { type AddressPin, guardedDispatcher, withPinnedAddress } from './dispatcher.ts';
 import { isSensitiveKey } from './secretWords.ts';
+import { fetchUserAgent } from './userAgent.ts';
 
 // The ambient global RequestInit (from @types/node) has no `dispatcher`
 // field under this project's tsconfig, so options that want one are typed
@@ -99,7 +107,12 @@ export async function fetchWithRetry(
         ...options,
         signal,
         headers: {
-          'User-Agent': 'library-mcp-server/1.0 (open source research tool)',
+          // Final wave (F1): one honest UA for every outbound call - see
+          // utils/userAgent.ts. This used to send
+          // `library-mcp-server/1.0 (open source research tool)`, a name
+          // this project has not used since it was renamed and a version
+          // that was never true, on the path every REST adapter takes.
+          'User-Agent': fetchUserAgent(),
           ...options.headers,
         },
       });
@@ -117,6 +130,178 @@ export async function fetchWithRetry(
   throw lastError;
 }
 
+// ─── Guarded redirects and a body cap for fetchJSON/fetchText ───────────────
+//
+// Final wave (C2): both used to hand `fetch` its follow-redirects default
+// and then read the whole body with response.json()/response.text(). Every
+// REST adapter, the open-access hops, the citation walk, PMC, and doi.org's
+// content negotiation go through here, and a redirect destination is
+// upstream-controlled - doi.org's especially - so an upstream that answers
+// `Location: http://169.254.169.254/...` was followed without a check, and
+// an unbounded chunked body was buffered whole after fetchWithRetry had
+// already cleared its timeout on the response headers.
+/** Default streamed body cap. Override per call with `{ maxBytes }`. */
+const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export type BodyLimitedOptions = FetchOptions & { maxBytes?: number };
+
+// The SSRF guard is applied to every REDIRECT hop, not to the caller's own
+// starting URL. Two reasons, both load-bearing:
+//   - The starting URL of a fetchJSON/fetchText call is always an adapter's
+//     own registered endpoint (a module-level constant, sometimes with a
+//     caller-supplied path segment or query appended) or an operator's
+//     configured service URL. A `Location` header is the only part of this
+//     path an upstream controls, and it is exactly the part that was
+//     unchecked.
+//   - Some configured endpoints are deliberately private: SEARXNG_URL and
+//     CRAWL4AI_URL name hosts on an operator's own tailnet, which the
+//     private-range rules refuse by design (fetchTier.ts checks those
+//     against configuredServiceOrigins() instead). Guarding hop 0 here
+//     would break them, and would put a live DNS lookup in front of every
+//     REST adapter call, including in unit tests that mock fetch.
+// A redirect that stays inside a configured service origin is allowed for
+// the same reason: it is an endpoint this server already calls directly.
+//
+// Re-review round 2: this now also returns the PIN. Validating a hop and
+// then connecting without pinning leaves the TOCTOU gap the guard exists
+// to close - a second DNS answer between the check and the connect is not
+// caught by validation alone - and fetchTier.ts's own redirect loop has
+// always pinned every hop. Reusing the addresses resolveFetchTarget just
+// validated (rather than resolving again to build a pin) is what actually
+// closes it; see that function's comment in src/web/urlGuard.ts.
+interface RedirectHop {
+  pin?: AddressPin;
+  // False only for a configured service origin, which is deliberately
+  // exempt from the private-range rules and therefore has no validated
+  // address set to pin to. Passing guardedDispatcher with no pin in scope
+  // would fail closed on its connect.lookup hook (see dispatcher.ts).
+  guarded: boolean;
+}
+
+async function resolveRedirectTarget(nextUrl: string): Promise<RedirectHop> {
+  try {
+    if (configuredServiceOrigins().has(new URL(nextUrl).origin.toLowerCase())) {
+      return { guarded: false };
+    }
+  } catch {
+    // Not a parseable URL; resolveFetchTarget below rejects it by shape.
+  }
+  const { pin } = await resolveFetchTarget(nextUrl);
+  return { pin, guarded: true };
+}
+
+// Per the fetch spec's redirect handling: 303 always becomes a GET, and
+// 301/302 become a GET when the original request was a POST. Re-review
+// round 2: this loop replayed the original method and body on every hop, so
+// a redirected POST was re-POSTed to the new location - a body sent
+// somewhere the caller never addressed, and (for the adapters that POST a
+// key-bearing JSON body) a credential with it. Content-Type/Content-Length
+// go with the dropped body.
+function afterRedirect(init: FetchOptions, status: number): FetchOptions {
+  const method = (init.method ?? 'GET').toUpperCase();
+  const becomesGet = status === 303 || ((status === 301 || status === 302) && method === 'POST');
+  if (!becomesGet) return init;
+  const { body: _body, headers, ...rest } = init;
+  const kept = Object.fromEntries(
+    Object.entries((headers as Record<string, string> | undefined) ?? {}).filter(
+      ([name]) => !['content-type', 'content-length'].includes(name.toLowerCase()),
+    ),
+  );
+  return { ...rest, method: 'GET', headers: kept };
+}
+
+async function fetchGuardedRedirects(
+  url: string,
+  options: FetchOptions,
+  timeoutMs: number,
+  retries: number,
+): Promise<{ response: Response; finalUrl: string }> {
+  let currentUrl = url;
+  let init: FetchOptions = options;
+  let hopPin: AddressPin | undefined;
+  let hopGuarded = false;
+  for (let hop = 0; ; hop++) {
+    // Hop 0 keeps the plain dispatcher and no pin, per the standing ruling
+    // above: its URL is the adapter's own endpoint, and some of those are
+    // deliberately private.
+    const hopInit: FetchOptions = {
+      ...init,
+      redirect: 'manual',
+      ...(hopGuarded ? { dispatcher: guardedDispatcher } : {}),
+    };
+    const attempt = () => fetchWithRetry(currentUrl, hopInit, timeoutMs, retries);
+    const response = hopPin ? await withPinnedAddress(hopPin, attempt) : await attempt();
+    if (!REDIRECT_STATUSES.has(response.status)) return { response, finalUrl: currentUrl };
+    // A redirect hop's body is never read; cancel it so the connection goes
+    // back to the pool instead of sitting open until GC.
+    await response.body?.cancel().catch(() => {});
+    if (hop >= MAX_REDIRECTS) {
+      throw new Error(`more than ${MAX_REDIRECTS} redirects, url: ${redactUrl(url)}`);
+    }
+    const location = response.headers.get('location');
+    if (!location) {
+      throw new Error(`redirect with no Location header, url: ${redactUrl(currentUrl)}`);
+    }
+    const nextUrl = new URL(location, currentUrl).toString();
+    ({ pin: hopPin, guarded: hopGuarded } = await resolveRedirectTarget(nextUrl));
+    init = afterRedirect(init, response.status);
+    currentUrl = nextUrl;
+  }
+}
+
+// Streams the body counting bytes and aborts once the running total passes
+// the cap, so a server that lies about (or omits) Content-Length cannot
+// force this process to buffer an unbounded response after fetchWithRetry's
+// per-attempt timer has already been cleared. An honest, oversized
+// Content-Length is rejected before a byte is read.
+async function readCappedText(response: Response, url: string, maxBytes: number): Promise<string> {
+  const declared = response.headers.get('content-length');
+  if (declared && Number(declared) > maxBytes) {
+    throw new Error(
+      `response declares ${declared} bytes, over the ${maxBytes}-byte cap, url: ${redactUrl(url)}`,
+    );
+  }
+  const body = response.body;
+  if (!body) return '';
+
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let out = '';
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new Error(
+          `response exceeded the ${maxBytes}-byte cap while streaming, url: ${redactUrl(url)}`,
+        );
+      }
+      out += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return out + decoder.decode();
+}
+
+async function fetchGuardedBody(
+  url: string,
+  options: BodyLimitedOptions,
+  timeoutMs: number,
+  retries: number,
+): Promise<string> {
+  const { maxBytes = DEFAULT_MAX_RESPONSE_BYTES, ...init } = options;
+  const { response, finalUrl } = await fetchGuardedRedirects(url, init, timeoutMs, retries);
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
+  }
+  return readCappedText(response, finalUrl, maxBytes);
+}
+
 // timeoutMs/retries let a source with a known-slow upstream (e.g. loc.gov's
 // collections search, which can take 15-30s to answer) ask for a longer
 // per-attempt budget than DEFAULT_TIMEOUT_MS without touching the shared
@@ -124,40 +309,26 @@ export async function fetchWithRetry(
 // is a separate outer guard and should be set at least as large as this.
 export async function fetchJSON<T>(
   url: string,
-  options: RequestInit = {},
+  options: BodyLimitedOptions = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retries = DEFAULT_RETRIES,
 ): Promise<T> {
-  const response = await fetchWithRetry(
+  const raw = await fetchGuardedBody(
     url,
-    {
-      ...options,
-      headers: { Accept: 'application/json', ...options.headers },
-    },
+    { ...options, headers: { Accept: 'application/json', ...options.headers } },
     timeoutMs,
     retries,
   );
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
-  }
-
-  return response.json() as Promise<T>;
+  return JSON.parse(raw) as T;
 }
 
 export async function fetchText(
   url: string,
-  options: RequestInit = {},
+  options: BodyLimitedOptions = {},
   timeoutMs = DEFAULT_TIMEOUT_MS,
   retries = DEFAULT_RETRIES,
 ): Promise<string> {
-  const response = await fetchWithRetry(url, options, timeoutMs, retries);
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText}, url: ${redactUrl(url)}`);
-  }
-
-  return response.text();
+  return fetchGuardedBody(url, options, timeoutMs, retries);
 }
 
 // Parses a Retry-After header (delta-seconds or an HTTP-date, RFC 9110

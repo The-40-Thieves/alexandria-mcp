@@ -5,7 +5,7 @@
 // pair whose behavior each test controls. One deliberate difference from
 // production: this calls `transport.handleRequest(req, res)` with no
 // parsedBody, letting the transport read+parse the body itself with no
-// size cap, rather than reimplementing index.ts's bounded readJsonBody() -
+// size cap, rather than reimplementing index.ts's bounded readCappedBody() -
 // this is a loopback-only test fixture with no real attacker on the other
 // end, so the cap production needs (see index.ts's JSON_BODY_LIMIT_BYTES
 // comment) buys nothing here. Not itself a *.test.ts file, so the test

@@ -231,3 +231,43 @@ test('libraryHealth', async (t) => {
     assert.equal(refreshed.probeAt, '2026-09-02T00:00:00.000Z');
   });
 });
+
+// Final wave (E7): a probe file that PARSES but has the wrong shape - a
+// truncated write, an older format, `{}` - left `results` undefined, and
+// the first `results[name]` read threw TypeError out of the one tool
+// handler that had no try/catch. Absent and corrupt were already meant to
+// read the same way; shape is part of corrupt now.
+test('libraryHealth: a valid-JSON probe file of the wrong shape reads as no probe', async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'alexandria-health-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const cases: Record<string, string> = {
+    'empty-object.json': '{}',
+    'no-results.json': JSON.stringify({ generatedAt: '2026-09-03T00:00:00.000Z' }),
+    'results-is-an-array.json': JSON.stringify({
+      generatedAt: '2026-09-03T00:00:00.000Z',
+      results: [],
+    }),
+    'results-is-a-string.json': JSON.stringify({
+      generatedAt: '2026-09-03T00:00:00.000Z',
+      results: 'nope',
+    }),
+    'top-level-array.json': '[]',
+    'top-level-null.json': 'null',
+  };
+
+  for (const [name, body] of Object.entries(cases)) {
+    const probePath = path.join(dir, name);
+    writeFileSync(probePath, body);
+    resetHealthProbeCacheForTests();
+    const result = libraryHealth({ probePath });
+    assert.equal(result.probeAt, undefined, `${name}: no probe timestamp is reported`);
+    assert.ok(result.sources.length > 0, `${name}: sources are still reported`);
+  }
+
+  // And a well-formed file is still read.
+  const good = path.join(dir, 'good.json');
+  writeFileSync(good, JSON.stringify({ generatedAt: '2026-09-03T00:00:00.000Z', results: {} }));
+  resetHealthProbeCacheForTests();
+  assert.equal(libraryHealth({ probePath: good }).probeAt, '2026-09-03T00:00:00.000Z');
+});

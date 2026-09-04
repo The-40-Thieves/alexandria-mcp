@@ -296,11 +296,24 @@ is always allowed regardless) and a per-client-IP rate limit
 error body once exceeded). See `docs/fetch-tier-runtime.md` for the
 details and `src/httpGuards.ts` for the implementation.
 
+**Set `ALEXANDRIA_ALLOWED_ORIGINS` on any deployment reachable by a
+hostname other than loopback.** With it unset, `Host`-header validation is
+**off** and the server logs one warning at startup saying so: a deployment's
+`Host` header is its own hostname, which cannot be in an allowlist that does
+not exist, so enforcing the check without one would `403` every request.
+Setting it is what turns DNS-rebinding protection on. The `Origin` check is
+unconditional either way, so a browser request carrying an `Origin` outside
+the list is always rejected.
+
+`POST /mcp` requires `content-type: application/json` (anything else is
+`415`) and a body no larger than 100 KiB (`413`, connection closed).
+
 Behind a reverse proxy or PaaS edge (Cloudflare Tunnel, Railway's own edge,
 ...) the rate limiter's per-client key defaults to `req.socket.remoteAddress`,
 which is the proxy's address for every caller, not the caller's - set
 `ALEXANDRIA_TRUSTED_PROXY=1` to key on `CF-Connecting-IP` (falling back to
-the first `X-Forwarded-For` entry) instead. Only set this once `/mcp` is
+the *rightmost* `X-Forwarded-For` entry, the one appended by the last hop;
+the leftmost entry is whatever the original caller sent) instead. Only set this once `/mcp` is
 reachable exclusively through a proxy you trust to set those headers
 honestly - see `docs/cloudflare.md`'s Tunnel and Access section.
 

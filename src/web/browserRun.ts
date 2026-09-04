@@ -46,7 +46,11 @@ export async function tryBrowserRun(url: string): Promise<FetchedPage> {
     throw new Error('browser-run: CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_BROWSER_RUN_TOKEN not set');
   }
 
-  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/browser-rendering/markdown`;
+  // encodeURIComponent even though config.ts already constrains this to 32
+  // lowercase hex characters (final wave, C6): the value lands in the URL's
+  // path, and a path segment built from a config value should be encoded
+  // where it is built, not only where it is validated - the two can drift.
+  const endpoint = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/browser-rendering/markdown`;
   const response = await fetchWithRetry(
     endpoint,
     {

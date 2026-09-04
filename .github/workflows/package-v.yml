@@ -49,13 +49,11 @@
 #    (any prerelease identifier), else `latest`, and that value is passed
 #    explicitly to `npm publish --tag`.
 #
-# Preconditions in the repo before the first tag (all in owner-checklist.md):
-#   - package.json: remove `publishConfig.registry` (it currently pins
-#     npm.pkg.github.com and would override registry-url below).
-#   - package.json: add `"mcpName": "io.github.The-40-Thieves/alexandria-mcp"`
-#     (the MCP registry reads it from the PUBLISHED package).
-#   - package.json: add a `bin` entry and a `#!/usr/bin/env node` shebang so
-#     `npx -y @the-40-thieves/alexandria-mcp` can start the server.
+# Remaining preconditions before the first tag (owner-checklist.md has the
+# full sequence). Final wave (G2): the four repo-side items that used to be
+# listed here - publishConfig.registry, mcpName, the bin entry, the shebang -
+# are all done in package.json and src/index.ts, so they are no longer
+# preconditions and reading them as such was misleading.
 #   - package.json `repository.url` must exactly match the GitHub repo
 #     (it does: https://github.com/The-40-Thieves/alexandria-mcp.git):
 #     https://docs.npmjs.com/trusted-publishers/#troubleshooting

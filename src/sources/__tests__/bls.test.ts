@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -98,4 +99,39 @@ test('blsRead', async (t) => {
 
 test('bls adapter is registered', () => {
   assert.ok(getAdapter('bls'));
+});
+
+// Final wave (F2): the description promises "set BLS_API_KEY for the
+// registered 500/day tier" while pacing.dailyCap was a flat 25, so an
+// operator who set the key got a twentieth of the throughput they were
+// told they had, throttled silently by the cap.
+//
+// The registry reads `pacing` once, at registration (module load), so this
+// re-imports bls.ts in a child process with and without the key rather
+// than trying to mutate env after the fact - which would prove nothing.
+test('bls: the daily cap is key-aware', async (t) => {
+  const script = `
+    const { listSources } = await import('${path.resolve(process.cwd(), 'src/sources/registry.ts')}');
+    await import('${path.resolve(process.cwd(), 'src/sources/bls.ts')}');
+    const bls = listSources().find((s) => s.name === 'bls');
+    console.log(JSON.stringify({ dailyCap: bls?.pacing?.dailyCap }));
+  `;
+  const run = (key: string | undefined): { dailyCap?: number } => {
+    const env: NodeJS.ProcessEnv = { ...process.env, ALEXANDRIA_STATE_DB: ':memory:' };
+    if (key === undefined) delete env.BLS_API_KEY;
+    else env.BLS_API_KEY = key;
+    const out = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+      encoding: 'utf8',
+      env,
+    });
+    return JSON.parse(out.trim().split('\n').at(-1) ?? '{}');
+  };
+
+  await t.test('keyless stays at the conservative 25/day', () => {
+    assert.equal(run(undefined).dailyCap, 25);
+  });
+
+  await t.test('with BLS_API_KEY set it is the registered 500/day tier', () => {
+    assert.equal(run('test-bls-key').dailyCap, 500);
+  });
 });

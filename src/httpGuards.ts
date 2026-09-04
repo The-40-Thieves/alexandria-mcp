@@ -22,12 +22,15 @@ const LOOPBACK_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
 // through config.ts's own always-fresh accessor (see its module comment) -
 // caching a snapshot here would silently stop tracking a changed env
 // between requests, in production and in a test that sets/unsets it.
-function allowedHostnames(): string[] {
-  const configured = (config.ALEXANDRIA_ALLOWED_ORIGINS ?? '')
+export function configuredOriginHostnames(): string[] {
+  return (config.ALEXANDRIA_ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  return [...new Set([...LOOPBACK_HOSTNAMES, ...configured])];
+}
+
+function allowedHostnames(): string[] {
+  return [...new Set([...LOOPBACK_HOSTNAMES, ...configuredOriginHostnames()])];
 }
 
 /**
@@ -35,10 +38,32 @@ function allowedHostnames(): string[] {
  * ALEXANDRIA_ALLOWED_ORIGINS (plus loopback, always). Returns false when the
  * request was already rejected (403) - the caller must not handle it
  * further in that case.
+ *
+ * Final wave (B1): the Host check applies ONLY when
+ * ALEXANDRIA_ALLOWED_ORIGINS is set. Applied unconditionally it 403s every
+ * request to any deployment whose operator never set the variable (verified
+ * live) - such a deployment's Host header is its own hostname, which cannot
+ * be in an allowlist that does not exist.
+ *
+ * Re-review round 2: an earlier version of this fix also applied the check
+ * when the connection arrived on a loopback interface. That was wrong for
+ * the deployment topology this repo's own docs recommend. A Cloudflare
+ * Tunnel terminates at `localhost:PORT` and forwards the public hostname in
+ * `Host`, so with no allowlist set, the tunnelled request (loopback
+ * interface, foreign Host) got 403 while a direct request to the same
+ * server on its LAN address, carrying the identical Host, got 200 -
+ * strictly backwards. The interface a connection arrives on says nothing
+ * about whether its Host is legitimate; only the allowlist does.
+ *
+ * The Origin check is unconditional: the SDK's originValidation passes any
+ * request with no Origin header (non-browser MCP clients send none), so a
+ * present Origin is always checked against the same list.
  */
 export function checkOrigin(req: IncomingMessage, res: ServerResponse): boolean {
   const hostnames = allowedHostnames();
-  if (!hostHeaderValidation(hostnames)(req, res)) return false;
+  if (configuredOriginHostnames().length > 0 && !hostHeaderValidation(hostnames)(req, res)) {
+    return false;
+  }
   if (!originValidation(hostnames)(req, res)) return false;
   return true;
 }
@@ -56,35 +81,59 @@ const buckets = new Map<string, Bucket>();
 
 // One entry per distinct client IP ever seen, for the life of the process -
 // a real, if slow, unbounded-growth vector on a long-running deployment
-// with many distinct callers. A hard ceiling bounds the worst case cheaply:
-// once past it, the whole map is dropped and every bucket starts full
-// again, which is a harmless one-off (a brief window of un-rate-limited
-// traffic) next to holding a Map that grows forever. Generous enough
-// (50,000 distinct IPs before it fires) that it never matters for this
-// server's actual traffic shape.
+// with many distinct callers. A hard ceiling bounds the worst case cheaply.
+// Generous enough (50,000 distinct IPs before it fires) that it never
+// matters for this server's actual traffic shape.
+//
+// Final wave (B2): past the ceiling, the OLDEST-seen bucket is evicted
+// rather than the whole map cleared. Clearing handed every tracked client
+// a full bucket at once, so a caller that could reach the ceiling (cheap
+// behind a proxy, or by spoofing a header this server is configured to
+// trust) could reset its own throttle on demand. A Map iterates in
+// insertion order, so its first key is the bucket first seen longest ago;
+// evicting that one costs the same as clearing but throws away a single
+// client's throttle instead of everyone's.
 const MAX_TRACKED_CLIENTS = 50_000;
+
+function evictOldestBucket(): void {
+  const oldest = buckets.keys().next();
+  if (!oldest.done) buckets.delete(oldest.value);
+}
 
 // Task 15 (Controller amendment): behind a reverse proxy (Cloudflare
 // Tunnel, a PaaS edge), req.socket.remoteAddress is the proxy's own
 // address for every client, collapsing the whole rate limiter into one
 // shared bucket. ALEXANDRIA_TRUSTED_PROXY=1 opts into trusting the
-// proxy-set headers instead: CF-Connecting-IP first (Cloudflare's own,
-// unspoofable-by-the-client header once behind a Tunnel/proxy), then the
-// first X-Forwarded-For entry (the original client, per the header's
-// left-to-right append convention - later entries are added by
-// intermediate hops closer to this server). Unset, or neither header
-// present, falls back to the socket address exactly as before - the flag
-// must be an explicit, deliberate opt-in (see config.ts's description)
-// since trusting either header from an untrusted caller would let it pick
-// its own rate-limit bucket.
+// proxy-set headers instead. Unset, or neither header present, falls back
+// to the socket address exactly as before - the flag must be an explicit,
+// deliberate opt-in (see config.ts's description) since trusting either
+// header from an untrusted caller would let it pick its own rate-limit
+// bucket.
+//
+// Final wave (B2): the RIGHTMOST X-Forwarded-For entry, not the leftmost.
+// X-Forwarded-For is appended left to right, so the leftmost entry is
+// whatever the ORIGINAL caller sent - a client that sends its own
+// `X-Forwarded-For: <anything>` header picks its own bucket, and can pick
+// a fresh one per request, which is the whole rate limit defeated. The
+// rightmost entry is the one appended by the last hop before this server,
+// which under this flag is the trusted proxy. CF-Connecting-IP stays
+// first: Cloudflare overwrites (not appends) it, so a client-supplied
+// value never survives the edge.
 function clientKey(req: IncomingMessage): string {
   if (config.ALEXANDRIA_TRUSTED_PROXY === '1') {
     const cfConnectingIp = req.headers['cf-connecting-ip'];
     if (typeof cfConnectingIp === 'string' && cfConnectingIp) return cfConnectingIp;
     const forwardedFor = req.headers['x-forwarded-for'];
-    const rawFirst = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-    const firstEntry = rawFirst?.split(',')[0]?.trim();
-    if (firstEntry) return firstEntry;
+    // Node collapses repeated headers into an array; the LAST header line
+    // carries the last hop's entries, so the rightmost entry overall is
+    // the last entry of the last value.
+    const raw = Array.isArray(forwardedFor) ? forwardedFor.at(-1) : forwardedFor;
+    const entries = (raw ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const lastEntry = entries.at(-1);
+    if (lastEntry) return lastEntry;
   }
   return req.socket.remoteAddress ?? 'unknown';
 }
@@ -114,9 +163,12 @@ function send429(res: ServerResponse): void {
  * the request further in that case.
  */
 export function checkRateLimit(req: IncomingMessage, res: ServerResponse): boolean {
-  if (buckets.size > MAX_TRACKED_CLIENTS) buckets.clear();
   const limit = config.ALEXANDRIA_HTTP_RATE_LIMIT;
   const key = clientKey(req);
+  // Only a key that is about to be ADDED can grow the map, so only that
+  // case evicts - a client already tracked at the ceiling must not cost
+  // some other client its bucket on every request.
+  if (!buckets.has(key) && buckets.size >= MAX_TRACKED_CLIENTS) evictOldestBucket();
   const now = Date.now();
   const bucket = buckets.get(key) ?? { tokens: limit, lastRefill: now };
   const elapsedMs = now - bucket.lastRefill;
@@ -136,4 +188,13 @@ export function checkRateLimit(req: IncomingMessage, res: ServerResponse): boole
 /** Test-only: clears every client's bucket so a rate-limit test starts full. */
 export function resetRateLimitForTests(): void {
   buckets.clear();
+}
+
+/** Test-only: the ceiling and the live bucket count, for the eviction test. */
+export const MAX_TRACKED_CLIENTS_FOR_TESTS = MAX_TRACKED_CLIENTS;
+export function trackedClientCountForTests(): number {
+  return buckets.size;
+}
+export function hasTrackedClientForTests(key: string): boolean {
+  return buckets.has(key);
 }

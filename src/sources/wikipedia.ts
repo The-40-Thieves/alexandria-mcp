@@ -6,6 +6,7 @@
 import type { LibraryResult, ReadResult } from '../types.ts';
 import { fetchJSON } from '../utils/http.ts';
 import { stripHtml } from '../utils/text-clean.ts';
+import { contactUserAgent } from '../utils/userAgent.ts';
 import { fetchAsText } from '../web/fetchTier.ts';
 import { register, truncateText } from './registry.ts';
 
@@ -14,10 +15,10 @@ const SUMMARY_BASE = 'https://en.wikipedia.org/api/rest_v1/page/summary';
 const MOBILE_HTML_BASE = 'https://en.wikipedia.org/api/rest_v1/page/mobile-html';
 
 function headers(): Record<string, string> {
-  const email = process.env.CONTACT_EMAIL;
-  return {
-    'User-Agent': `alexandria-mcp/10 (${email ? `mailto:${email}` : 'https://github.com/The-40-Thieves/alexandria-mcp'})`,
-  };
+  // Final wave (F1): the version comes from package.json via
+  // utils/userAgent.ts, not a hardcoded `alexandria-mcp/10` frozen at
+  // whatever major this repo was on when this line was written.
+  return { 'User-Agent': contactUserAgent() };
 }
 
 interface WPSearchPage {

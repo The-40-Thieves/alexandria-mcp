@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { extractPdf } from './pdf.ts';
+import { READ_MAX_CHARS } from '../sources/registry.ts';
+import { extractPdfOffThread, resetExtractWorkerForTests } from './extract.ts';
+import { runPdfExtraction } from './extractWorker.ts';
+import { extractPdf, PDF_LIMITS_FOR_TESTS } from './pdf.ts';
 
 // eval/fixtures/sample.pdf is a hand-built, two-page PDF (see
 // scripts/gen-pdf-fixture.ts) - real bytes committed to the repo rather
@@ -84,3 +87,58 @@ function buildBlankPdf(): Uint8Array {
   chunks.push(`trailer\n<< /Size ${totalObjs} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
   return new Uint8Array(Buffer.from(chunks.join(''), 'latin1'));
 }
+
+// Final wave (C5): the char bound duplicates registry.ts's READ_MAX_CHARS
+// rather than importing it (registry.ts pulls in the state store's sqlite
+// handle, and pdf.ts runs inside the extraction worker thread). This is
+// the gate that stops the two drifting apart.
+test('the PDF text bound equals library_read`s own READ_MAX_CHARS', () => {
+  assert.equal(PDF_LIMITS_FOR_TESTS.maxTextChars, READ_MAX_CHARS);
+  assert.equal(PDF_LIMITS_FOR_TESTS.maxPages, 500);
+});
+
+// Final wave (C5): extractPdf ran on the main thread with no page or time
+// limit. It now runs as a second job kind on the same worker as HTML
+// extraction, under the same 30s timeout.
+test('extractPdfOffThread', async (t) => {
+  t.after(() => resetExtractWorkerForTests());
+
+  await t.test('a PDF job round-trips through the worker', async () => {
+    const bytes = sampleBytes();
+    const viaWorker = await extractPdfOffThread(bytes, 'https://example.org/sample.pdf');
+    assert.deepEqual(
+      viaWorker.pages.map((p) => p.page),
+      [1, 2],
+    );
+    assert.equal(viaWorker.pages[0].text, 'Hello from page one of the fixture PDF.');
+    assert.equal(
+      viaWorker.text,
+      'Hello from page one of the fixture PDF.\n\nHello from page two of the fixture PDF.',
+    );
+    // The byte buffer was transferred, not copied: the caller's view is
+    // detached, which is why fetchTier.ts must not touch `bytes` after the
+    // call (it does not - readCappedBytes builds it fresh for this one use).
+    assert.equal(bytes.byteLength, 0, 'the buffer should have been transferred to the worker');
+  });
+
+  await t.test('the same bytes extract identically in-thread', async () => {
+    const inThread = await runPdfExtraction(sampleBytes(), 'https://example.org/sample.pdf');
+    assert.equal(
+      inThread.text,
+      'Hello from page one of the fixture PDF.\n\nHello from page two of the fixture PDF.',
+    );
+  });
+
+  await t.test('a PDF job that outlives the timeout rejects', async () => {
+    // The worker is torn down under the job, which is exactly what the
+    // JOB_TIMEOUT_MS path does to a wedged parse - the caller must get a
+    // rejection rather than a promise that never settles.
+    const job = extractPdfOffThread(sampleBytes(), 'https://example.org/slow.pdf');
+    // The rejection handler is attached BEFORE the teardown that triggers
+    // it, or node:test sees an unhandled rejection instead of this
+    // assertion.
+    const rejects = assert.rejects(() => job, /worker/);
+    await resetExtractWorkerForTests();
+    await rejects;
+  });
+});

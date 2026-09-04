@@ -15,6 +15,7 @@
 //     async function - the exact same code path, just invoked directly.
 import { parentPort } from 'node:worker_threads';
 import { parseHTML } from 'linkedom';
+import type { ExtractedPdf } from './pdf.ts';
 
 // Loaded dynamically rather than with a static import, same as fetchTier.ts
 // used to do for this same call: pulled in only when an extraction job
@@ -35,27 +36,69 @@ export interface ExtractedHtml {
   text: string;
 }
 
+// Final wave (C3): `useAsync` defaults to TRUE in the installed defuddle
+// (see node_modules/defuddle/dist/types.d.ts: "Allow async extractors to
+// fetch content from third-party APIs when no content can be extracted
+// from the local HTML"). For a URL matching one of its async extractors -
+// wiki.c2.com is the clearest, extractors/c2-wiki.js GETs
+// https://c2.com/wiki/remodel/pages/<title> - minimal HTML plus a matching
+// URL made this worker fetch a third-party API on its own, with none of
+// Alexandria's guards: no assertFetchableUrl, no address pinning, no
+// redirect check, no body cap, and no accounting of the call at all.
+// Alexandria fetches the page itself (fetchTier.ts, guarded) and hands the
+// HTML here; extraction has no business opening a second connection.
+const DEFUDDLE_OPTIONS = { markdown: true, useAsync: false } as const;
+
 /** The actual extraction work: identical to fetchTier.ts's former inline call. */
 export async function runExtraction(html: string, url: string): Promise<ExtractedHtml> {
   const { document } = parseHTML(html);
   const Defuddle = await loadDefuddle();
-  const result = await Defuddle(document, url, { markdown: true });
+  const result = await Defuddle(document, url, DEFUDDLE_OPTIONS);
   return { title: result.title || url, text: (result.content ?? '').trim() };
 }
 
-interface ExtractJobMessage {
-  id: number;
-  html: string;
-  url: string;
+// Final wave (C5): PDF text extraction runs here too, as a second job
+// kind, rather than on the main thread. unpdf inlines PDF.js's worker into
+// its own bundle and runs it synchronously in-process, so a PDF with a
+// large page count or object graph blocked the event loop - and every
+// concurrent MCP request with it - for as long as it took, with no
+// timeout, no page limit, and nothing able to cancel it. Here it is under
+// extract.ts's existing 30s per-job timeout and worker teardown, and
+// pdf.ts's own page/char bounds cut the work short.
+//
+// Imported dynamically for the same reason defuddle is: unpdf is a large
+// module, and an HTML-only worker should never pay to load it.
+let pdfModulePromise: Promise<typeof import('./pdf.ts')> | undefined;
+function loadPdf(): Promise<typeof import('./pdf.ts')> {
+  if (!pdfModulePromise) pdfModulePromise = import('./pdf.ts');
+  return pdfModulePromise;
+}
+
+export async function runPdfExtraction(bytes: Uint8Array, url: string): Promise<ExtractedPdf> {
+  const { extractPdf } = await loadPdf();
+  return extractPdf(bytes, url);
+}
+
+export type ExtractJobMessage =
+  | { id: number; kind: 'html'; html: string; url: string }
+  | { id: number; kind: 'pdf'; bytes: Uint8Array; url: string };
+
+export type ExtractJobResult = ExtractedHtml | ExtractedPdf;
+
+function runJob(msg: ExtractJobMessage): Promise<ExtractJobResult> {
+  return msg.kind === 'pdf'
+    ? runPdfExtraction(msg.bytes, msg.url)
+    : runExtraction(msg.html, msg.url);
 }
 
 // Worker entry point. Only wired up when this module is actually running
 // as a worker thread (parentPort !== null) - extract.ts's in-thread
-// fallback imports runExtraction() directly and never triggers this.
+// fallback imports runExtraction()/runPdfExtraction() directly and never
+// triggers this.
 if (parentPort) {
   const port = parentPort;
   port.on('message', (msg: ExtractJobMessage) => {
-    runExtraction(msg.html, msg.url).then(
+    runJob(msg).then(
       (result) => port.postMessage({ id: msg.id, result }),
       (err: unknown) =>
         port.postMessage({ id: msg.id, error: err instanceof Error ? err.message : String(err) }),

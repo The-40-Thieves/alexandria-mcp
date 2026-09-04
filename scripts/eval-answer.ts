@@ -209,9 +209,17 @@ export async function checkResolvable(url: string): Promise<boolean> {
   return result.ok;
 }
 
-function resolvabilityTarget(citation: Citation): string | undefined {
+// Final wave (E4): a corpus citation's `url` falls back to its source's
+// HOMEPAGE when the chunk predates ChunkMetadata.url (see
+// corpusSearch.ts), and scoring a homepage as "this citation resolves"
+// measures nothing - every source's homepage resolves. A corpus citation
+// is scored on its own id when that id is a DOI, and otherwise left out of
+// the resolvability sample entirely rather than counted as a free pass.
+export function resolvabilityTarget(citation: Citation): string | undefined {
+  const doiUrl = DOI_RE.test(citation.id) ? `https://doi.org/${citation.id}` : undefined;
+  if (citation.via === 'corpus') return doiUrl;
   if (citation.url) return citation.url;
-  return DOI_RE.test(citation.id) ? `https://doi.org/${citation.id}` : undefined;
+  return doiUrl;
 }
 
 async function scoreQuestion(
@@ -232,6 +240,15 @@ async function scoreQuestion(
   // return shape doesn't carry that text back out, so this is a second
   // read rather than a reuse of the first. Cached per citation number so a
   // source cited by several sentences is only read once per question.
+  //
+  // Final wave (E4): a corpus-cache citation used to carry
+  // `source: 'corpus'`, which is deliberately not a registered adapter, so
+  // getAdapter() threw here and every such citation was silently dropped
+  // from citation precision - the score was computed over a subset that
+  // excluded exactly the answers the corpus cache contributed to.
+  // libraryAnswer now projects those citations onto the chunk's real
+  // source and id (`via: 'corpus'` marks them), so this reads the real
+  // source like any other.
   const chunkTextCache = new Map<number, string | null>();
   async function chunkText(n: number): Promise<string | null> {
     if (chunkTextCache.has(n)) return chunkTextCache.get(n) ?? null;

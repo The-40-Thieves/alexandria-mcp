@@ -7,6 +7,11 @@ import { fetchJSON } from '../utils/http.ts';
 import { register } from './registry.ts';
 
 const URL = 'https://api.census.gov/data.json';
+// Final wave (C2): fetchJSON caps response bodies at 10 MB by default;
+// this catalog measured 5,212,453 bytes on 2026-09-03 - under that today,
+// but it is a whole-catalog download that only grows, so the cap is set
+// explicitly here rather than left to drift into the default one day.
+const CATALOG_MAX_BYTES = 32 * 1024 * 1024;
 const TIMEOUT_MS = 30000;
 
 interface CensusDataset {
@@ -25,10 +30,12 @@ let cached: Promise<CensusCatalog> | undefined;
 
 function download(): Promise<CensusCatalog> {
   if (!cached) {
-    cached = fetchJSON<CensusCatalog>(URL, {}, TIMEOUT_MS).catch((err) => {
-      cached = undefined; // let a later call retry after a failed download
-      throw err;
-    });
+    cached = fetchJSON<CensusCatalog>(URL, { maxBytes: CATALOG_MAX_BYTES }, TIMEOUT_MS).catch(
+      (err) => {
+        cached = undefined; // let a later call retry after a failed download
+        throw err;
+      },
+    );
   }
   return cached;
 }

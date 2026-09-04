@@ -32,6 +32,7 @@ import {
   type Stage1Mode,
   stage1ModeHint,
 } from '../utils/catalogIndex.ts';
+import { dataBlock, escapeSourceText, UNTRUSTED_DATA_SENTENCE } from '../utils/promptData.ts';
 import { chatJSON, roleConfig } from '../utils/providers.ts';
 import { routingCache, routingCacheKey } from '../utils/resultCache.ts';
 
@@ -230,10 +231,16 @@ async function expandCandidatesWithAlternates(
   freshness: 'realtime' | 'daily' | undefined,
 ): Promise<CatalogEntry[]> {
   try {
+    // Final wave (D2): the caller's query used to be the whole user
+    // message, unfenced, so a crafted query read as a continuation of the
+    // instruction above it. It is a data block like every other
+    // caller-supplied value now, and the system message says so.
     const decision = await chatJSON(
       'router',
-      'Given a user search query, propose two alternate phrasings that capture the same intent using different terms, emphasis, or angle - the way a librarian would try a second and third search when the first one might be too narrow.\n\nReturn JSON with this exact structure: {"queries": ["alternate phrasing 1", "alternate phrasing 2"]}',
-      query,
+      'Given a user search query, propose two alternate phrasings that capture the same intent using different terms, emphasis, or angle - the way a librarian would try a second and third search when the first one might be too narrow.\n\n' +
+        'Return JSON with this exact structure: {"queries": ["alternate phrasing 1", "alternate phrasing 2"]}\n\n' +
+        UNTRUSTED_DATA_SENTENCE,
+      dataBlock('search query to rephrase', 'query', escapeSourceText(query)),
       AlternateQueriesSchema,
     );
 

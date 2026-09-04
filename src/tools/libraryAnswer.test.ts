@@ -5,6 +5,7 @@ import { corpusSearchRef } from '../pipeline/corpusSearch.ts';
 import { register } from '../sources/registry.ts';
 import { resetCatalogCacheForTests } from '../utils/catalogIndex.ts';
 import { resetRoutingCacheForTests } from '../utils/resultCache.ts';
+import { dnsResolver } from '../web/fetchTier.ts';
 import { formatResult } from './format.ts';
 import {
   dropDanglingCitations,
@@ -250,6 +251,137 @@ test('escapeSourceText', async (t) => {
     assert.equal(escapeSourceText('a <b>bold</b> claim'), 'a <b>bold</b> claim');
     assert.equal(escapeSourceText('a < b comparison'), 'a < b comparison');
   });
+});
+
+// Final wave (E2): readTopSources() filtered on hasFullText and called
+// getAdapter().read() once, so task 6's open-access chain applied to
+// library_read and the document resource only. A scholarly row (crossref,
+// datacite, openalex, semanticscholar, the preprint servers) answers
+// hasFullText: false with an abstract stub and a DOI, and the full text is
+// one OA hop away - library_answer used to synthesize from the stub, or
+// drop the row entirely, where library_read on the same id returned the
+// full text.
+test('libraryAnswer: a DOI-bearing metadata row is read through the open-access chain', async (t) => {
+  const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
+  const originalLookup = dnsResolver.lookup;
+  t.after(() => {
+    process.env = originalEnv;
+    globalThis.fetch = originalFetch;
+    dnsResolver.lookup = originalLookup;
+    resetCatalogCacheForTests();
+    resetRoutingCacheForTests();
+  });
+
+  delete process.env.OPENAI_API_KEY;
+  delete process.env.ALEXANDRIA_API_KEY;
+  delete process.env.ALEXANDRIA_EMBEDDINGS_API_KEY;
+  delete process.env.KNOWLEDGE_MCP_URL;
+  delete process.env.CORE_API_KEY;
+  process.env.ALEXANDRIA_ROUTER_SKIP_MARGIN = '2';
+  resetRoutingCacheForTests();
+
+  const DOI = '10.4321/zzftest.oa.1';
+  const FULL_TEXT = `Open access full text about ${TOKEN}. `.repeat(120);
+
+  // A scholarly source: search says hasFullText: false, read returns an
+  // abstract stub plus the DOI. Exactly the shape the OA chain is for.
+  register('zzftest_oa', {
+    description: `Test scholarly source about ${TOKEN} with DOIs`,
+    supportsIngest: false,
+    async search() {
+      return [
+        {
+          id: 'oa1',
+          source: 'zzftest_oa',
+          title: 'Scholarly Item With A DOI',
+          authors: [],
+          hasFullText: false,
+          url: `https://doi.org/${DOI}`,
+        },
+      ];
+    },
+    async read() {
+      return {
+        title: 'Scholarly Item With A DOI',
+        authors: [],
+        text: 'A short abstract stub, well under the full-text floor.',
+        doi: DOI,
+      };
+    },
+  });
+  resetCatalogCacheForTests();
+
+  const router = await startFakeChatServer(() => ({
+    intent: `find info about ${TOKEN}`,
+    routes: [{ source: 'zzftest_oa', query: TOKEN, reason: 'scholarly match' }],
+  }));
+  t.after(() => router.close());
+  const synth = await startFakeChatServer(
+    () => `The open access full text says something about ${TOKEN} [1].`,
+  );
+  t.after(() => synth.close());
+  const verify = await startFakeChatServer(allSupportedVerifyDecide);
+  t.after(() => verify.close());
+
+  process.env.ALEXANDRIA_ROUTER_BASE_URL = router.url;
+  process.env.ALEXANDRIA_ROUTER_API_KEY = 'test-key';
+  process.env.ALEXANDRIA_SYNTH_BASE_URL = synth.url;
+  process.env.ALEXANDRIA_SYNTH_API_KEY = 'test-key';
+  process.env.ALEXANDRIA_VERIFY_BASE_URL = verify.url;
+  process.env.ALEXANDRIA_VERIFY_API_KEY = 'test-key';
+
+  // The OA candidate host is a fixture, not a real hostname.
+  dnsResolver.lookup = (async () => [
+    { address: '93.184.216.34', family: 4 },
+  ]) as typeof dnsResolver.lookup;
+
+  // Everything that is not one of the three local chat servers above is an
+  // open-access hop: OpenAlex's DOI lookup, then the candidate page.
+  const oaCalls: string[] = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('127.0.0.1')) return originalFetch(input as string, init);
+    oaCalls.push(url);
+    if (url.includes('api.openalex.org')) {
+      return new Response(
+        JSON.stringify({ best_oa_location: { pdf_url: 'https://oa.example.org/paper' } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    if (url.startsWith('https://oa.example.org/')) {
+      return new Response(`<html><body><article><p>${FULL_TEXT}</p></article></body></html>`, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  const result = await libraryAnswer(`what does ${TOKEN} say`, {
+    maxSources: 5,
+    resultsPerSource: 5,
+    readTop: 4,
+  });
+
+  assert.equal(result.citations.length, 1, 'the DOI-bearing row is read and cited');
+  assert.equal(result.citations[0].source, 'zzftest_oa');
+  assert.ok(
+    oaCalls.some((u) => u.includes('api.openalex.org')),
+    `the OA chain must have run; calls: ${oaCalls.join(', ')}`,
+  );
+  assert.ok(
+    oaCalls.some((u) => u.startsWith('https://oa.example.org/')),
+    `the OA candidate must have been fetched; calls: ${oaCalls.join(', ')}`,
+  );
+
+  // The synth prompt carries the OA full text, not the abstract stub.
+  const synthUser = synth.requests.at(-1)?.messages[1].content ?? '';
+  assert.ok(synthUser.includes('Open access full text'), 'the OA text reached the synth prompt');
+  assert.ok(
+    !synthUser.includes('A short abstract stub'),
+    'the abstract stub must have been replaced',
+  );
 });
 
 test('libraryAnswer', async (t) => {
@@ -835,9 +967,19 @@ test('libraryAnswer', async (t) => {
         result.results.some((r) => r.source === 'corpus'),
         'the corpus hit is folded into the fused/ranked results',
       );
+      // Final wave (E4): the citation is projected onto the chunk's
+      // ORIGINAL source and id (the pair library_read accepts and the
+      // server instructions tell an agent to pass back), with `via`
+      // recording that the text came from the corpus cache. Citing it at
+      // all still proves its fullText was used with no adapter read -
+      // 'corpus' is deliberately not a registered adapter.
+      const corpusCitation = result.citations.find((c) => c.via === 'corpus');
+      assert.ok(corpusCitation, 'the corpus hit is cited');
+      assert.equal(corpusCitation.source, 'zzftest_full');
+      assert.equal(corpusCitation.id, 'cached-doc');
       assert.ok(
-        result.citations.some((c) => c.source === 'corpus'),
-        'the corpus hit is cited, proving its fullText was used with no adapter read',
+        !result.citations.some((c) => c.source === 'corpus'),
+        'no citation names the unreadable pseudo-source',
       );
     },
   );
@@ -933,7 +1075,9 @@ test('libraryAnswer', async (t) => {
       readTop: 4,
     });
 
-    const citation = result.citations.find((c) => c.source === 'corpus');
+    // Final wave (E4): found by its `via` marker, since the citation now
+    // carries the chunk's original source rather than the pseudo-source.
+    const citation = result.citations.find((c) => c.via === 'corpus');
     assert.ok(citation, 'the corpus hit is cited');
     assert.equal(citation.url, 'https://example.test/cached-doc', 'the stamped url is cited');
     assert.equal(

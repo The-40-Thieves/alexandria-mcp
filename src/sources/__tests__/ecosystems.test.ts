@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { VERSION } from '../../version.ts';
 import { ecosystemsSearch, normalizeEcosystems } from '../ecosystems.ts';
 
 const fixture = JSON.parse(
@@ -52,7 +53,10 @@ test('ecosystemsSearch', async (t) => {
       return new Response(JSON.stringify(fixture), { status: 200 });
     }) as typeof fetch;
     const out = await ecosystemsSearch('express', 5);
-    assert.equal(headers?.['User-Agent'], 'alexandria-mcp/10 (mailto:test@example.org)');
+    // Final wave (F1): the version comes from package.json now, not a
+    // literal frozen at `alexandria-mcp/10`. The mailto is still required
+    // (ecosyste.ms answers 402 without one).
+    assert.equal(headers?.['User-Agent'], `Alexandria/${VERSION} (mailto:test@example.org)`);
     assert.equal(out.length, 2);
   });
 });

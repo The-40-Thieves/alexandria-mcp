@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { connect as netConnect } from 'node:net';
 import test from 'node:test';
-import { checkRateLimit, resetRateLimitForTests } from './httpGuards.ts';
+import {
+  trackedClientCountForTests as buckets,
+  checkOrigin,
+  checkRateLimit,
+  hasTrackedClientForTests,
+  MAX_TRACKED_CLIENTS_FOR_TESTS,
+  resetRateLimitForTests,
+} from './httpGuards.ts';
 import { createHttpApp } from './index.ts';
 
 function withApp(): { server: Server; port: number; close: () => Promise<void> } {
@@ -92,16 +100,20 @@ test('origin guard', async (t) => {
 // the limiter is wrong. Calling the guard function directly keeps 61
 // iterations at native JS speed (microseconds), well under the refill
 // window, so the boundary is exact.
+// `localAddress` is the interface the connection arrived on, which is what
+// checkOrigin's Host-check condition reads (final wave B1); it defaults to
+// loopback so every existing rate-limit caller is unaffected.
 function fakeReqRes(
   remoteAddress: string,
   headers: Record<string, string> = {},
+  localAddress = '127.0.0.1',
 ): {
   req: IncomingMessage;
   res: ServerResponse;
   written: { status?: number; body?: string };
 } {
   const written: { status?: number; body?: string } = {};
-  const req = { socket: { remoteAddress }, headers } as unknown as IncomingMessage;
+  const req = { socket: { remoteAddress, localAddress }, headers } as unknown as IncomingMessage;
   const res = {
     writeHead(status: number) {
       written.status = status;
@@ -223,8 +235,12 @@ test('checkRateLimit: ALEXANDRIA_TRUSTED_PROXY', async (t) => {
     },
   );
 
+  // Final wave (B2): the RIGHTMOST X-Forwarded-For entry, which is the one
+  // the trusted last hop appended. The leftmost entry is whatever the
+  // original caller sent, so keying on it let a client pick - and keep
+  // picking a fresh - rate-limit bucket by sending its own header.
   await t.test(
-    'falls back to the first X-Forwarded-For entry when CF-Connecting-IP is absent',
+    'falls back to the rightmost X-Forwarded-For entry when CF-Connecting-IP is absent',
     () => {
       process.env.ALEXANDRIA_TRUSTED_PROXY = '1';
       resetRateLimitForTests();
@@ -232,22 +248,25 @@ test('checkRateLimit: ALEXANDRIA_TRUSTED_PROXY', async (t) => {
 
       for (let i = 0; i < 60; i++) {
         const { req, res } = fakeReqRes(proxyAddress, {
-          'x-forwarded-for': '198.51.100.20, 10.0.0.1',
+          'x-forwarded-for': `spoofed-${i}, 198.51.100.20`,
         });
         assert.equal(checkRateLimit(req, res), true);
       }
+      // A brand new leftmost entry, same rightmost one: the SAME bucket,
+      // so the client cannot escape its own throttle by rewriting the
+      // part of the header it controls.
       const { req: exhausted, res: exhaustedRes } = fakeReqRes(proxyAddress, {
-        'x-forwarded-for': '198.51.100.20, 10.0.0.1',
+        'x-forwarded-for': 'a-totally-fresh-value, 198.51.100.20',
       });
       assert.equal(checkRateLimit(exhausted, exhaustedRes), false);
 
       const { req: fresh, res: freshRes } = fakeReqRes(proxyAddress, {
-        'x-forwarded-for': '198.51.100.21, 10.0.0.1',
+        'x-forwarded-for': 'spoofed-0, 198.51.100.21',
       });
       assert.equal(
         checkRateLimit(fresh, freshRes),
         true,
-        'a different first entry gets its own bucket',
+        'a different rightmost entry gets its own bucket',
       );
 
       delete process.env.ALEXANDRIA_TRUSTED_PROXY;
@@ -272,4 +291,220 @@ test('checkRateLimit: ALEXANDRIA_TRUSTED_PROXY', async (t) => {
       assert.equal(checkRateLimit(req, res), false, 'the shared socket-keyed bucket is exhausted');
     },
   );
+});
+
+// Final wave (B1): applied unconditionally, the Host check 403s every
+// request to any non-loopback deployment whose operator never set
+// ALEXANDRIA_ALLOWED_ORIGINS, because such a deployment's Host header is
+// its own public hostname and there is no allowlist for it to be in. The
+// check now applies when there IS an allowlist, or when the connection
+// arrived on a loopback interface (the case DNS rebinding targets).
+//
+// checkOrigin() is driven directly rather than over a socket: the
+// condition reads req.socket.localAddress, and an in-process test server
+// can only ever be bound to loopback, so a real round trip could not
+// exercise the non-loopback branch at all.
+test('checkOrigin: Host-header validation is conditional', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+
+  const publicHost = { host: 'alexandria.example.com' };
+
+  await t.test('a non-loopback Host with no allowlist set is allowed through', () => {
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+    const { req, res, written } = fakeReqRes('203.0.113.9', publicHost, '203.0.113.1');
+    assert.equal(checkOrigin(req, res), true);
+    assert.equal(written.status, undefined, 'no rejection should have been written');
+  });
+
+  await t.test('the same request is 403 once the allowlist names other hosts', () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'other.example.org';
+    const { req, res, written } = fakeReqRes('203.0.113.9', publicHost, '203.0.113.1');
+    assert.equal(checkOrigin(req, res), false);
+    assert.equal(written.status, 403);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
+
+  await t.test('the allowlisted Host passes with the allowlist set', () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'alexandria.example.com';
+    const { req, res, written } = fakeReqRes('203.0.113.9', publicHost, '203.0.113.1');
+    assert.equal(checkOrigin(req, res), true);
+    assert.equal(written.status, undefined);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
+
+  // Re-review round 2: the interface a connection arrives on must NOT
+  // decide this. A Cloudflare Tunnel terminates at localhost:PORT and
+  // forwards the public hostname in Host, so keying on loopback rejected
+  // the tunnelled request while letting the identical Host through on a
+  // LAN address - strictly backwards, and the exact topology this repo's
+  // own docs recommend. See the end-to-end test below for the socket-level
+  // version of this case.
+  await t.test('a loopback connection with a foreign Host passes with no allowlist', () => {
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+    const { req, res, written } = fakeReqRes('127.0.0.1', publicHost, '127.0.0.1');
+    assert.equal(checkOrigin(req, res), true, 'the tunnel topology must not be rejected');
+    assert.equal(written.status, undefined);
+  });
+
+  await t.test('a loopback connection with a foreign Host is 403 once the allowlist is set', () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'other.example.org';
+    const { req, res, written } = fakeReqRes('127.0.0.1', publicHost, '127.0.0.1');
+    assert.equal(checkOrigin(req, res), false);
+    assert.equal(written.status, 403);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
+
+  await t.test('an Origin outside the allowlist is 403 even on a non-loopback connection', () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'alexandria.example.com';
+    const { req, res, written } = fakeReqRes(
+      '203.0.113.9',
+      { ...publicHost, origin: 'https://evil.example.net' },
+      '203.0.113.1',
+    );
+    assert.equal(checkOrigin(req, res), false);
+    assert.equal(written.status, 403);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
+
+  await t.test('a request with no Origin header passes the Origin check', () => {
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+    const { req, res, written } = fakeReqRes('203.0.113.9', publicHost, '203.0.113.1');
+    assert.equal(checkOrigin(req, res), true);
+    assert.equal(written.status, undefined);
+  });
+});
+
+// Final wave (B2): past the ceiling the map used to be cleared outright,
+// handing every tracked client a full bucket at once - so a caller able to
+// reach the ceiling could reset its own throttle. Only the oldest-seen
+// bucket is dropped now.
+test('checkRateLimit: the ceiling evicts the oldest bucket, not every bucket', () => {
+  resetRateLimitForTests();
+  const firstSeen = '198.51.100.200';
+
+  // Exhaust one client's bucket, then fill the map to its ceiling with
+  // other clients. That first client is the oldest entry, so it is the
+  // one eviction takes; a client inserted after it must keep its state.
+  for (let i = 0; i < 60; i++) {
+    const { req, res } = fakeReqRes(firstSeen);
+    assert.equal(checkRateLimit(req, res), true);
+  }
+  const { req: over, res: overRes } = fakeReqRes(firstSeen);
+  assert.equal(checkRateLimit(over, overRes), false, 'the first client is throttled');
+
+  // Fill the map to one short of its ceiling with distinct keys.
+  let filler = 0;
+  while (buckets() < MAX_TRACKED_CLIENTS_FOR_TESTS - 1) {
+    const { req, res } = fakeReqRes(`filler-${filler++}`);
+    checkRateLimit(req, res);
+  }
+
+  // Exhausted LAST, so no wall time passes between here and the final
+  // assertion below - the bucket refills continuously (see httpGuards.ts),
+  // and the fill loop above takes long enough to hand back a token.
+  const secondSeen = '198.51.100.201';
+  for (let i = 0; i < 60; i++) {
+    const { req, res } = fakeReqRes(secondSeen);
+    assert.equal(checkRateLimit(req, res), true);
+  }
+
+  assert.equal(
+    hasTrackedClientForTests(firstSeen),
+    true,
+    'the oldest bucket is still held at (not past) the ceiling',
+  );
+
+  // One more distinct client crosses the ceiling.
+  const { req: crossing, res: crossingRes } = fakeReqRes('198.51.100.202');
+  checkRateLimit(crossing, crossingRes);
+
+  assert.equal(
+    buckets(),
+    MAX_TRACKED_CLIENTS_FOR_TESTS,
+    'the map settles at the ceiling instead of growing',
+  );
+  assert.equal(hasTrackedClientForTests(firstSeen), false, 'the oldest bucket was evicted');
+  assert.equal(
+    hasTrackedClientForTests(secondSeen),
+    true,
+    'a newer bucket survives, so the whole map was not cleared',
+  );
+
+  // The surviving client is still throttled: its bucket was not reset.
+  const { req: still, res: stillRes } = fakeReqRes(secondSeen);
+  assert.equal(checkRateLimit(still, stillRes), false);
+  resetRateLimitForTests();
+});
+
+// Re-review round 2, the reproduction that opened B1: a real server bound
+// to 0.0.0.0 with NO allowlist, reached over loopback with a foreign Host
+// header - the Cloudflare Tunnel topology docs/cloudflare.md recommends,
+// where cloudflared connects to localhost:PORT and forwards the public
+// hostname in Host. Driven over a raw socket rather than fetch(), because
+// Host is a forbidden header name for fetch and cannot be set from it.
+test('an unallowlisted server bound to 0.0.0.0 accepts a loopback request with a foreign Host', async (t) => {
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    process.env = originalEnv;
+  });
+  delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  resetRateLimitForTests();
+  t.after(() => resetRateLimitForTests());
+
+  const app = createHttpApp();
+  const server = app.listen(0, '0.0.0.0');
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const statusLine = (host: string, extraHeaders = ''): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const socket = netConnect(port, '127.0.0.1');
+      let data = '';
+      socket.on('data', (chunk) => {
+        data += chunk.toString();
+        if (data.includes('\r\n\r\n')) {
+          socket.destroy();
+          resolve(data.split('\r\n')[0] ?? '');
+        }
+      });
+      socket.on('error', reject);
+      socket.once('connect', () => {
+        socket.write(
+          `POST /mcp HTTP/1.1\r\nHost: ${host}\r\n` +
+            'Content-Type: application/json\r\n' +
+            'Accept: application/json, text/event-stream\r\n' +
+            `${extraHeaders}` +
+            `Content-Length: ${Buffer.byteLength(mcpBody)}\r\nConnection: close\r\n\r\n${mcpBody}`,
+        );
+      });
+      setTimeout(() => {
+        socket.destroy();
+        reject(new Error('no response within 5000ms'));
+      }, 5000).unref?.();
+    });
+
+  await t.test('a foreign Host over loopback is served, not 403ed', async () => {
+    assert.match(await statusLine('alexandria.example.com'), /^HTTP\/1\.1 200 /);
+  });
+
+  await t.test('the same request is 403ed once the allowlist names other hosts', async () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'other.example.org';
+    resetRateLimitForTests();
+    assert.match(await statusLine('alexandria.example.com'), /^HTTP\/1\.1 403 /);
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
+
+  await t.test('an Origin outside the allowlist is still 403ed', async () => {
+    process.env.ALEXANDRIA_ALLOWED_ORIGINS = 'alexandria.example.com';
+    resetRateLimitForTests();
+    assert.match(
+      await statusLine('alexandria.example.com', 'Origin: https://evil.example.net\r\n'),
+      /^HTTP\/1\.1 403 /,
+    );
+    delete process.env.ALEXANDRIA_ALLOWED_ORIGINS;
+  });
 });

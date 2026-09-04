@@ -8,6 +8,10 @@ import { register } from './registry.ts';
 
 const URL =
   'https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json';
+// Final wave (C2): fetchJSON caps response bodies at 10 MB by default;
+// the MITRE enterprise-attack STIX bundle measured 53,835,637 bytes on
+// 2026-09-03, so it needs an explicit larger cap with room to grow.
+const CATALOG_MAX_BYTES = 128 * 1024 * 1024;
 const TIMEOUT_MS = 60000;
 
 interface StixExternalReference {
@@ -35,7 +39,7 @@ function techniqueId(obj: StixAttackPattern): string | undefined {
 
 function loadTechniques(): Promise<StixAttackPattern[]> {
   if (!cached) {
-    cached = fetchJSON<StixBundle>(URL, {}, TIMEOUT_MS)
+    cached = fetchJSON<StixBundle>(URL, { maxBytes: CATALOG_MAX_BYTES }, TIMEOUT_MS)
       .then((bundle) => bundle.objects.filter((o) => o.type === 'attack-pattern' && techniqueId(o)))
       .catch((err) => {
         cached = undefined; // let a later call retry after a failed download
