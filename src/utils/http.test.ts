@@ -303,8 +303,9 @@ test('fetchJSON/fetchText: guarded redirects and a streamed body cap', async (t)
 // (b) The original method and body were replayed on every hop, so a
 // redirected POST was re-POSTed to the new location: a body, and for the
 // adapters that POST a key-bearing payload a credential with it, sent
-// somewhere the caller never addressed. Per the fetch spec, 303 always
-// becomes a GET and 301/302 become a GET when the request was a POST.
+// somewhere the caller never addressed. Per the fetch spec, 303 becomes a
+// GET unless the original request was already HEAD, and 301/302 become a
+// GET when the request was a POST.
 test('fetchJSON/fetchText: redirect hops are pinned and re-methoded', async (t) => {
   const originalFetch = globalThis.fetch;
   const originalLookup = dnsResolver.lookup;
@@ -405,6 +406,24 @@ test('fetchJSON/fetchText: redirect hops are pinned and re-methoded', async (t) 
 
     await fetchText('https://x.example/put', { method: 'PUT', body: 'payload' }, 1000, 0);
     assert.deepEqual(methods, ['PUT', 'GET']);
+  });
+
+  await t.test('a 303 on a HEAD request stays HEAD, unlike every other method', async () => {
+    dnsResolver.lookup = (async () => [
+      { address: '93.184.216.34', family: 4 },
+    ]) as typeof dnsResolver.lookup;
+
+    const methods: Array<string | undefined> = [];
+    globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+      methods.push(init.method);
+      if (url.endsWith('/head')) {
+        return new Response(null, { status: 303, headers: { location: 'https://x.example/done' } });
+      }
+      return new Response(null, { status: 200 });
+    }) as typeof fetch;
+
+    await fetchText('https://x.example/head', { method: 'HEAD' }, 1000, 0);
+    assert.deepEqual(methods, ['HEAD', 'HEAD']);
   });
 
   await t.test('a 307 preserves the method and body', async () => {
