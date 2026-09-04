@@ -1,9 +1,13 @@
 {
   "name": "@the-40-thieves/alexandria-mcp",
-  "version": "10.0.0",
+  "version": "11.0.0",
   "type": "module",
-  "description": "138-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
+  "description": "152-source digital library MCP server. Natural language search across academic papers, public domain books, legal records, government archives, and software documentation.",
   "main": "dist/index.js",
+  "mcpName": "io.github.The-40-Thieves/alexandria-mcp",
+  "bin": {
+    "alexandria-mcp": "dist/index.js"
+  },
   "files": [
     "dist",
     "README.md",
@@ -49,7 +53,8 @@
     "url": "https://github.com/The-40-Thieves/alexandria-mcp.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.0.0",

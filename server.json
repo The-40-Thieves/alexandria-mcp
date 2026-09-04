@@ -1,0 +1,109 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "environmentVariablesNote": "environmentVariables above is a curated subset: the optional, source-specific keys. The full list of environment variables this server reads (transport, provider, and caching settings included) is documented in .env.example in the repository."
+    }
+  },
+  "name": "io.github.The-40-Thieves/alexandria-mcp",
+  "title": "Alexandria",
+  "description": "Search, read, and cite across 152 libraries: 11 tools, 3 prompts, and a full-text resource.",
+  "repository": {
+    "url": "https://github.com/The-40-Thieves/alexandria-mcp",
+    "source": "github",
+    "id": "1233551033"
+  },
+  "version": "11.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@the-40-thieves/alexandria-mcp",
+      "version": "11.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "OPENAI_API_KEY",
+          "description": "OpenAI key for routing (library_ask), synthesis (library_answer, library_research), and embeddings (library_ingest). Search and read tools work without it.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "ALEXANDRIA_BASE_URL",
+          "description": "OpenAI-compatible gateway base URL shared by every LLM role (router, synth, research, embeddings, rerank). Falls back to https://api.openai.com/v1.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string",
+          "placeholder": "https://gateway.example.com/v1"
+        },
+        {
+          "name": "ALEXANDRIA_API_KEY",
+          "description": "API key paired with ALEXANDRIA_BASE_URL. Falls back to OPENAI_API_KEY.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "CORE_API_KEY",
+          "description": "Unlocks the core source (CORE, 57M+ open access papers). Free key from core.ac.uk/services/api.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "COURTLISTENER_API_KEY",
+          "description": "Unlocks the courtlistener source (US federal and state court opinions). Free key from courtlistener.com.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "GOVINFO_API_KEY",
+          "description": "Unlocks govinfo (Congressional Record, Federal Register, US Code); also accepted by congress and regulations. Free key from api.data.gov.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "GOOGLE_BOOKS_API_KEY",
+          "description": "Unlocks the googlebooks source (40M+ books). Free key from the Google Cloud Console (Books API).",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "GITHUB_TOKEN",
+          "description": "Unlocks githubsearch and githubmcp (GitHub code search); optional for ghsa and openiti. Public-repo read scope is enough.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "NASA_ADS_API_KEY",
+          "description": "Unlocks the nasaads source (NASA Astrophysics Data System). Free key from ui.adsabs.harvard.edu.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "EUROPEANA_API_KEY",
+          "description": "Unlocks the europeana source (50M+ European cultural heritage items). Free key from apis.europeana.eu.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SEMANTIC_SCHOLAR_API_KEY",
+          "description": "Optional for semanticscholar and library_recommend; raises the rate limit. Free key from semanticscholar.org/product/api.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
