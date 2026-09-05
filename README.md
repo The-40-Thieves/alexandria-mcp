@@ -1,5 +1,11 @@
 # Alexandria
 
+[![npm version](https://img.shields.io/npm/v/@the-40-thieves/alexandria-mcp.svg)](https://www.npmjs.com/package/@the-40-thieves/alexandria-mcp)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=alexandria&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkB0aGUtNDAtdGhpZXZlcy9hbGV4YW5kcmlhLW1jcCJdfQ==)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=alexandria&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40the-40-thieves%2Falexandria-mcp%22%5D%7D)
+[Install in Goose](goose://extension?cmd=npx&arg=-y&arg=%40the-40-thieves%2Falexandria-mcp&id=alexandria&name=Alexandria&description=Query%2C%20read%2C%20and%20ingest%20texts%20from%20152%20public%20digital%20libraries)
+
 A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 152 public digital libraries. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, etc.).
 
 ## Tools
@@ -139,6 +145,28 @@ Some sources require their own API key. These are free registrations. Sources wi
 | `SEMANTIC_SCHOLAR_API_KEY` | `semanticscholar` | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) — optional, increases rate limits |
 | `TROVE_API_KEY` | `trove` | [trove.nla.gov.au/about/create-something/using-api](https://trove.nla.gov.au/about/create-something/using-api) — ~1 week approval |
 | `YOUTUBE_API_KEY` | `youtube` | [console.cloud.google.com](https://console.cloud.google.com/) — enable YouTube Data API v3; search only, transcripts need no key |
+
+## Privacy Policy
+
+Alexandria has no telemetry of its own: it runs on infrastructure you
+control, and nothing about your queries, results, or credentials is sent to
+the Alexandria project.
+
+- Queries go to the upstream public library sources the agent selects for a
+  given request, using each source's own public API under that source's own
+  terms.
+- `library_ask`, `library_answer`, `library_research`, and `library_ingest`,
+  when an OpenAI (or OpenAI-compatible gateway) key is configured, also send
+  your query text and retrieved excerpts to the LLM and embeddings provider
+  the operator set up. See [docs/cloudflare.md](docs/cloudflare.md) for the
+  Cloudflare AI Gateway routing path and
+  [docs/fetch-tier-runtime.md](docs/fetch-tier-runtime.md) for how outbound
+  fetches to library sources are guarded.
+- Nothing is stored by the project itself. The operator's own `data/`
+  directory holds local caches (state DB, per-process read cache) on the
+  machine running the server, and nowhere else.
+
+Full text: [PRIVACY.md](PRIVACY.md).
 
 ## Setup
 
@@ -358,6 +386,100 @@ Register in Claude Desktop:
 Health check: `GET /health` returns `{ status: "ok", version: "11.0.0", sources: { total: 152, visible: 116, hidden: 36, calls: 0, errors: 0 }, byKind: { rest: 118, hub: 0, rss: 22, mcp: 6, scrape: 6 }, quota: { day: "2026-09-02", reserved: 0, sources: 0, backend: "state" }, cache: { entries: 0 }, tools: 11 }`.
 
 Metrics: `GET /metrics` returns per-source counters (calls, errors, timeouts, cacheHits, quotaRejections, latencyMsTotal) and per-tool counters (invocations, llmCalls) as JSON, e.g. `{ "sources": { "arxiv": { "calls": 12, "errors": 0, "timeouts": 0, "cacheHits": 3, "quotaRejections": 0, "latencyMsTotal": 4210 } }, "tools": { "library_ask": { "invocations": 5, "llmCalls": 5 } } }`. Only sources/tools actually called since the process started appear.
+
+## Install in other clients
+
+All of these run the published package via `npx`; search and read work with
+no environment variables, and `--env`/env block additions enable
+`library_ask`, `library_answer`, `library_research`, and `library_ingest` the
+same way the Claude Code and Claude Desktop sections above do.
+
+**GitHub Copilot** - `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "alexandria": {
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"]
+    }
+  }
+}
+```
+
+**Windsurf** - `mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "alexandria": {
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"]
+    }
+  }
+}
+```
+
+**Codex CLI**:
+
+```bash
+codex mcp add alexandria -- npx -y @the-40-thieves/alexandria-mcp
+```
+
+**OpenCode** - `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "alexandria": {
+      "type": "local",
+      "command": ["npx", "-y", "@the-40-thieves/alexandria-mcp"]
+    }
+  }
+}
+```
+
+**Amazon Q** - `~/.aws/amazonq/mcp.json` (global) or `q mcp add`:
+
+```json
+{
+  "mcpServers": {
+    "alexandria": {
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"]
+    }
+  }
+}
+```
+
+**Kiro** - `.kiro/settings/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "alexandria": {
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"]
+    }
+  }
+}
+```
+
+**Gemini CLI**:
+
+```bash
+gemini extensions install https://github.com/The-40-Thieves/alexandria-mcp
+```
+
+**Continue** - add to the `mcpServers` array in your Continue config:
+
+```json
+{
+  "name": "alexandria",
+  "command": "npx",
+  "args": ["-y", "@the-40-thieves/alexandria-mcp"]
+}
+```
 
 ## Adding Custom Providers
 

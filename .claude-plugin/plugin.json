@@ -1,0 +1,11 @@
+{
+  "name": "alexandria",
+  "description": "Query, read, and ingest texts from 152 public digital libraries: academic papers, public domain books, legal records, government archives, security advisories, news, and developer documentation.",
+  "version": "11.0.0",
+  "author": {
+    "name": "suavecito585"
+  },
+  "homepage": "https://github.com/The-40-Thieves/alexandria-mcp",
+  "repository": "https://github.com/The-40-Thieves/alexandria-mcp",
+  "license": "MIT"
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "alexandria": {
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"],
+      "env": {
+        "TRANSPORT": "stdio"
+      }
+    }
+  }
+}
