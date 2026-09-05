@@ -146,6 +146,28 @@ Some sources require their own API key. These are free registrations. Sources wi
 | `TROVE_API_KEY` | `trove` | [trove.nla.gov.au/about/create-something/using-api](https://trove.nla.gov.au/about/create-something/using-api) — ~1 week approval |
 | `YOUTUBE_API_KEY` | `youtube` | [console.cloud.google.com](https://console.cloud.google.com/) — enable YouTube Data API v3; search only, transcripts need no key |
 
+## Privacy Policy
+
+Alexandria has no telemetry of its own: it runs on infrastructure you
+control, and nothing about your queries, results, or credentials is sent to
+the Alexandria project.
+
+- Queries go to the upstream public library sources the agent selects for a
+  given request, using each source's own public API under that source's own
+  terms.
+- `library_ask`, `library_answer`, `library_research`, and `library_ingest`,
+  when an OpenAI (or OpenAI-compatible gateway) key is configured, also send
+  your query text and retrieved excerpts to the LLM and embeddings provider
+  the operator set up. See [docs/cloudflare.md](docs/cloudflare.md) for the
+  Cloudflare AI Gateway routing path and
+  [docs/fetch-tier-runtime.md](docs/fetch-tier-runtime.md) for how outbound
+  fetches to library sources are guarded.
+- Nothing is stored by the project itself. The operator's own `data/`
+  directory holds local caches (state DB, per-process read cache) on the
+  machine running the server, and nowhere else.
+
+Full text: [PRIVACY.md](PRIVACY.md).
+
 ## Setup
 
 ```bash
