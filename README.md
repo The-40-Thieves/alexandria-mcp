@@ -394,7 +394,7 @@ no environment variables, and `--env`/env block additions enable
 `library_ask`, `library_answer`, `library_research`, and `library_ingest` the
 same way the Claude Code and Claude Desktop sections above do.
 
-**GitHub Copilot** — `.vscode/mcp.json`:
+**GitHub Copilot** - `.vscode/mcp.json`:
 
 ```json
 {
@@ -407,7 +407,7 @@ same way the Claude Code and Claude Desktop sections above do.
 }
 ```
 
-**Windsurf** — `mcp_config.json`:
+**Windsurf** - `mcp_config.json`:
 
 ```json
 {
@@ -426,7 +426,7 @@ same way the Claude Code and Claude Desktop sections above do.
 codex mcp add alexandria -- npx -y @the-40-thieves/alexandria-mcp
 ```
 
-**OpenCode** — `opencode.json`:
+**OpenCode** - `opencode.json`:
 
 ```json
 {
@@ -439,7 +439,7 @@ codex mcp add alexandria -- npx -y @the-40-thieves/alexandria-mcp
 }
 ```
 
-**Amazon Q** — `~/.aws/amazonq/mcp.json` (global) or `q mcp add`:
+**Amazon Q** - `~/.aws/amazonq/mcp.json` (global) or `q mcp add`:
 
 ```json
 {
@@ -452,7 +452,7 @@ codex mcp add alexandria -- npx -y @the-40-thieves/alexandria-mcp
 }
 ```
 
-**Kiro** — `.kiro/settings/mcp.json`:
+**Kiro** - `.kiro/settings/mcp.json`:
 
 ```json
 {
@@ -471,7 +471,7 @@ codex mcp add alexandria -- npx -y @the-40-thieves/alexandria-mcp
 gemini extensions install https://github.com/The-40-Thieves/alexandria-mcp
 ```
 
-**Continue** — add to the `mcpServers` array in your Continue config:
+**Continue** - add to the `mcpServers` array in your Continue config:
 
 ```json
 {

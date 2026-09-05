@@ -26,7 +26,7 @@ Search and read need no credentials. `library_ask`, `library_answer`,
 
 ## Workflow
 
-Start with `library_ask(query)` — it routes a natural-language question to
+Start with `library_ask(query)` - it routes a natural-language question to
 the best sources and searches them in parallel. Use `library_search(query,
 source, limit?)` instead when you already know which of the 152 sources to
 query.
@@ -55,5 +55,5 @@ retrying it.
 (default `concise`). `concise` returns the high-signal fields only (title,
 source, id, year, hasFullText, url; the answer/report plus citations; health
 name, cluster, status). `detailed` adds routing reasons, relevance scores,
-per-stage diagnostics, and per-source error rate, latency, and quota usage —
+per-stage diagnostics, and per-source error rate, latency, and quota usage -
 ask for it when you need to explain or debug a result, not by default.
