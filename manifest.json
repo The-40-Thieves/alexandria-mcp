@@ -27,23 +27,59 @@
     }
   },
   "tools": [
-    { "name": "library_list_sources", "description": "List all 152 sources with descriptions and full-text capabilities" },
-    { "name": "library_ask", "description": "Natural language search: routes a query to the best sources, searches in parallel, returns unified deduplicated results" },
-    { "name": "library_search", "description": "Search a specific source by title, author, or keywords" },
+    {
+      "name": "library_list_sources",
+      "description": "List all 152 sources with descriptions and full-text capabilities"
+    },
+    {
+      "name": "library_ask",
+      "description": "Natural language search: routes a query to the best sources, searches in parallel, returns unified deduplicated results"
+    },
+    {
+      "name": "library_search",
+      "description": "Search a specific source by title, author, or keywords"
+    },
     { "name": "library_read", "description": "Fetch full text or metadata for an item" },
-    { "name": "library_index", "description": "Dry run: chunk and score text quality without writing anything" },
-    { "name": "library_ingest", "description": "Chunk, embed, and store an item in the operator's vector database" },
-    { "name": "library_recommend", "description": "Get similar papers via Semantic Scholar's recommendation engine" },
-    { "name": "library_answer", "description": "Ask a question and get a synthesized answer with inline citations" },
-    { "name": "library_research", "description": "Recursive multi-round research producing a final cited report" },
-    { "name": "library_health_check", "description": "Report per-source health, merging live and last-probed status" },
-    { "name": "library_citations", "description": "List works an item cites or is cited by, with bibliography export" }
+    {
+      "name": "library_index",
+      "description": "Dry run: chunk and score text quality without writing anything"
+    },
+    {
+      "name": "library_ingest",
+      "description": "Chunk, embed, and store an item in the operator's vector database"
+    },
+    {
+      "name": "library_recommend",
+      "description": "Get similar papers via Semantic Scholar's recommendation engine"
+    },
+    {
+      "name": "library_answer",
+      "description": "Ask a question and get a synthesized answer with inline citations"
+    },
+    {
+      "name": "library_research",
+      "description": "Recursive multi-round research producing a final cited report"
+    },
+    {
+      "name": "library_health_check",
+      "description": "Report per-source health, merging live and last-probed status"
+    },
+    {
+      "name": "library_citations",
+      "description": "List works an item cites or is cited by, with bibliography export"
+    }
   ],
-  "keywords": ["mcp", "mcp-server", "model-context-protocol", "library", "research", "academic", "rag"],
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "library",
+    "research",
+    "academic",
+    "rag"
+  ],
   "license": "MIT",
-  "privacy_policies": [
-    "https://github.com/The-40-Thieves/alexandria-mcp/blob/main/PRIVACY.md"
-  ],
+  "privacy_policies": ["https://github.com/The-40-Thieves/alexandria-mcp/blob/main/PRIVACY.md"],
   "compatibility": {
     "platforms": ["darwin", "win32", "linux"],
     "runtimes": {
