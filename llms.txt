@@ -1,0 +1,12 @@
+# Alexandria
+
+> A Model Context Protocol (MCP) server for querying, reading, and ingesting texts from 152 public digital libraries: academic papers, public domain books, legal records, government archives, security advisories, news, and developer documentation. Works with any MCP-compatible client (Claude Desktop, Cursor, VS Code Copilot, and others).
+
+## Docs
+
+- [README](README.md): tools, prompts, resources, credentials, setup, and client configuration
+- [Source registry](docs/sources.md): all 152 sources with auth env vars and last-verified dates
+- [Cloudflare integration](docs/cloudflare.md): what runs on Workers and what does not, and why
+- [Fetch-tier runtime notes](docs/fetch-tier-runtime.md): the guarded outbound fetch path's known limits
+- [Changelog](CHANGELOG.md): version history
+- [Security policy](SECURITY.md): supported versions and how to report a vulnerability
