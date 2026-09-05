@@ -1,0 +1,31 @@
+# Custom exclusions beyond mcpb's built-in defaults (.git, node_modules/.cache,
+# node_modules/.bin, *.map, package-lock.json, and more - see
+# github.com/modelcontextprotocol/mcpb/blob/main/CLI.md for the full default
+# list). This bundle's server.entry_point is dist/index.js; none of the
+# patterns below are read at runtime.
+
+# Vendored TypeScript source and declaration files: type-only or requiring a
+# compile step Node does not perform on a package's node_modules copy, and
+# not what any dependency's package.json main/module/exports points at.
+node_modules/**/*.ts
+node_modules/**/*.d.mts
+node_modules/**/*.d.cts
+
+# Vendored test suites and fixtures.
+node_modules/**/test/
+node_modules/**/tests/
+node_modules/**/__tests__/
+node_modules/**/__fixtures__/
+
+# Vendored docs and changelogs. LICENSE/license files are deliberately not
+# matched here: several bundled dependencies ship LICENSE.md, and dropping
+# a license file from a redistributed package is a compliance risk, not
+# just a size one.
+node_modules/**/README*
+node_modules/**/readme*
+node_modules/**/CHANGELOG*
+node_modules/**/CHANGES*
+node_modules/**/HISTORY*
+node_modules/**/CONTRIBUTING*
+node_modules/**/docs/
+node_modules/**/.github/
