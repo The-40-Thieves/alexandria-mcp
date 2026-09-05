@@ -1,0 +1,19 @@
+{
+  "name": "alexandria",
+  "version": "11.0.0",
+  "description": "Query, read, and ingest texts from 152 public digital libraries: academic papers, public domain books, legal records, government archives, security advisories, news, and developer documentation.",
+  "mcpServers": {
+    "alexandria": {
+      "command": "npx",
+      "args": ["-y", "@the-40-thieves/alexandria-mcp"]
+    }
+  },
+  "settings": [
+    {
+      "name": "OpenAI API Key",
+      "description": "Enables library_ask's query routing and library_ingest's embeddings. Search and read work without it.",
+      "envVar": "OPENAI_API_KEY",
+      "sensitive": true
+    }
+  ]
+}
