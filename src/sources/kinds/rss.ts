@@ -55,12 +55,14 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
     return (feed.items ?? []).map((item) => {
       const link = item.link ?? item.guid?.value ?? '';
       const authors =
-        item.authors ?? item.dc?.creators ?? (item.dc?.creator ? [item.dc.creator] : []);
+        item.authors?.map((a) => a.name).filter((n): n is string => Boolean(n)) ??
+        item.dc?.creators ??
+        [];
       return {
         id: link || (item.guid?.value ?? item.title ?? ''),
         title: item.title ?? '',
         link,
-        published: first(item.pubDate, item.dc?.dates?.[0], item.dc?.date),
+        published: first(item.pubDate, item.dc?.dates?.[0]),
         summary: cleanSummary(first(item.description, item.content?.encoded)),
         authors,
       };
@@ -75,10 +77,10 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
         '';
       return {
         id: entry.id ?? link,
-        title: entry.title ?? '',
+        title: entry.title?.value ?? '',
         link,
         published: first(entry.published, entry.updated),
-        summary: cleanSummary(first(entry.summary, entry.content)),
+        summary: cleanSummary(first(entry.summary?.value, entry.content?.value)),
         authors: (entry.authors ?? []).map((a) => a.name).filter((n): n is string => Boolean(n)),
       };
     });
@@ -86,12 +88,12 @@ export function parseFeedItems(xmlOrJson: string): FeedItem[] {
 
   if (format === 'rdf') {
     return (feed.items ?? []).map((item) => {
-      const authors = item.dc?.creators ?? (item.dc?.creator ? [item.dc.creator] : []);
+      const authors = item.dc?.creators ?? [];
       return {
         id: item.link ?? item.rdf?.about ?? '',
         title: item.title ?? '',
         link: item.link ?? '',
-        published: first(item.dc?.dates?.[0], item.dc?.date),
+        published: first(item.dc?.dates?.[0]),
         summary: cleanSummary(item.description),
         authors,
       };
