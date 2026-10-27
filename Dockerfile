@@ -2,8 +2,8 @@
 # Docker builds this from the pinned commit at the repo root, so this file
 # must be committed as `Dockerfile` before the registry PR is opened.
 # Runtime deps are pure JS; SQLite comes from node:sqlite (built in), so
-# node:24-alpine needs no build toolchain.
-FROM node:24-alpine
+# node:26-alpine needs no build toolchain.
+FROM node:26-alpine
 
 WORKDIR /app
 
