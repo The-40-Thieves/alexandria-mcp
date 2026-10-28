@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "dev": "node src/index.ts",
+    "bench": "vitest bench --run",
     "test": "ALEXANDRIA_STATE_DB=:memory: NODE_ENV=test node --test --test-reporter=spec --test-concurrency=4 'src/**/*.test.ts' 'scripts/**/*.test.ts'",
     "probe": "node scripts/probe.ts",
     "probe:baseline": "node scripts/probe.ts --baseline",
@@ -80,9 +81,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.3",
+    "@codspeed/vitest-plugin": "^6.1.0",
     "@types/node": "^26.6.5",
     "knip": "^6.43.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   },
   "engines": {
     "node": ">=24.0.0"

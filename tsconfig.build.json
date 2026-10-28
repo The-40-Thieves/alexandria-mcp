@@ -9,5 +9,12 @@
     // that actually emits.
     "rootDir": "./src"
   },
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/__tests__/**", "scripts/**/*"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/__tests__/**",
+    "scripts/**/*",
+    "bench/**/*"
+  ]
 }
