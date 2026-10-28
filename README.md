@@ -2,6 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/@the-40-thieves/alexandria-mcp.svg)](https://www.npmjs.com/package/@the-40-thieves/alexandria-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://app.codspeed.io/The-40-Thieves/alexandria-mcp?utm_source=badge)
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=alexandria&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkB0aGUtNDAtdGhpZXZlcy9hbGV4YW5kcmlhLW1jcCJdfQ==)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=alexandria&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40the-40-thieves%2Falexandria-mcp%22%5D%7D)
 [Install in Goose](goose://extension?cmd=npx&arg=-y&arg=%40the-40-thieves%2Falexandria-mcp&id=alexandria&name=Alexandria&description=Query%2C%20read%2C%20and%20ingest%20texts%20from%20152%20public%20digital%20libraries)
