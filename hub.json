@@ -1,0 +1,17 @@
+{
+  "$schema": "https://the40thieves.dev/schemas/hub.json",
+  "tagline": "Search, read and cite across 152 public digital libraries from any MCP client: papers, books, law, government records, advisories, news and developer docs.",
+  "claim": {
+    "text": "152 sources in the registry (36 need a key or config), with nDCG@5 of 0.885 and recall@20 of 0.955 on the 81-query routing golden set.",
+    "source": "https://github.com/The-40-Thieves/alexandria-mcp/blob/main/docs/routing-eval.md",
+    "measured_on": "2026-11-02"
+  },
+  "install": {
+    "shell": "npx -y @the-40-thieves/alexandria-mcp",
+    "claude-code": "claude mcp add alexandria -- npx -y @the-40-thieves/alexandria-mcp",
+    "cursor": "{ \"mcpServers\": { \"alexandria\": { \"command\": \"npx\", \"args\": [\"-y\", \"@the-40-thieves/alexandria-mcp\"] } } }",
+    "vscode": "{ \"servers\": { \"alexandria\": { \"command\": \"npx\", \"args\": [\"-y\", \"@the-40-thieves/alexandria-mcp\"] } } }"
+  },
+  "docs": "docs/",
+  "listed": true
+}
