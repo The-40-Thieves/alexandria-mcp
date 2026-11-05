@@ -13,5 +13,6 @@
     "vscode": "{ \"servers\": { \"alexandria\": { \"command\": \"npx\", \"args\": [\"-y\", \"@the-40-thieves/alexandria-mcp\"] } } }"
   },
   "docs": "docs/",
+  "docs_site": true,
   "listed": true
 }
