@@ -1,0 +1,31 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "alexandria-mcp",
+  "description": "Search, read and cite across public digital libraries from any MCP client.",
+  "colors": {
+    "primary": "#7C3AED",
+    "light": "#A78BFA",
+    "dark": "#6D28D9"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Overview",
+        "pages": [
+          "index"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "answer-eval",
+          "cloudflare",
+          "fetch-tier-runtime",
+          "routing-eval",
+          "sources"
+        ]
+      }
+    ]
+  }
+}
